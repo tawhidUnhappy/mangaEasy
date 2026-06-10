@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Manga Panel Editor</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/editor.css') }}"
+    />
+  </head>
+  <body
+    data-storage-key="{{ storage_key }}"
+    data-min-panel="{{ min_panel | int }}"
+  >
+    <div id="toolbar">
+      <button id="saveBtn">💾 Save all panels (Ctrl+S)</button>
+      <button id="clearAllBtn" class="secondary">🧹 Clear all marks (C)</button>
+      <button id="autoBtn" class="secondary">🤖 Auto marks (R)</button>
+      <button id="finishBtn" class="danger">✅ Finish & Close (F)</button>
+      <span id="count">Panels: 0</span>
+      <span id="infoText">
+        Click = line → 2nd click = area · N = line after last area · Drag
+        top/bottom handles to adjust · Right-click area/line to delete · Esc
+        cancels pending line · Ctrl+S = save · S = split hovered panel · R
+        re-runs auto marks. Panels are always sorted top→bottom and saved that
+        way.
+      </span>
+      <span id="status"></span>
+    </div>
+
+    <div id="reader">
+      <div id="pages"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+  </body>
+</html>

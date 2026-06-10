@@ -1,0 +1,70 @@
+{
+  "_comment": "Copy to config.system.json and tune for your machine/project.",
+  "download_defaults": {
+    "translated_language": "en",
+    "use_data_saver": false,
+    "download_delay": 0.5
+  },
+  "bgm": {
+    "file": "music/background.mp3",
+    "volume_db": -34
+  },
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "background_image": "background_image/BACKGROUND.png",
+    "encoder": {
+      "nvenc_cq": 19,
+      "nvenc_preset": "p6",
+      "libx264_crf": 18,
+      "libx264_preset": "slow",
+      "aac_bitrate": "256k",
+      "bgm_bitrate": "192k"
+    }
+  },
+  "audio": {
+    "sample_rate": 48000,
+    "channels": 1,
+    "fade_in_ms": 15,
+    "fade_out_ms": 220,
+    "tail_silence_ms": 80
+  },
+  "paths": {
+    "panels_subdir": "panels",
+    "audio_subdir": "audio",
+    "processed_subdir": "panels_processed"
+  },
+  "process_panels": {
+    "upscale": false,
+    "upscale_factor": 4,
+    "mirror": false,
+    "hide_bubbles": false,
+    "inpaint_radius": 5
+  },
+  "watermark": {
+    "enabled": false,
+    "text": "MyChannel",
+    "opacity": 0.55,
+    "font_size": 48,
+    "padding": 20
+  },
+  "whisper": {
+    "model": "medium",
+    "device": "auto",
+    "compute": "float16"
+  },
+  "tts": {
+    "speaker_wav": "vocal/reference.wav",
+    "use_raw_narration": true
+  },
+  "ports": {
+    "cut_page": 5000,
+    "narration_editor": 5003,
+    "narration_editor_all": 5005,
+    "narration_review": 5006
+  },
+  "cut_page": {
+    "reading_direction": "rtl"
+  }
+}

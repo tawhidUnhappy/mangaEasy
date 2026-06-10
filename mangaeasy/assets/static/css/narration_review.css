@@ -1,0 +1,377 @@
+/* ── Reset & base ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #111118;
+  color: #dcdce8;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+#header {
+  height: 46px;
+  background: #1a1a30;
+  border-bottom: 1px solid #2a2a4a;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  flex-shrink: 0;
+  gap: 10px;
+  justify-content: space-between;
+}
+.header-left  { display: flex; align-items: center; gap: 10px; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+
+.title        { font-weight: 700; font-size: 15px; color: #fff; white-space: nowrap; }
+.manga-badge  {
+  font-size: 11px; font-weight: 700; color: #fff;
+  background: #4040b0; padding: 2px 10px; border-radius: 10px; white-space: nowrap;
+}
+.chapter-range { font-size: 11px; color: #666; white-space: nowrap; }
+.status-text   { font-size: 12px; color: #666; white-space: nowrap; }
+
+.note-count-badge {
+  font-size: 11px; font-weight: 700;
+  color: #f0a030;
+  background: #2a1e00;
+  padding: 2px 9px; border-radius: 10px;
+  white-space: nowrap;
+  display: none;
+}
+.note-count-badge.visible { display: inline-block; }
+
+/* ── Main layout (player | resizer | note panel) ────────────────────────────── */
+#main-area {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* Player column */
+#player-col {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: #111118;
+  overflow: hidden;
+}
+
+/* Drag resizer */
+#col-resizer {
+  width: 5px;
+  background: #1e1e38;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+#col-resizer:hover, #col-resizer.dragging { background: #4040b0; }
+
+/* Note column */
+#note-col {
+  width: 340px;
+  min-width: 200px;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  background: #16162a;
+  border-left: 1px solid #2a2a4a;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Image display ───────────────────────────────────────────────────────────── */
+#image-display {
+  flex: 1;
+  min-height: 0;
+  background: #08080f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#panelImg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: none;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+#panelImg.visible { display: block; }
+.no-image-msg { color: #333; font-size: 14px; }
+
+/* ── Narration text ──────────────────────────────────────────────────────────── */
+#narration-box {
+  padding: 8px 14px;
+  border-top: 1px solid #1e1e38;
+  background: #12121f;
+  flex-shrink: 0;
+  max-height: 88px;
+  overflow-y: auto;
+}
+#narration-box::-webkit-scrollbar { width: 4px; }
+#narration-box::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 2px; }
+
+.section-label {
+  font-size: 10px; font-weight: 700; color: #444;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+.narration-text {
+  font-size: 12px; color: #999; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────────────────── */
+#progress-area {
+  padding: 10px 14px 4px;
+  flex-shrink: 0;
+  background: #111118;
+}
+#progressBar {
+  height: 5px;
+  background: #252540;
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+  overflow: visible;
+  transition: height 0.15s;
+}
+#progressBar:hover { height: 7px; }
+#progressFill {
+  height: 100%;
+  background: #5050cc;
+  border-radius: 3px;
+  width: 0%;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+#progressThumb {
+  position: absolute;
+  top: 50%;
+  width: 13px; height: 13px;
+  background: #8888ee;
+  border-radius: 50%;
+  left: 0%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#progressBar:hover #progressThumb { opacity: 1; }
+.time-row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: #505068;
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Playback controls ───────────────────────────────────────────────────────── */
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 10px;
+  flex-shrink: 0;
+  background: #111118;
+  border-top: 1px solid #1a1a2e;
+}
+
+button {
+  border: none; cursor: pointer; border-radius: 4px;
+  font-size: 13px; color: #ccc; transition: background 0.12s, color 0.12s;
+}
+button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-ctrl {
+  background: #252540;
+  padding: 7px 12px;
+}
+.btn-ctrl:hover:not(:disabled) { background: #303055; color: #fff; }
+
+.btn-play {
+  background: #3838aa;
+  color: #fff;
+  padding: 8px 20px;
+  font-size: 16px;
+  border-radius: 50px;
+  min-width: 56px;
+}
+.btn-play:hover:not(:disabled) { background: #5050cc; }
+
+.btn-primary {
+  background: #3838aa;
+  color: #fff;
+  padding: 7px 14px;
+}
+.btn-primary:hover:not(:disabled) { background: #5050cc; }
+
+.btn-secondary {
+  background: #252540;
+  color: #aaa;
+  padding: 7px 12px;
+}
+.btn-secondary:hover:not(:disabled) { background: #303055; color: #fff; }
+
+.btn-danger {
+  background: #5a1a1a;
+  color: #ffaaaa;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+}
+.btn-danger:hover { background: #7a2a2a; color: #fff; }
+
+.speed-group {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: auto;
+}
+.speed-label { font-size: 11px; color: #555; }
+#speedSelect {
+  background: #252540; color: #ccc;
+  border: 1px solid #333355; border-radius: 4px;
+  padding: 5px 8px; font-size: 12px; cursor: pointer; outline: none;
+}
+#speedSelect:focus { border-color: #5050cc; }
+
+/* ── Segment bar (bottom track) ─────────────────────────────────────────────── */
+#segment-bar {
+  height: 50px;
+  background: #13132a;
+  border-top: 1px solid #2a2a4a;
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+#segment-bar::-webkit-scrollbar { height: 4px; }
+#segment-bar::-webkit-scrollbar-track { background: #0e0e1e; }
+#segment-bar::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 2px; }
+
+#segment-track {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.seg-divider {
+  font-size: 10px; font-weight: 700;
+  color: #5050aa;
+  padding: 0 8px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.seg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #1c1c38;
+  border: 1px solid #28284a;
+  border-radius: 4px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #7070a0;
+  flex-shrink: 0;
+  user-select: none;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.seg-chip:hover { background: #242448; color: #bbb; }
+.seg-chip.active {
+  background: #2a2a60;
+  border-color: #5050cc;
+  color: #fff;
+}
+.seg-note-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #f0a030;
+  flex-shrink: 0;
+  display: none;
+}
+.seg-chip.has-note .seg-note-dot { display: inline-block; }
+
+/* ── Note panel ──────────────────────────────────────────────────────────────── */
+#note-header {
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid #2a2a4a;
+  flex-shrink: 0;
+}
+.note-title { font-weight: 700; font-size: 13px; color: #8080cc; margin-bottom: 4px; }
+.note-image-id {
+  font-size: 11px; color: #555;
+  font-family: Consolas, 'Courier New', monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Lock overlay */
+#noteLockOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 8, 24, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+#noteLockOverlay.hidden { display: none; }
+.lock-icon { font-size: 28px; color: #303060; }
+.lock-text  { font-size: 13px; color: #404060; }
+
+#note-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 14px;
+}
+#noteTextarea {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background: #0e0e20;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  color: #d0d0ee;
+  padding: 10px 12px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.65;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#noteTextarea:focus  { border-color: #5050cc; }
+#noteTextarea:disabled { opacity: 0.3; cursor: not-allowed; }
+
+#note-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  border-top: 1px solid #2a2a4a;
+  flex-shrink: 0;
+}
+.note-save-status {
+  flex: 1;
+  font-size: 12px; color: #666;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.note-save-status.saved   { color: #50c050; }
+.note-save-status.unsaved { color: #d0a020; }
+.note-save-status.error   { color: #e05050; }

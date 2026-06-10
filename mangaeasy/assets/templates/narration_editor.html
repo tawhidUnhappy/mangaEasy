@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Narration Editor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narration_editor.css') }}" />
+  </head>
+
+  <body>
+    <div id="header">
+      <div class="title">Narration Editor</div>
+
+      <div class="header-right">
+        <div class="speech-controls">
+          <button id="micToggleBtn" class="primary" type="button">🎤 Start</button>
+          <span id="micStatus" class="status-bar">Mic: Off</span>
+          <span id="whisperStatus" class="status-bar"></span>
+        </div>
+
+        <span id="save-status" class="status-bar">All changes saved</span>
+        <div class="loader" id="loader"></div>
+      </div>
+    </div>
+
+    <div id="container">
+      <div id="left-pane">
+        <div class="pane-content">
+          <div class="info-row">
+            <span id="pageCounter">Page - of -</span>
+            <span id="imageFilename"></span>
+          </div>
+
+          <div class="speech-tab">
+            <div class="speech-title">Speech to Text</div>
+            <div class="speech-hint">Shortcut: <b>Insert</b> (Start/Stop)</div>
+
+            <div class="speech-actions">
+              <button id="insertModeBtn" type="button">Insert: Append</button>
+              <button id="clearLastBtn" type="button">Clear</button>
+            </div>
+
+            <div id="lastTranscript" class="speech-output">…</div>
+          </div>
+
+          <div class="editor-wrap">
+            <label for="narrationText">Narration Text (Auto-saves)</label>
+            <textarea id="narrationText" placeholder="Type here or use mic..."></textarea>
+          </div>
+        </div>
+
+        <div class="nav-bar">
+          <button id="prevBtn" type="button">&larr; Prev</button>
+          <button id="nextBtn" type="button">Next &rarr;</button>
+          <button id="finishBtn" class="danger" type="button">Finish & Close</button>
+        </div>
+      </div>
+
+      <div id="resizer"></div>
+
+      <div id="right-pane">
+        <img id="previewImage" class="preview" alt="Panel Image" style="display:none;" />
+        <div id="noImage" class="no-image">No Image Source</div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/narration_editor.js') }}"></script>
+  </body>
+</html>

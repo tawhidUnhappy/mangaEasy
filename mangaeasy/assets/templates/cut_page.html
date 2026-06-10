@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manga Cropper Toolkit</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cut_page.css') }}" />
+  </head>
+  <body>
+
+    <!-- ── Toolbar ── -->
+    <div id="toolbar">
+      <div id="info">
+        <button id="logToggleBtn" class="log-toggle" title="Toggle log terminal">📟
+          <span id="logUnreadBadge"></span>
+        </button>
+        <span id="mangaTitle">{{ manga }} - Chapter {{ chapter }}</span>
+        <span id="imageCounter">Image: 0 / 0</span>
+        <span id="panelCount" class="panel-count">0 panels</span>
+        <span id="totalPanelCount" class="total-panel-count"></span>
+        <span id="status">Ready</span>
+        <span id="gpuBadge" class="gpu-badge gpu-pending" title="Checking GPU…">⌛ GPU</span>
+      </div>
+
+      <div id="actions">
+        <span id="helpText"><b>L/R Arrows</b>: Prev/Next · <b>A</b>: AI Detect · <b>F</b>: Full Page · <b>Hold W</b>: Force Draw · <b>L</b>: Layers · <b>Alt+Click</b>: Cycle Overlap</span>
+        <button id="prevBtn" class="secondary">⬅ Prev</button>
+        <button id="nextBtn" class="secondary">Next ➡</button>
+        <span class="divider">|</span>
+        <button id="autoDetectBtn" class="secondary">🤖 AI Detect (A)</button>
+        <button id="autoAllBtn" class="secondary">🚀 Auto All</button>
+        <button id="fullPageBtn" class="secondary">📄 Full (F)</button>
+        <button id="undoBtn" class="secondary">↺ Undo</button>
+        <button id="clearBtn" class="secondary">🧹 Clear</button>
+        <span class="divider">|</span>
+        <button id="layerToggleBtn" class="secondary active" title="Toggle layer panel (L)">🔢 Layers</button>
+        <span class="divider">|</span>
+        <button id="cropAllBtn" class="primary">✅ Finish & Crop All</button>
+      </div>
+    </div>
+
+    <!-- ── Auto-All Progress Overlay ── -->
+    <div id="autoAllOverlay">
+      <div id="autoAllPanel">
+        <div id="autoAllTitle">🤖 AI Panel Detection — All Pages</div>
+        <div id="autoAllProgressRow">
+          <div id="autoAllBar"><div id="autoAllFill"></div></div>
+          <span id="autoAllPercent">0%</span>
+        </div>
+        <div id="autoAllCurrent">Loading MAGI v2 AI model…</div>
+        <div id="autoAllLog"></div>
+        <div id="autoAllActions">
+          <button id="autoAllStopBtn" class="danger">⏹ Stop</button>
+          <button id="autoAllCloseBtn" style="display:none;" class="primary">✅ Done — Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Main content: sidebar + workspace ── -->
+    <div id="mainContent">
+
+      <!-- Left log sidebar -->
+      <div id="logSidebar">
+        <div id="logSidebarHeader">
+          <span>📟 Terminal</span>
+          <button id="logClearBtn" type="button">Clear</button>
+        </div>
+        <div id="logBody"></div>
+      </div>
+
+      <!-- Canvas workspace -->
+      <div id="workspace">
+        <div id="canvas-container">
+          <!-- Canvas injected here by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Right layer sidebar -->
+      <div id="layerSidebar" class="open">
+        <div id="layerSidebarHeader">
+          <span>🔢 Layers <span id="layerCountBadge" class="layer-count-badge">0</span></span>
+          <button id="layerSortBtn" title="Re-apply reading-order sort to all panels">↕ Sort</button>
+        </div>
+
+        <!-- Properties panel (Figma-style inspect) -->
+        <div id="boxProps">
+          <div id="boxPropsEmpty" class="box-props-empty">Click a panel to inspect</div>
+          <div id="boxPropsForm" style="display:none;">
+            <div class="box-props-section">Position &amp; Size</div>
+            <div class="box-props-grid">
+              <div class="box-prop-field"><label>X</label><input type="number" id="propX" /></div>
+              <div class="box-prop-field"><label>Y</label><input type="number" id="propY" /></div>
+              <div class="box-prop-field"><label>W</label><input type="number" id="propW" /></div>
+              <div class="box-prop-field"><label>H</label><input type="number" id="propH" /></div>
+            </div>
+            <div class="box-props-section">Output Panel # <span class="box-prop-hint">blank = auto</span></div>
+            <div class="box-props-grid">
+              <div class="box-prop-field box-prop-full">
+                <input type="number" id="propPanelNum" placeholder="auto (follows order)" min="1" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="layerList"></div>
+      </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/cut_page.js') }}"></script>
+  </body>
+</html>

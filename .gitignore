@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build / env
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Local config (publish the *.example.json files instead)
+config.json
+config.system.json
+
+# Caches
+/.cache/
+/.hf_cache/
+
+# Generated runtime output
+/tmp/
+/tmp_video/
+/videos/
+/output_videos/
+/audio/
+/output/
+/work/
+/audio_preprocessed/
+/download_logs/
+*.log
+*.err
+*.out
+
+# User content and local media
+/manga/
+/static/
+/templates/
+/prompts/
+/music/
+/fonts/
+/background_image/
+/vocal/
+/upscale/
+/thumbnail/
+
+# External AI tools are sibling uv projects, not vendored here
+/kokoro-82m/
+/index-tts/
+/f5-tts/
+/magi-v3/
+
+# Editor / assistant local state
+.claude/
+.idea/
+.vscode/

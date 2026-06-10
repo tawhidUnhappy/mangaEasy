@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Narration Review — {{ manga_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narration_review.css') }}" />
+  </head>
+
+  <body>
+
+    <!-- ── Header ────────────────────────────────────────────────────────── -->
+    <div id="header">
+      <div class="header-left">
+        <span class="title">Narration Review</span>
+        <span class="manga-badge">{{ manga_name }}</span>
+        <span class="chapter-range">Ch.{{ start_ch }} – {{ end_ch }}</span>
+      </div>
+      <div class="header-right">
+        <span id="segmentLabel" class="status-text">Loading…</span>
+        <span id="noteCountLabel" class="note-count-badge" title="Panels with notes"></span>
+        <button id="closeBtn" class="btn-danger" type="button">Close</button>
+      </div>
+    </div>
+
+    <!-- ── Main area (player | resizer | note panel) ─────────────────────── -->
+    <div id="main-area">
+
+      <!-- Left: video player column -->
+      <div id="player-col">
+
+        <!-- Panel image -->
+        <div id="image-display">
+          <img id="panelImg" alt="Panel" />
+          <div id="noImageMsg" class="no-image-msg">No segments loaded</div>
+        </div>
+
+        <!-- Narration text (context, read-only) -->
+        <div id="narration-box">
+          <div class="section-label">Narration</div>
+          <div id="narrationText" class="narration-text">&nbsp;</div>
+        </div>
+
+        <!-- Progress bar -->
+        <div id="progress-area">
+          <div id="progressBar" role="slider" aria-label="Seek" tabindex="0">
+            <div id="progressFill"></div>
+            <div id="progressThumb"></div>
+          </div>
+          <div class="time-row">
+            <span id="timeElapsed">0:00</span>
+            <span id="timeTotal">–:––</span>
+          </div>
+        </div>
+
+        <!-- Playback controls -->
+        <div id="controls">
+          <button id="prevBtn" class="btn-ctrl" type="button" title="Previous segment (←)">&#9664;&#9664;</button>
+          <button id="playPauseBtn" class="btn-play" type="button" title="Play / Pause (Space)">&#9654;</button>
+          <button id="nextBtn" class="btn-ctrl" type="button" title="Next segment (→)">&#9654;&#9654;</button>
+          <div class="speed-group">
+            <label class="speed-label" for="speedSelect">Speed</label>
+            <select id="speedSelect">
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </div>
+
+      </div><!-- /player-col -->
+
+      <!-- Drag resizer -->
+      <div id="col-resizer"></div>
+
+      <!-- Right: feedback note column -->
+      <div id="note-col">
+
+        <div id="note-header">
+          <div class="note-title">Feedback Note</div>
+          <div id="noteImageLabel" class="note-image-id">—</div>
+        </div>
+
+        <!-- Semi-transparent overlay shown while video is playing -->
+        <div id="noteLockOverlay">
+          <div class="lock-icon">&#9654;</div>
+          <div class="lock-text">Pause to take notes</div>
+        </div>
+
+        <div id="note-body">
+          <textarea
+            id="noteTextarea"
+            placeholder="Write what's wrong with this narration…&#10;&#10;Examples:&#10;• Wrong speaker identified&#10;• Incorrect emotion / tone&#10;• Missing context&#10;• Inaccurate panel description&#10;• Mistimed dialogue"
+            disabled
+          ></textarea>
+        </div>
+
+        <div id="note-footer">
+          <span id="noteSaveStatus" class="note-save-status"></span>
+          <button id="clearNoteBtn" class="btn-secondary" type="button" title="Clear this note">Clear</button>
+          <button id="saveNoteBtn" class="btn-primary" type="button" title="Save note (Ctrl+S)" disabled>Save Note</button>
+        </div>
+
+      </div><!-- /note-col -->
+
+    </div><!-- /main-area -->
+
+    <!-- ── Segment track (bottom bar) ────────────────────────────────────── -->
+    <div id="segment-bar">
+      <div id="segment-track"></div>
+    </div>
+
+    <!-- Hidden audio element -->
+    <audio id="audioPlayer" preload="auto"></audio>
+
+    <!-- Inject server-side data for JS -->
+    <script>
+      window._REVIEW = {
+        mangaName: {{ manga_name | tojson }},
+        total:     {{ total }},
+      };
+    </script>
+    <script src="{{ url_for('static', filename='js/narration_review.js') }}"></script>
+
+  </body>
+</html>

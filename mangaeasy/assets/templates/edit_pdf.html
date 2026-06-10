@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Edit Panels</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/edit_pdf.css') }}"
+    />
+  </head>
+  <body>
+    <div class="topbar">
+      <button class="btn" id="prevBtn">◀ Prev</button>
+      <button class="btn" id="nextBtn">Next ▶</button>
+
+      <span class="title">
+        <span class="muted">{{ pdf_name }}</span>
+        • Page <b id="pnum"></b> / <b id="ptotal"></b>
+      </span>
+
+      <span class="muted tips">
+        Arrow keys: <span class="kbd">←</span>/<span class="kbd">→</span> •
+        Mode: <span class="kbd">L</span> link • <span class="kbd">T</span> text
+        • Delete: <span class="kbd">Del</span>/<span class="kbd"
+          >Backspace</span
+        >
+        • Undo: <span class="kbd">Z</span> • Cancel:
+        <span class="kbd">Esc</span> • Finish: <span class="kbd">F</span> •
+        Clear cache: <span class="kbd">K</span>
+      </span>
+
+      <span class="spacer"></span>
+
+      <button class="btn" id="saveBtn">Save</button>
+      <button class="btn primary" id="exportBtn">Export PDF</button>
+      <button
+        class="btn danger"
+        id="finishBtn"
+        title="Burn marks to chapter_{chapter}_mark.pdf then stop server (F)"
+      >
+        Finish (F)
+      </button>
+    </div>
+
+    <div class="wrap" id="wrap">
+      <div class="panel side" id="sidePanel">
+        <div class="muted">Mode: <span id="modepill" class="pill"></span></div>
+
+        <div class="row" style="margin-top: 8px">
+          <button class="btn" id="modeLinkBtn">Link mode (L)</button>
+          <button class="btn" id="modeTextBtn">Text mode (T)</button>
+        </div>
+
+        <div class="block">
+          <div class="muted">Default label for new links (optional)</div>
+          <textarea
+            id="defaultLabel"
+            class="labelbox"
+            rows="2"
+            placeholder="e.g., Alice"
+          ></textarea>
+        </div>
+
+        <div class="block">
+          <div class="muted">Default free text (Text mode)</div>
+          <textarea
+            id="defaultText"
+            class="labelbox"
+            rows="3"
+            placeholder="Type text here, press T, then click on the panel to place it."
+          ></textarea>
+        </div>
+
+        <div class="block">
+          <div class="muted">Selected item</div>
+          <div class="selectedRow">
+            <span id="selectedInfo" class="pill">None</span>
+            <button class="btn danger" id="deleteBtn">Delete</button>
+          </div>
+
+          <div class="muted" style="margin-top: 8px">
+            Text / Label for selected
+          </div>
+          <textarea
+            id="selectedText"
+            class="labelbox"
+            rows="3"
+            placeholder="Select an item, then type here…"
+          ></textarea>
+
+          <div class="muted hint">
+            Links: label drawn near speaker. Text items: drawn at their
+            position.
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="cancelBtn">Cancel pending</button>
+          <button class="btn" id="undoBtn">Undo</button>
+          <button class="btn" id="clearBtn">Clear page</button>
+        </div>
+
+        <div class="row">
+          <button
+            class="btn"
+            id="clearCacheBtn"
+            title="Clear browser local cache for this chapter"
+          >
+            Clear local cache
+          </button>
+        </div>
+
+        <div class="muted block">Items:</div>
+        <div id="itemlist" class="list"></div>
+      </div>
+
+      <div id="resizer" class="resizer" title="Drag to resize sidebar"></div>
+
+      <div class="panel main">
+        <div class="stage">
+          <div class="pagebox">
+            <img id="pageimg" alt="panel page" />
+            <canvas id="overlay"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      window.__PAGE_INDEX__ = {{ page_index }};
+      window.__PAGE_COUNT__ = {{ page_count }};
+      window.__DOC_KEY__ = {{ (doc_key|default(""))|tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='js/edit_pdf.js') }}"></script>
+  </body>
+</html>

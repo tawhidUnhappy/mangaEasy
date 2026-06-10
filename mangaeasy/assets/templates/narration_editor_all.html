@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Narration Editor — All Chapters</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/narration_editor_all.css') }}" />
+  </head>
+
+  <body>
+    <div id="header">
+      <div class="header-left">
+        <div class="title">Narration Editor</div>
+        <span id="chapterBadge" class="chapter-badge"></span>
+      </div>
+
+      <div class="header-right">
+        <div class="speech-controls">
+          <button id="micToggleBtn" class="primary" type="button">🎤 Start</button>
+          <span id="micStatus" class="status-bar">Mic: Off</span>
+          <span id="whisperStatus" class="status-bar"></span>
+        </div>
+        <span id="save-status" class="status-bar">All changes saved</span>
+        <div class="loader" id="loader"></div>
+      </div>
+    </div>
+
+    <div id="container">
+
+      <!-- Left: editor controls -->
+      <div id="left-pane">
+        <div class="pane-content">
+          <div class="info-row">
+            <span id="pageCounter">Page - of -</span>
+            <span id="imageFilename"></span>
+          </div>
+
+          <div class="speech-tab">
+            <div class="speech-title">Speech to Text</div>
+            <div class="speech-hint">Shortcut: <b>Insert</b> (Start/Stop)</div>
+            <div class="speech-actions">
+              <button id="insertModeBtn" type="button">Insert: Append</button>
+              <button id="clearLastBtn" type="button">Clear</button>
+            </div>
+            <div id="lastTranscript" class="speech-output">…</div>
+          </div>
+
+          <div class="editor-wrap">
+            <label for="narrationText">Narration Text (Auto-saves)</label>
+            <textarea id="narrationText" placeholder="Type here or use mic..."></textarea>
+          </div>
+        </div>
+
+        <div class="nav-bar">
+          <button id="prevBtn" type="button">&larr; Prev</button>
+          <button id="nextBtn" type="button">Next &rarr;</button>
+          <button id="finishBtn" class="danger" type="button">Finish &amp; Close</button>
+        </div>
+      </div>
+
+      <div id="resizer-left" class="resizer"></div>
+
+      <!-- Center: image preview -->
+      <div id="center-pane">
+        <img id="previewImage" class="preview" alt="Panel Image" style="display:none;" />
+        <div id="noImage" class="no-image">No Image Source</div>
+      </div>
+
+      <div id="resizer-right" class="resizer"></div>
+
+      <!-- Right: panel navigator -->
+      <div id="panel-nav">
+        <div id="panel-nav-header">
+          <div class="panel-nav-title">Panel Navigator</div>
+          <div class="panel-jump-row">
+            <input
+              id="panelJumpInput"
+              type="text"
+              placeholder="Panel # or filename…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="panelJumpBtn" type="button">Go</button>
+          </div>
+          <div id="panel-match-count" class="panel-match-count"></div>
+        </div>
+        <div id="panel-list"></div>
+      </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/narration_editor_all.js') }}"></script>
+  </body>
+</html>

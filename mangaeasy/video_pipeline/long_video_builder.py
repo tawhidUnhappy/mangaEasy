@@ -1,0 +1,240 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from mangaeasy.video_pipeline.common import item_number, merge_item_selection, project_name
+from mangaeasy.video_pipeline.ffmpeg_tools import (
+    choose_h264_encoder,
+    h264_encoder_args,
+    run,
+    validate_video_stream,
+    write_concat_file,
+)
+
+
+ITEM_VIDEO_RE = re.compile(r"^(?:item|chapter)_(\d+)\.mp4$", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class LongVideoConfig:
+    project_root: Path
+    output_root: Path
+    work_dir: Path
+    project_name_override: str | None = None
+    input_dir: Path | None = None
+    output: Path | None = None
+    start: str = "01"
+    end: str | None = None
+    items: list[str] | None = None
+    item_range: str | None = None
+    overwrite: bool = False
+    reencode: bool = False
+    copy_all: bool = False
+    encoder: str = "auto"
+    preset: str = "p1"
+    cq: int = 18
+    audio_bitrate: str = "128k"
+    narration_dir: Path | None = None
+    background_music: Path | None = None
+    music_volume: float = 0.035
+    narration_volume: float = 1.0
+
+
+def output_path(config: LongVideoConfig) -> Path:
+    name = project_name(config.project_root, config.project_name_override)
+    return (config.output or (config.output_root / name / f"{name}_full.mp4")).resolve()
+
+
+def project_work_dir(config: LongVideoConfig) -> Path:
+    return config.work_dir.resolve() / project_name(config.project_root, config.project_name_override)
+
+
+def input_dir(config: LongVideoConfig) -> Path:
+    name = project_name(config.project_root, config.project_name_override)
+    if config.input_dir is not None:
+        return config.input_dir.resolve()
+    current = (config.output_root / name / "items").resolve()
+    legacy = (config.output_root / name / "chapters").resolve()
+    return legacy if legacy.exists() and not current.exists() else current
+
+
+def discover_chapters(folder: Path) -> dict[int, Path]:
+    chapters = {}
+    for path in list(folder.glob("item_*.mp4")) + list(folder.glob("chapter_*.mp4")):
+        match = ITEM_VIDEO_RE.match(path.name)
+        if match:
+            chapters[int(match.group(1))] = path
+    return chapters
+
+
+def selected_range(config: LongVideoConfig, chapters: dict[int, Path]) -> tuple[int, int]:
+    selected = merge_item_selection(config.items, config.item_range)
+    if selected:
+        return min(item_number(chapter) for chapter in selected), max(item_number(chapter) for chapter in selected)
+    return item_number(config.start), item_number(config.end) if config.end else max(chapters)
+
+
+def chapter_narration_files(narration_dir: Path, start: int, end: int) -> list[Path]:
+    files: list[Path] = []
+    for number in range(start, end + 1):
+        path = narration_dir / f"item_{number:02d}_narration.wav"
+        if not path.exists():
+            legacy = narration_dir / f"chapter_{number:02d}_narration.wav"
+            path = legacy if legacy.exists() else path
+        if not path.exists():
+            raise FileNotFoundError(f"Missing item narration WAV: {path}")
+        files.append(path)
+    return files
+
+
+def build_full_narration_wav(paths: list[Path], work_dir: Path, output_name: str) -> Path:
+    output = work_dir / f"{Path(output_name).stem}_narration.wav"
+    audio_list = write_concat_file(paths, work_dir / f"{Path(output_name).stem}_audio.ffconcat")
+    run(
+        [
+            "ffmpeg", "-hide_banner", "-y", "-guess_layout_max", "0",
+            "-f", "concat", "-safe", "0", "-i", str(audio_list),
+            "-af", "aformat=channel_layouts=mono,aresample=48000",
+            "-c:a", "pcm_s16le", str(output),
+        ]
+    )
+    return output
+
+
+def build_video_only_copy(input_path: Path, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    run(
+        [
+            "ffmpeg", "-hide_banner", "-y",
+            "-i", str(input_path),
+            "-map", "0:v:0",
+            "-c:v", "copy",
+            "-an",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+    )
+    return output_path
+
+
+def video_only_chapter_files(paths: list[Path], work_dir: Path) -> list[Path]:
+    clean_dir = work_dir / "long_video_only_items"
+    clean_paths: list[Path] = []
+    for path in paths:
+        clean_path = clean_dir / path.name
+        clean_paths.append(build_video_only_copy(path, clean_path))
+    return clean_paths
+
+
+def mixed_audio_filter(narration_volume: float, music_volume: float, narration_input: int, music_input: int) -> str:
+    return (
+        f"[{narration_input}:a]volume={narration_volume},"
+        "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narr];"
+        f"[{music_input}:a]volume={music_volume},"
+        "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[music];"
+        "[narr][music]amix=inputs=2:duration=first:dropout_transition=3,"
+        "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
+    )
+
+
+def narration_only_filter(narration_volume: float) -> str:
+    return (
+        f"[1:a]volume={narration_volume},"
+        "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,"
+        "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
+    )
+
+
+def video_codec_args(config: LongVideoConfig) -> list[str]:
+    if not config.reencode:
+        return ["-c:v", "copy"]
+    return h264_encoder_args(choose_h264_encoder(config.encoder), config.preset, config.cq)
+
+
+def validate_config(config: LongVideoConfig) -> None:
+    if config.background_music is not None and not config.background_music.exists():
+        raise FileNotFoundError(f"Background music does not exist: {config.background_music}")
+    if config.music_volume < 0 or config.narration_volume < 0:
+        raise ValueError("Audio volumes must be non-negative.")
+
+
+def build_long_video(config: LongVideoConfig) -> Path:
+    validate_config(config)
+    out_path = output_path(config)
+    work_dir = project_work_dir(config)
+    if out_path.exists() and not config.overwrite:
+        raise FileExistsError(f"Output exists. Use --overwrite: {out_path}")
+
+    chapters = discover_chapters(input_dir(config))
+    if not chapters:
+        raise FileNotFoundError(f"No item_*.mp4 files found in {input_dir(config)}")
+    start, end = selected_range(config, chapters)
+    missing = [n for n in range(start, end + 1) if n not in chapters]
+    if missing:
+        raise FileNotFoundError("Missing item videos: " + ", ".join(f"{n:02d}" for n in missing))
+
+    selected = [chapters[n] for n in range(start, end + 1)]
+    for path in selected:
+        validate_video_stream(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    base = ["ffmpeg", "-hide_banner", "-y" if config.overwrite else "-n"]
+    narration_input: list[str] = []
+    music_input: list[str] = []
+    full_narration = None
+    if config.narration_dir is not None:
+        full_narration = build_full_narration_wav(
+            chapter_narration_files(config.narration_dir.resolve(), start, end),
+            work_dir,
+            out_path.name,
+        )
+        narration_input = ["-guess_layout_max", "0", "-i", str(full_narration)]
+
+    video_inputs = video_only_chapter_files(selected, work_dir) if full_narration is not None else selected
+    concat_path = write_concat_file(video_inputs, work_dir / f"{out_path.stem}.ffconcat")
+    print(f"Joining {len(selected)} item video(s): {start:02d} through {end:02d}", flush=True)
+    inputs = ["-fflags", "+genpts", "-f", "concat", "-safe", "0", "-i", str(concat_path)]
+
+    if config.background_music is not None and full_narration is not None:
+        music_input = ["-guess_layout_max", "0", "-stream_loop", "-1", "-i", str(config.background_music.resolve())]
+        output_args = [
+            "-filter_complex", mixed_audio_filter(config.narration_volume, config.music_volume, 1, 2),
+            "-map", "0:v:0", "-map", "[a]", *video_codec_args(config),
+            "-c:a", "aac", "-b:a", config.audio_bitrate,
+            "-movflags", "+faststart", str(out_path),
+        ]
+    elif full_narration is not None:
+        output_args = [
+            "-filter_complex", narration_only_filter(config.narration_volume),
+            "-map", "0:v:0", "-map", "[a]", *video_codec_args(config),
+            "-c:a", "aac", "-b:a", config.audio_bitrate,
+            "-movflags", "+faststart", str(out_path),
+        ]
+    elif config.background_music is not None:
+        music_input = ["-guess_layout_max", "0", "-stream_loop", "-1", "-i", str(config.background_music.resolve())]
+        output_args = [
+            "-filter_complex", mixed_audio_filter(config.narration_volume, config.music_volume, 0, 1),
+            "-map", "0:v:0", "-map", "[a]", *video_codec_args(config),
+            "-c:a", "aac", "-b:a", config.audio_bitrate,
+            "-movflags", "+faststart", str(out_path),
+        ]
+    elif config.reencode:
+        output_args = [
+            *video_codec_args(config),
+            "-c:a", "aac", "-b:a", config.audio_bitrate,
+            "-movflags", "+faststart", str(out_path),
+        ]
+    elif config.copy_all:
+        output_args = ["-c", "copy", "-movflags", "+faststart", str(out_path)]
+    else:
+        output_args = [
+            "-fflags", "+genpts", "-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy",
+            "-c:a", "aac", "-b:a", config.audio_bitrate,
+            "-af", "aresample=async=1:first_pts=0", "-movflags", "+faststart", str(out_path),
+        ]
+
+    run(base + inputs + narration_input + music_input + output_args)
+    print(f"\nLong video written to: {out_path}", flush=True)
+    return out_path

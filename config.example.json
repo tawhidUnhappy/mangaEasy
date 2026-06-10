@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to config.json for the legacy manga chapter tools.",
+  "download": {
+    "manga_id": "https://mangadex.org/title/your-title-id",
+    "name": "my_manga",
+    "chapter": 1
+  }
+}

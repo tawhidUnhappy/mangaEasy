@@ -1,0 +1,223 @@
+:root {
+  --sidew: 380px;
+  --sidew-min: 320px;
+  --sidew-max: 560px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0f1115;
+  color: #e8e8e8;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* App layout: let the editor area take the remaining viewport height */
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  /* Keep the app inside the viewport; panels manage their own scrolling */
+  overflow: hidden;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #141824;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  z-index: 10;
+}
+
+.title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50vw; }
+.muted { color: rgba(255,255,255,0.65); }
+.spacer { flex: 1; }
+
+.tips { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.25);
+  margin: 0 2px;
+}
+
+.btn {
+  background: rgba(255,255,255,0.06);
+  color: #e8e8e8;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.btn:hover { filter: brightness(1.12); }
+.btn.active { box-shadow: 0 0 0 2px rgba(0,200,255,0.35) inset; }
+
+.btn.primary {
+  background: rgba(0,120,255,0.25);
+  border-color: rgba(0,120,255,0.5);
+}
+.btn.danger {
+  background: rgba(255, 60, 60, 0.18);
+  border-color: rgba(255, 60, 60, 0.45);
+}
+
+.wrap {
+  display: grid;
+  grid-template-columns: var(--sidew) 8px 1fr;
+  grid-template-rows: 1fr;
+  /* take remaining height under the topbar */
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.panel.side {
+  border-right: 1px solid rgba(255,255,255,0.08);
+  padding: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+
+/* Sidebar resizer (Canva-like) */
+.resizer{
+  width: 8px;
+  cursor: col-resize;
+  background: rgba(255,255,255,0.04);
+  position: relative;
+}
+.resizer::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:2px;
+  height:40px;
+  transform:translate(-50%,-50%);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.22);
+}
+.resizer:hover{
+  background: rgba(255,255,255,0.08);
+}
+body.resizing, body.resizing *{
+  cursor: col-resize !important;
+  user-select:none !important;
+}
+
+.panel.main {
+  padding: 8px;
+  box-sizing: border-box;
+  /* allow scroll if needed, but default view scales to fit */
+  overflow: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.block { margin: 12px 0; }
+
+.labelbox {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  color: #e8e8e8;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px;
+  outline: none;
+  resize: vertical;
+}
+
+.pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.stage {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.pagebox {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  max-height: 100%;
+  /* ensure it can shrink inside flex containers */
+  min-width: 0;
+  min-height: 0;
+}
+
+#pageimg {
+  display: block;
+  /* Fit both width and height of the available panel area */
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* nicer scrollbars */
+.panel.side, .panel.main {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) rgba(255,255,255,0.06);
+}
+
+#overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+}
+
+/* Responsive: on narrow screens, stack sidebar above editor */
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .panel.side { max-height: 42vh; }
+}
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+}
+.item.sel { border-color: rgba(0,200,255,0.6); }
+.actions { display: flex; gap: 6px; margin-top: 8px; }
+.smallbtn { padding: 5px 8px; border-radius: 10px; font-size: 12px; }
+.hint { font-size: 12px; }
+.selectedRow { display: flex; align-items: center; gap: 8px; }
+
+/* Avoid horizontal scroll in sidebar */
+.panel.side, .panel.side *{
+  box-sizing: border-box;
+}
+.panel.side .labelbox, .panel.side textarea{
+  width: 100%;
+  max-width: 100%;
+}
+.item, .muted, .tips{
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
