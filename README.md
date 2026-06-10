@@ -258,9 +258,9 @@ globally but your models live elsewhere):
 
 ```bash
 # Windows (PowerShell)
-$env:KOKORO_ROOT    = "D:\kokoro-82m"
-$env:INDEX_TTS_ROOT = "D:\index-tts"
-$env:MAGI_V3_ROOT   = "D:\magi-v3"
+$env:KOKORO_ROOT    = "D:/kokoro-82m"
+$env:INDEX_TTS_ROOT = "D:/index-tts"
+$env:MAGI_V3_ROOT   = "D:/magi-v3"
 ```
 
 ```bash
@@ -293,7 +293,7 @@ If the tool is installed globally but your project files live elsewhere, run
 commands from the project folder or set:
 
 ```bash
-$env:MANGAEASY_PROJECT_ROOT = "D:\my-manga-project"   # PowerShell
+$env:MANGAEASY_PROJECT_ROOT = "D:/my-manga-project"   # PowerShell
 export MANGAEASY_PROJECT_ROOT=~/my-manga-project       # bash
 ```
 

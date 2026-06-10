@@ -129,9 +129,9 @@ def main() -> int:
         print(f"  {tool_name:10s} {status}  ({', '.join(env_vars)})")
     print()
     print("Install tools as sibling uv projects when you need them, for example:")
-    print("  .\\kokoro-82m")
-    print("  .\\index-tts")
-    print("  .\\magi-v3")
+    print("  ./kokoro-82m")
+    print("  ./index-tts")
+    print("  ./magi-v3")
     print("Each tool keeps its own .venv and Python.")
     return 0
 
