@@ -51,7 +51,7 @@ os.environ.setdefault("HF_DATASETS_OFFLINE", "0")
 
 # Speaker reference WAV — from config.system.json → tts.speaker_wav
 _tts_cfg         = load_system_config().get("tts", {})
-SPEAKER_WAV      = PROJECT_ROOT / _tts_cfg.get("speaker_wav", "vocal/manga[vocal]2.wav")
+SPEAKER_WAV      = PROJECT_ROOT / _tts_cfg.get("speaker_wav", "vocal/manga[vocal2].wav")
 USE_RAW_NARRATION = bool(_tts_cfg.get("use_raw_narration", False))
 
 # ── Import IndexTTS2 ──────────────────────────────────────────────────────────
@@ -101,11 +101,12 @@ def generate_missing_audio() -> None:
 
     try:
         print("[INFO] Loading IndexTTS2 model...")
+        use_cuda = device == "cuda"
         tts = IndexTTS2(
             cfg_path=str(INDX_CFG_PATH),
             model_dir=str(INDX_MODEL_DIR),
-            use_fp16=True,
-            use_cuda_kernel=True,
+            use_fp16=use_cuda,
+            use_cuda_kernel=use_cuda,
             use_deepspeed=False,
         )
         print("[INFO] IndexTTS2 loaded.")

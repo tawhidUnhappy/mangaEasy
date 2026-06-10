@@ -32,6 +32,8 @@ Usage:
 - [Features](#features)
 - [Requirements](#requirements)
 - [Install](#install)
+- [The desktop app](#the-desktop-app)
+- [Install the AI tools (one command)](#install-the-ai-tools-one-command)
 - [Quick start: image folders → video](#quick-start-image-folders--video)
 - [The `mangaeasy` command](#the-mangaeasy-command)
 - [External AI tools](#external-ai-tools)
@@ -47,12 +49,17 @@ Usage:
 ## Features
 
 - **One command, many tools** — `mangaeasy <subcommand>`, discoverable via `--help`.
+- **Desktop app** — `mangaeasy app` opens a control center: install AI tools with
+  one click, edit configs, run the pipeline, and launch editors with live logs.
+- **One-command AI tool install** — `mangaeasy install-tool index-tts` clones the
+  latest version from GitHub and builds its isolated environment for you.
 - **General item-based video pipeline** — point it at numbered folders of images +
   `narration.json` and get per-item videos plus an optional joined long video.
-- **Isolated AI tools** — Kokoro / IndexTTS / F5-TTS / MAGI run in their own `uv`
+- **Isolated AI tools** — Kokoro / IndexTTS / MAGI run in their own `uv`
   environments so their Torch/CUDA stacks never clash with the core install.
-- **Hardware-aware encoding** — `--encoder auto` picks NVENC, AMF, Quick Sync,
-  VideoToolbox, or falls back to `libx264`. `--device auto` uses CUDA when present.
+- **Hardware-aware everything** — `--encoder auto` picks NVENC, AMF, Quick Sync,
+  VideoToolbox, or falls back to `libx264`; `--tts auto` uses IndexTTS (voice
+  cloning) on NVIDIA GPU machines and Kokoro on CPU machines.
 - **Legacy manga workflow included** — MangaDex download, page-cutting and
   narration web editors, watermarking, PDF export, and more.
 - **Cross-platform** — Windows, macOS, and Linux.
@@ -62,9 +69,15 @@ Usage:
 - Python **3.10+**
 - [`uv`](https://docs.astral.sh/uv/) (recommended installer/runner)
 - **FFmpeg** and **FFprobe** on your `PATH`
-- *(optional)* an NVIDIA / AMD / Intel / Apple GPU encoder exposed by your FFmpeg build
-- *(optional)* external TTS / detection tools as sibling `uv` projects — see
-  [External AI tools](#external-ai-tools)
+- *(optional)* external TTS / detection tools — installed for you by
+  [`mangaeasy install-tool`](#install-the-ai-tools-one-command)
+
+**A GPU is not required.** Everything runs on plain CPUs (Windows, macOS,
+Linux): video encoding falls back to `libx264`, and the AI tool installers
+automatically pick CPU builds when no NVIDIA GPU is present. With an NVIDIA /
+AMD / Intel / Apple GPU you get hardware video encoding, and with an NVIDIA GPU
+the TTS and panel-detection models run much faster — but none of it is needed
+to use the tool.
 
 ## Install
 
@@ -103,6 +116,46 @@ uv sync --extra whisper   # faster-whisper
 uv sync --extra ml        # torch, transformers, opencv, MAGI deps, ...
 uv sync --extra all        # everything above
 ```
+
+## The desktop app
+
+```bash
+mangaeasy app
+```
+
+Opens a native window (falls back to your browser with `--browser` or when no GUI
+backend is available) with everything in one place:
+
+- **Setup** — checks git / uv / FFmpeg / GPU, shows which AI tools are installed,
+  and installs them with one click while streaming the logs live.
+- **Project** — pick your project folder and edit `config.json` /
+  `config.system.json` with forms, no manual JSON wrangling.
+- **Run** — run the full video pipeline (or any single step) and chapter commands
+  with dropdowns and checkboxes; watch progress in the built-in log console.
+- **Editors** — launch the panel / narration web editors with one click.
+
+See [docs/app.md](docs/app.md) for details.
+
+## Install the AI tools (one command)
+
+The heavy AI models (TTS, panel detection) live in their **own isolated
+environments** so they never break the main install. Check what your system has
+and provision what's missing:
+
+```bash
+mangaeasy doctor                  # prerequisite + tool status report
+mangaeasy install-tool index-tts  # IndexTTS-2 voice-cloning TTS (clone + env + model)
+mangaeasy install-tool magi-v3    # MAGI v3 manga panel detection (env + adapter)
+```
+
+Tools install into `~/.mangaeasy/tools` and are found automatically from any
+folder. The installer **detects your hardware**: with an NVIDIA GPU it uses
+CUDA builds, otherwise it picks CPU builds that work on any machine (force
+either with `--cuda` / `--cpu`). Other flags: `--ref <branch/tag>` to pin a
+version, `--skip-model` to skip the big weight download. The same installs are
+available as buttons in `mangaeasy app`.
+
+See [docs/install-tools.md](docs/install-tools.md) for what each installer does.
 
 ## Quick start: image folders → video
 
@@ -150,8 +203,12 @@ mangaeasy video-join     --project-root content --project-name my_project --item
 mangaeasy video-validate --project-root content --project-name my_project --item-range 01-24 --require-long
 ```
 
-> Audio generation uses Kokoro by default and expects a sibling `kokoro-82m`
-> environment. See [External AI tools](#external-ai-tools).
+> **TTS engine:** `mangaeasy video` picks the best engine for your machine —
+> **IndexTTS** (voice cloning, highest quality) when you have an NVIDIA GPU and
+> have run `mangaeasy install-tool index-tts`, otherwise **Kokoro** (light,
+> great on CPU). Force one with `--tts indextts` / `--tts kokoro`. IndexTTS
+> clones the voice from a reference WAV (`config.system.json → tts.speaker_wav`
+> or `--speaker-wav`); Kokoro uses the built-in `af_heart` voice.
 
 ## The `mangaeasy` command
 
@@ -167,8 +224,9 @@ Command groups:
 
 | Group | What it covers |
 |-------|----------------|
+| **Setup & app** | `app` (desktop control center), `doctor` (environment report), `install-tool` (provision AI tools from GitHub). |
 | **Video pipeline** | `video`, `video-audio`, `video-render`, `video-join`, `video-check`, `video-validate`, and audio/clean helpers — the general image-folder workflow. |
-| **External tools** | `tools` (show where envs resolve), `index-tts`, `f5-tts`. |
+| **External tools** | `tools` (show where envs resolve), `index-tts`. |
 | **Manga: acquire** | `download`, `cut-page`, `panel-editor`, `gutter-split`, `process-panels`. |
 | **Manga: narration** | `narration-editor`, `narration-editor-all`, `narration-review`, `join-narration`, `normalize-narration`, `clean-narration`, `backup-narration`, `rename-file`. |
 | **Manga: render** | `render-video`, `add-bgm`, `join-chapters`, `timestamps`, `to-pdf`, `watermark`, `convert-images`, … |
@@ -176,20 +234,20 @@ Command groups:
 
 ## External AI tools
 
-The heavy model tools are kept as **sibling `uv` projects** so their large,
-conflicting dependency stacks never touch the core install. The recommended
-workspace layout:
+The heavy model tools are kept in **their own isolated `uv` environments** so
+their large, conflicting dependency stacks never touch the core install. The
+easiest way to get them is [`mangaeasy install-tool`](#install-the-ai-tools-one-command),
+which puts them in the managed folder:
 
 ```text
-workspace/
-  mangaEasy/      # this project (or just the installed tool)
-  kokoro-82m/     # Kokoro TTS  (uv project)
-  index-tts/      # IndexTTS     (uv project, optional)
-  f5-tts/         # F5-TTS       (uv project, optional)
-  magi-v3/        # MAGI panel detection (uv project, optional)
+~/.mangaeasy/tools/
+  index-tts/      # IndexTTS-2  (cloned uv project + model checkpoints)
+  magi-v3/        # MAGI v3 panel detection (generated env + detect_magi.py)
+  kokoro-82m/     # Kokoro TTS  (generated env, default voice af_heart)
 ```
 
-`mangaeasy` auto-detects siblings by folder name. Check what resolves:
+Sibling folders next to your project (`./index-tts`, `./magi-v3`, …) also work —
+handy if you manage the tools yourself. Check what resolves:
 
 ```bash
 mangaeasy tools
@@ -202,7 +260,6 @@ globally but your models live elsewhere):
 # Windows (PowerShell)
 $env:KOKORO_ROOT    = "D:\kokoro-82m"
 $env:INDEX_TTS_ROOT = "D:\index-tts"
-$env:F5_TTS_ROOT    = "D:\f5-tts"
 $env:MAGI_V3_ROOT   = "D:\magi-v3"
 ```
 
@@ -266,8 +323,10 @@ work/<project>/                        # scratch / intermediates
 
 ## Documentation
 
+- [The desktop app](docs/app.md) — the `mangaeasy app` control center
+- [Installing AI tools](docs/install-tools.md) — what `install-tool` sets up for each tool
 - [Architecture](docs/architecture.md) — how the package and external tools fit together
-- [External tools](docs/external-tools.md) — Kokoro, IndexTTS, F5-TTS, MAGI
+- [External tools](docs/external-tools.md) — Kokoro, IndexTTS, MAGI
 - [Publishing](docs/publishing.md) — release checklist
 
 ## Contributing

@@ -16,7 +16,7 @@ Make sure these are **not** committed (they are git-ignored by default):
 - generated runtime output: `audio/`, `output/`, `work/`, `download_logs/`
 - user media: `manga/`, `music/`, `fonts/`, `background_image/`, `vocal/`
 - local `config.json` and `config.system.json`
-- sibling external tools: `kokoro-82m/`, `index-tts/`, `f5-tts/`, `magi-v3/`
+- sibling external tools: `kokoro-82m/`, `index-tts/`, `magi-v3/`
 
 ## First publish
 

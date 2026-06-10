@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mangaEasy</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">mangaEasy <span class="version">v{{ version }}</span></div>
+  <nav id="tabs">
+    <button class="tab active" data-tab="setup">Setup</button>
+    <button class="tab" data-tab="project">Project</button>
+    <button class="tab" data-tab="run">Run</button>
+    <button class="tab" data-tab="editors">Editors</button>
+  </nav>
+  <div id="job-indicator" class="idle">idle</div>
+</header>
+
+<main>
+
+  <!-- ── Setup ─────────────────────────────────────────────────────────── -->
+  <section id="tab-setup" class="tab-page active">
+    <div class="row between">
+      <h2>Environment</h2>
+      <button id="doctor-refresh" class="btn">Refresh</button>
+    </div>
+    <div id="prereq-grid" class="grid"></div>
+
+    <div class="row between">
+      <h2>AI tools</h2>
+      <div class="opts">
+        <label><input type="checkbox" id="opt-cpu"> CPU-only</label>
+        <label><input type="checkbox" id="opt-skip-model"> Skip model download</label>
+      </div>
+    </div>
+    <p class="hint">Tools install into the managed folder shown below and are found automatically from any project.</p>
+    <p class="hint" id="tools-home"></p>
+    <div id="tool-cards"></div>
+  </section>
+
+  <!-- ── Project ───────────────────────────────────────────────────────── -->
+  <section id="tab-project" class="tab-page">
+    <h2>Project folder</h2>
+    <div class="row">
+      <input id="project-root" class="text grow" spellcheck="false">
+      <button id="project-set" class="btn primary">Set</button>
+    </div>
+    <p class="hint">All commands and editors run against this folder.</p>
+
+    <h2>config.json <span class="hint">(per-manga settings)</span></h2>
+    <div class="form-grid">
+      <label>Manga URL / ID <input id="cfg-manga-id" class="text" spellcheck="false"></label>
+      <label>Name <input id="cfg-name" class="text" spellcheck="false"></label>
+      <label>Chapter <input id="cfg-chapter" type="number" min="0" class="text"></label>
+    </div>
+    <div class="row">
+      <button id="cfg-save" class="btn primary">Save config.json</button>
+      <span id="cfg-status" class="hint"></span>
+    </div>
+
+    <h2>config.system.json <span class="hint">(machine / render settings)</span></h2>
+    <textarea id="syscfg" rows="16" spellcheck="false"></textarea>
+    <div class="row">
+      <button id="syscfg-save" class="btn primary">Save config.system.json</button>
+      <span id="syscfg-status" class="hint"></span>
+    </div>
+  </section>
+
+  <!-- ── Run ───────────────────────────────────────────────────────────── -->
+  <section id="tab-run" class="tab-page">
+    <h2>General video pipeline</h2>
+    <div class="form-grid">
+      <label>Step
+        <select id="run-step">
+          <option value="video">Full pipeline (audio + render + join)</option>
+          <option value="video-check">Check inputs</option>
+          <option value="video-audio">Generate audio (Kokoro)</option>
+          <option value="video-audio-indextts">Generate audio (IndexTTS)</option>
+          <option value="video-render">Render item videos</option>
+          <option value="video-join">Join long video</option>
+          <option value="video-validate">Validate outputs</option>
+        </select>
+      </label>
+      <label>TTS engine (full pipeline)
+        <select id="run-tts">
+          <option value="auto">auto — IndexTTS if GPU, else Kokoro</option>
+          <option value="indextts">IndexTTS (voice cloning, GPU)</option>
+          <option value="kokoro">Kokoro (light, any machine)</option>
+        </select>
+      </label>
+      <label>Content folder <input id="run-content" class="text" value="content" spellcheck="false"></label>
+      <label>Project name <input id="run-name" class="text" placeholder="(defaults to folder name)" spellcheck="false"></label>
+      <label>Items <input id="run-items" class="text" placeholder="e.g. 01-12" spellcheck="false"></label>
+      <label>Encoder
+        <select id="run-encoder">
+          <option value="auto">auto (detect GPU)</option>
+          <option value="h264_nvenc">NVIDIA NVENC</option>
+          <option value="h264_amf">AMD AMF</option>
+          <option value="h264_qsv">Intel Quick Sync</option>
+          <option value="libx264">CPU (libx264)</option>
+        </select>
+      </label>
+      <label>TTS device
+        <select id="run-device">
+          <option value="auto">auto</option>
+          <option value="cuda">cuda</option>
+          <option value="cpu">cpu</option>
+        </select>
+      </label>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="run-long" checked> Build long video</label>
+      <label><input type="checkbox" id="run-ow-audio"> Overwrite audio</label>
+      <label><input type="checkbox" id="run-ow-video"> Overwrite video</label>
+    </div>
+    <div class="row">
+      <button id="run-start" class="btn primary">Run</button>
+      <button id="run-stop" class="btn danger" disabled>Stop</button>
+      <span id="run-status" class="hint"></span>
+    </div>
+
+    <h2>Manga chapter commands</h2>
+    <div class="row">
+      <select id="chap-cmd">
+        <option value="download">download — fetch chapter from MangaDex</option>
+        <option value="init-chapter">init-chapter — create chapter folders</option>
+        <option value="process-panels">process-panels — upscale / clean panels</option>
+        <option value="render-video">render-video — render chapter video</option>
+        <option value="add-bgm">add-bgm — add background music</option>
+        <option value="join-chapters">join-chapters — join all chapters + BGM</option>
+        <option value="timestamps">timestamps — per-panel timestamps</option>
+        <option value="to-pdf">to-pdf — export chapter PDF</option>
+        <option value="increment-chapter">increment-chapter — bump chapter number</option>
+      </select>
+      <input id="chap-args" class="text grow" placeholder="extra args (optional)" spellcheck="false">
+      <button id="chap-run" class="btn">Run</button>
+    </div>
+    <p class="hint">Chapter commands use config.json / config.system.json from the project folder.</p>
+  </section>
+
+  <!-- ── Editors ───────────────────────────────────────────────────────── -->
+  <section id="tab-editors" class="tab-page">
+    <h2>Web editors</h2>
+    <p class="hint">Each editor opens automatically in your browser and works on the current project folder.</p>
+    <div id="editor-cards"></div>
+  </section>
+
+</main>
+
+<!-- ── Log console ─────────────────────────────────────────────────────── -->
+<div id="console">
+  <div id="console-bar">
+    <span class="label">Logs</span>
+    <span class="spacer"></span>
+    <button id="log-clear" class="btn small">Clear</button>
+    <button id="console-toggle" class="btn small">Hide</button>
+  </div>
+  <div id="log-lines"></div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

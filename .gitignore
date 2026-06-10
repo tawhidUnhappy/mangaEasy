@@ -47,7 +47,6 @@ config.system.json
 # External AI tools are sibling uv projects, not vendored here
 /kokoro-82m/
 /index-tts/
-/f5-tts/
 /magi-v3/
 
 # Editor / assistant local state

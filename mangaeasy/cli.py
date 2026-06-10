@@ -22,11 +22,15 @@ from mangaeasy import __version__
 
 # command name -> (module path, function, group, one-line help)
 COMMANDS: dict[str, tuple[str, str, str, str]] = {
+    # ── Setup & app ───────────────────────────────────────────────────────────
+    "app":                  ("mangaeasy.web.app",                              "main",        "Setup & app",      "Open the mangaEasy control center (desktop app)."),
+    "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
+    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, ...) from GitHub."),
+
     # ── General item-based video pipeline (the recommended workflow) ──────────
-    "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: generate audio, render item videos, optionally join."),
+    "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
     "video-audio":          ("mangaeasy.video_pipeline.generate_audio",        "main",        "Video pipeline",   "Generate per-item narration audio with Kokoro TTS."),
     "video-audio-indextts": ("mangaeasy.video_pipeline.generate_audio_indextts","main",       "Video pipeline",   "Generate per-item audio with IndexTTS (external env)."),
-    "video-audio-f5tts":    ("mangaeasy.video_pipeline.generate_audio_f5tts",  "main",        "Video pipeline",   "Generate per-item audio with F5-TTS (external env)."),
     "video-render":         ("mangaeasy.video_pipeline.make_videos",           "main",        "Video pipeline",   "Render one video per item from panels + audio."),
     "video-join":           ("mangaeasy.video_pipeline.make_long_video",       "main",        "Video pipeline",   "Join item videos into one long video (optional BGM)."),
     "video-check":          ("mangaeasy.video_pipeline.check_items",           "main",        "Video pipeline",   "Validate item inputs (panels + narration.json)."),
@@ -38,9 +42,8 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "video-clean-work":     ("mangaeasy.video_pipeline.cleanup_work",          "main",        "Video pipeline",   "Delete the work/ scratch directory."),
 
     # ── External AI tool environments ─────────────────────────────────────────
-    "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/F5/MAGI) resolve."),
+    "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI) resolve."),
     "index-tts":            ("mangaeasy.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
-    "f5-tts":               ("mangaeasy.tools.f5_tts",                         "main",        "External tools",   "Run F5-TTS inside its external uv env."),
 
     # ── Manga chapter workflow: acquire & edit ────────────────────────────────
     "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download a manga chapter from MangaDex."),

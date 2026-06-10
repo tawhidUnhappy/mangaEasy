@@ -103,12 +103,13 @@ def main() -> int:
         return 0
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    use_cuda = device == "cuda"
     print(f"\n[INFO] Loading IndexTTS2 (device: {device}, speaker: {speaker_wav.name})...", flush=True)
     tts = IndexTTS2(
         cfg_path=str(CHECKPOINTS_DIR / "config.yaml"),
         model_dir=str(CHECKPOINTS_DIR),
-        use_fp16=True,
-        use_cuda_kernel=True,
+        use_fp16=use_cuda,
+        use_cuda_kernel=use_cuda,
         use_deepspeed=False,
     )
     print(f"[INFO] Generating {len(to_generate)} audio files...", flush=True)

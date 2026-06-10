@@ -29,15 +29,13 @@ The default project root is the current working directory. Set
 
 ## External tools
 
-Kokoro, IndexTTS, F5-TTS, and MAGI can each keep their own Python, CUDA, Torch,
-and Transformers dependencies as sibling `uv` projects:
+Kokoro, IndexTTS, and MAGI can each keep their own Python, CUDA, Torch,
+and Transformers dependencies as isolated `uv` projects:
 
 ```text
-workspace/
-  mangaEasy/
+~/.mangaeasy/tools/   (or siblings of your project)
   kokoro-82m/
   index-tts/
-  f5-tts/
   magi-v3/
 ```
 
@@ -45,17 +43,28 @@ This avoids dependency conflicts while still allowing full GPU acceleration.
 
 ## GPU strategy
 
+No GPU is required anywhere — every stage has a CPU path.
+
+Tool installs (`mangaeasy install-tool`):
+
+- Auto-detects hardware: CUDA torch builds only on Windows/Linux with an
+  NVIDIA GPU; standard CPU builds everywhere else (macOS, AMD, plain CPU).
+- Force a choice with `--cuda` or `--cpu`.
+
 Audio:
 
+- `mangaeasy video --tts auto` (the default) picks IndexTTS when an NVIDIA GPU
+  and the installed `index-tts` env are available, otherwise Kokoro.
 - `mangaeasy video-audio` calls `kokoro-82m` with that tool's own Python.
-- `--device auto` uses CUDA when available.
+- `--device auto` uses CUDA when available, otherwise CPU.
 - `--device cuda` fails fast if CUDA is not visible.
+- The IndexTTS bridge enables fp16/CUDA kernels only when CUDA is present.
 
 Video:
 
 - `--encoder auto` detects H.264 encoders exposed by FFmpeg.
 - Preference order: `h264_nvenc`, `h264_amf`, `h264_qsv`,
-  `h264_videotoolbox`, `libx264`.
+  `h264_videotoolbox`, `libx264` (CPU, always available).
 
 ## Package data
 

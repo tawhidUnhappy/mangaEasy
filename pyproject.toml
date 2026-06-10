@@ -1,6 +1,6 @@
 [project]
 name = "mangaeasy"
-version = "0.3.0"
+version = "0.4.0"
 description = "General manga and image-to-video automation with isolated external AI tool envs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,7 @@ dependencies = [
     "img2pdf>=0.5.0",
     "pydub>=0.25.1",
     "numpy>=1.24.0",
+    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -100,11 +101,6 @@ Homepage = "https://github.com/tawhidUnhappy/mangaEasy"
 Repository = "https://github.com/tawhidUnhappy/mangaEasy"
 Issues = "https://github.com/tawhidUnhappy/mangaEasy/issues"
 
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[tool.uv.sources]
-torch = [{ index = "pytorch-cu128" }]
-torchvision = [{ index = "pytorch-cu128" }]
+# Torch resolves from PyPI so the optional `ml` extra installs on any platform
+# (Windows/Linux/macOS, CPU or GPU). CUDA-specific torch builds are handled in
+# the isolated external tool envs by `mangaeasy install-tool`, never here.

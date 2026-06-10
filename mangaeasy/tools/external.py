@@ -9,7 +9,6 @@ from pathlib import Path
 TOOL_ENVS = {
     "kokoro-82m": ("KOKORO_ROOT",),
     "index-tts": ("INDEX_TTS_ROOT", "INDEX_TTS_DIR"),
-    "f5-tts": ("F5_TTS_ROOT",),
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
 }
 
@@ -20,10 +19,32 @@ def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def mangaeasy_home() -> Path:
+    """Per-user mangaEasy data dir (default ~/.mangaeasy, override MANGAEASY_HOME)."""
+    configured = os.environ.get("MANGAEASY_HOME")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (Path.home() / ".mangaeasy").resolve()
+
+
+def tools_home() -> Path:
+    """Managed dir where `mangaeasy install-tool` puts external tool envs.
+
+    Default ~/.mangaeasy/tools so a globally-installed mangaeasy can find the
+    tools from any working directory. Override with MANGAEASY_TOOLS_DIR.
+    """
+    configured = os.environ.get("MANGAEASY_TOOLS_DIR")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return mangaeasy_home() / "tools"
+
+
 def candidate_roots() -> list[Path]:
     cwd = Path.cwd().resolve()
     root = package_root().resolve()
-    candidates = [cwd, cwd.parent, root, root.parent]
+    # Managed tools dir first (install-once-use-anywhere), then folders relative
+    # to where the user is working, then the package location.
+    candidates = [tools_home(), cwd, cwd.parent, root, root.parent]
     seen: set[Path] = set()
     result: list[Path] = []
     for path in candidates:
@@ -110,7 +131,6 @@ def main() -> int:
     print("Install tools as sibling uv projects when you need them, for example:")
     print("  .\\kokoro-82m")
     print("  .\\index-tts")
-    print("  .\\f5-tts")
     print("  .\\magi-v3")
     print("Each tool keeps its own .venv and Python.")
     return 0

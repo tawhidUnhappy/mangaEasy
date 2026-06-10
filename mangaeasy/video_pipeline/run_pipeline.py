@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,8 +17,48 @@ from mangaeasy.video_pipeline.common import (
 )
 
 
+def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
+    """Pick the TTS engine. auto = IndexTTS on GPU machines, Kokoro otherwise.
+
+    IndexTTS gives the best quality but needs an NVIDIA GPU, an installed
+    index-tts tool env with checkpoints, and a speaker reference WAV. If any
+    piece is missing, auto falls back to Kokoro (light, runs well on CPU).
+    """
+    if choice in ("kokoro", "indextts"):
+        return choice
+
+    from mangaeasy.tools.external import resolve_tool_dir
+    from mangaeasy.video_pipeline.generate_audio_indextts import _default_speaker_wav
+
+    if shutil.which("nvidia-smi") is None:
+        print("[tts:auto] no NVIDIA GPU -> Kokoro")
+        return "kokoro"
+    tool_dir = resolve_tool_dir("index-tts", required=False)
+    if tool_dir is None:
+        print("[tts:auto] GPU found, but index-tts is not installed -> Kokoro")
+        print("           (get the higher-quality TTS with: mangaeasy install-tool index-tts)")
+        return "kokoro"
+    if not (tool_dir / "checkpoints" / "config.yaml").exists():
+        print("[tts:auto] index-tts found, but model checkpoints are missing -> Kokoro")
+        print("           (re-run: mangaeasy install-tool index-tts)")
+        return "kokoro"
+    ref = (speaker_wav or _default_speaker_wav()).resolve()
+    if not ref.is_file():
+        print("[tts:auto] GPU + IndexTTS ready, but no speaker reference WAV -> Kokoro")
+        print(f"           (expected {ref}; set config.system.json -> tts.speaker_wav or pass --speaker-wav)")
+        return "kokoro"
+    print(f"[tts:auto] NVIDIA GPU + IndexTTS installed -> IndexTTS (speaker: {ref.name})")
+    return "indextts"
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run Kokoro audio generation, then build videos.")
+    parser = argparse.ArgumentParser(
+        description="Generate narration audio (IndexTTS on GPU machines, Kokoro otherwise), then build videos."
+    )
+    parser.add_argument("--tts", choices=("auto", "kokoro", "indextts"), default="auto",
+                        help="TTS engine. auto picks IndexTTS when a GPU and the tool are available, else Kokoro.")
+    parser.add_argument("--speaker-wav", type=Path, default=None,
+                        help="IndexTTS speaker reference WAV (defaults to config.system.json -> tts.speaker_wav).")
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
@@ -58,17 +99,27 @@ def main() -> int:
     cwd = Path.cwd()
     selected_items = merge_item_selection(args.items, args.item_range)
 
-    audio_cmd = [
-        sys.executable, "-m", "mangaeasy.video_pipeline.generate_audio",
-        "--project-root", str(args.project_root),
-        "--audio-root", str(args.audio_root),
-        "--work-dir", str(args.work_dir),
-        "--kokoro-root", str(args.kokoro_root),
-        "--voice", args.voice,
-        "--lang", args.lang,
-        "--speed", str(args.speed),
-        "--device", args.device,
-    ]
+    engine = resolve_tts_engine(args.tts, args.speaker_wav)
+    if engine == "indextts":
+        audio_cmd = [
+            sys.executable, "-m", "mangaeasy.video_pipeline.generate_audio_indextts",
+            "--project-root", str(args.project_root),
+            "--audio-root", str(args.audio_root),
+        ]
+        if args.speaker_wav is not None:
+            audio_cmd += ["--speaker-wav", str(args.speaker_wav)]
+    else:
+        audio_cmd = [
+            sys.executable, "-m", "mangaeasy.video_pipeline.generate_audio",
+            "--project-root", str(args.project_root),
+            "--audio-root", str(args.audio_root),
+            "--work-dir", str(args.work_dir),
+            "--kokoro-root", str(args.kokoro_root),
+            "--voice", args.voice,
+            "--lang", args.lang,
+            "--speed", str(args.speed),
+            "--device", args.device,
+        ]
     if args.project_name:
         audio_cmd += ["--project-name", args.project_name]
     if args.overwrite_audio:
