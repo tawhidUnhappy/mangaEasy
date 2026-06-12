@@ -133,6 +133,7 @@
             <option value="video-audio-indextts">Only generate audio (IndexTTS)</option>
             <option value="video-render">Only render item videos</option>
             <option value="video-join">Only join into one long video</option>
+            <option value="video-normalize-audio">Make the final video YouTube-loud (−14 LUFS)</option>
             <option value="video-validate">Validate generated output</option>
           </select>
         </label>
@@ -147,6 +148,8 @@
       <div class="opts">
         <label title="After rendering each item, also concatenate everything into a single long video">
           <input type="checkbox" id="run-long" checked> Also build one long video</label>
+        <label title="Two-pass loudness normalization of the long video to YouTube's standard (−14 LUFS integrated, −1.5 dBTP)">
+          <input type="checkbox" id="run-normalize" checked> YouTube loudness (−14 LUFS)</label>
       </div>
 
       <details class="advanced" id="run-advanced">

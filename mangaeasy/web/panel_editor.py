@@ -12,6 +12,7 @@ from PIL import Image
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config
 from mangaeasy.panels.gutter import load_gutter_config, auto_detect_panels
+from mangaeasy.paths import chapter_dir
 from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.flask_utils import make_app, register_shutdown, run_app
 
@@ -22,8 +23,8 @@ _dl          = load_download_config()
 _chapter     = int(_dl["chapter"])
 _name        = str(_dl["name"])
 
-IMAGE_DIR = PROJECT_ROOT / "manga" / _name / f"{_chapter:02d}" / "download"
-PANEL_DIR = PROJECT_ROOT / "manga" / _name / f"{_chapter:02d}" / "panels"
+IMAGE_DIR = chapter_dir(_name, _chapter) / "download"
+PANEL_DIR = chapter_dir(_name, _chapter) / "panels"
 PANEL_DIR.mkdir(parents=True, exist_ok=True)
 
 app = make_app(__name__, static_url_path="/static")

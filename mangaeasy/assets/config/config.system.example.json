@@ -31,6 +31,7 @@
     "tail_silence_ms": 80
   },
   "paths": {
+    "library_subdir": "library",
     "panels_subdir": "panels",
     "audio_subdir": "audio",
     "processed_subdir": "panels_processed"

@@ -1,7 +1,7 @@
 """mangaeasy.narration.join — concatenate all chapter narration.json files into one.
 
-Collects every narration.json under manga/{name}/ in chapter order and writes
-them as a single flat array to manga/{name}/narration_all.json.
+Collects every narration.json under library/{name}/ in chapter order and writes
+them as a single flat array to library/{name}/narration_all.json.
 
 Each entry keeps its original {image, narration} fields; a chapter field is
 added so entries remain traceable after merging.
@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config
+from mangaeasy.paths import manga_dir
 
 
 # ---------------------------------------------------------------------------
@@ -23,9 +24,9 @@ from mangaeasy.config import PROJECT_ROOT, load_download_config
 # ---------------------------------------------------------------------------
 
 def _sorted_narration_files(name: str) -> list[tuple[int, Path]]:
-    manga_dir = PROJECT_ROOT / "manga" / name
+    title_dir = manga_dir(name)
     results: list[tuple[int, Path]] = []
-    for ch_dir in sorted(manga_dir.iterdir()):
+    for ch_dir in sorted(title_dir.iterdir()):
         try:
             chapter = int(ch_dir.name)
         except ValueError:

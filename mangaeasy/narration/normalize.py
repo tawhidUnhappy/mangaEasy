@@ -18,9 +18,9 @@ import argparse
 import re
 from pathlib import Path
 
-from mangaeasy.config import PROJECT_ROOT, load_download_config
+from mangaeasy.config import load_download_config
 from mangaeasy.narration import load_narration, save_narration
-from mangaeasy.paths import narration_json
+from mangaeasy.paths import manga_dir, narration_json
 
 # ---------------------------------------------------------------------------
 # Character-level replacements (applied first, in order)
@@ -138,9 +138,9 @@ def process_file(path: Path, write: bool, label: str) -> int:
 # ---------------------------------------------------------------------------
 
 def _all_narration_files(name: str) -> list[tuple[Path, str]]:
-    manga_dir = PROJECT_ROOT / "manga" / name
+    title_dir = manga_dir(name)
     files = []
-    for ch_dir in sorted(manga_dir.iterdir()):
+    for ch_dir in sorted(title_dir.iterdir()):
         try:
             chapter = int(ch_dir.name)
         except ValueError:

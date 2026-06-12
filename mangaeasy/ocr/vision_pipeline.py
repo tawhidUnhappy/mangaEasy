@@ -9,8 +9,8 @@ Auto mode (reads name/chapter from config.json):
 Manual mode (explicit chapter directory):
     uv run --directory ../magi-v3 python mangaeasy/ocr/vision_pipeline.py <chapter_dir>
 
-Auto mode scans ./manga/{name}/{chapter}/panels/ and writes to
-./manga/{name}/{chapter}/narration_{chapter}.json.
+Auto mode scans ./library/{name}/{chapter}/panels/ and writes to
+./library/{name}/{chapter}/narration_{chapter}.json.
 Manual mode reads narration.json from <chapter_dir> and resolves images from there.
 
 Existing fields are never overwritten — re-run is safe.

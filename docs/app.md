@@ -68,8 +68,11 @@ Three numbered steps:
    finished videos land. Relative names like `content` resolve inside the
    project folder; Browse… picks any folder on the machine.
 2. **What to do** — pick the step (everything, or a single stage) and the
-   voice engine. Encoder, TTS device, item ranges and overwrite flags sit
-   under **Advanced options**.
+   voice engine. **YouTube loudness (−14 LUFS)** runs a two-pass loudness
+   normalization on the finished long video so it plays at YouTube's
+   standard volume; it is also available as a standalone step. Encoder,
+   TTS device, item ranges and overwrite flags sit under
+   **Advanced options**.
 3. **Run** — Start / Stop with live logs. The status line tells you when the
    job finishes.
 

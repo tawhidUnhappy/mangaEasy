@@ -2,8 +2,8 @@
 """mangaeasy.audio.fade
 Create faded COPIES of generated WAV files without touching the originals.
 
-Source : manga/{name}/{ch:02d}/audio/*.wav
-Output : manga/{name}/{ch:02d}/tmp/audio_faded/*.wav
+Source : library/{name}/{ch:02d}/audio/*.wav
+Output : library/{name}/{ch:02d}/tmp/audio_faded/*.wav
 
 Audio settings come from config.system.json → audio section.
 """

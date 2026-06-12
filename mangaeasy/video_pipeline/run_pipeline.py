@@ -74,6 +74,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
     parser.add_argument("--build-long-video", action="store_true")
+    parser.add_argument("--normalize-audio", action="store_true",
+                        help="After the long video is built, loudness-normalize it in place "
+                             "for YouTube (-14 LUFS integrated, two-pass).")
     parser.add_argument("--background-style", choices=("blur", "black", "image"), default="black")
     parser.add_argument("--background-image", type=Path, default=None)
     parser.add_argument("--background-music", type=Path, default=None)
@@ -175,6 +178,17 @@ def main() -> int:
         if selected_items:
             long_cmd += ["--items", *selected_items]
         run(long_cmd, cwd)
+
+        if args.normalize_audio:
+            norm_cmd = [
+                sys.executable, "-m", "mangaeasy.video_pipeline.normalize_long_audio",
+                "--project-root", str(args.project_root),
+                "--output-root", str(args.output_root),
+                "--replace",
+            ]
+            if args.project_name:
+                norm_cmd += ["--project-name", args.project_name]
+            run(norm_cmd, cwd)
     return 0
 
 

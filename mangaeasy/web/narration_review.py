@@ -13,6 +13,7 @@ from typing import Any
 from flask import jsonify, render_template, request, send_from_directory
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.paths import manga_dir
 from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.flask_utils import make_app, register_shutdown, run_app
 
@@ -145,7 +146,7 @@ def _load_segments(
 
 # ── Global state ───────────────────────────────────────────────────────────────
 
-MANGA_ROOT = PROJECT_ROOT / "manga" / _name
+MANGA_ROOT = manga_dir(_name)
 SEGMENTS, IMAGE_DIRS, AUDIO_DIRS, START_CH, END_CH = _load_segments(MANGA_ROOT)
 
 NOTES_FILE = TMP_DIR / f"{START_CH}_{END_CH}_Note_{_name}.json"

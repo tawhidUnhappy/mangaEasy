@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.paths import manga_dir
 from mangaeasy.video.join import _sorted_chapter_dirs
 from mangaeasy.video.render import collect_pairs, ffprobe_duration
 
@@ -29,7 +30,7 @@ def main() -> None:
     syscfg = load_system_config()
     dl = load_download_config()
     name = str(dl["name"])
-    manga_root = PROJECT_ROOT / "manga" / name
+    manga_root = manga_dir(name)
 
     if not manga_root.exists():
         print(f"[ERROR] Manga folder not found: {manga_root}")

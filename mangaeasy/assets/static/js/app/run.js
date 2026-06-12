@@ -3,12 +3,16 @@
 import { $, api, appendLog } from "./core.js";
 import { pollStatus } from "./status.js";
 
-const STEPS_WITH_OUTPUT = new Set(["video", "video-render", "video-join", "video-validate"]);
+const STEPS_WITH_OUTPUT = new Set([
+  "video", "video-render", "video-join", "video-normalize-audio", "video-validate",
+]);
+const STEPS_WITHOUT_ITEMS = new Set(["video-normalize-audio"]);
 
 export function updateStepUI() {
   const step = $("run-step").value;
   $("run-tts").disabled = step !== "video";
   $("run-long").disabled = step !== "video";
+  $("run-normalize").disabled = step !== "video";
   $("run-output-dir").disabled = !STEPS_WITH_OUTPUT.has(step);
 }
 
@@ -21,7 +25,7 @@ function buildRunArgs() {
   const args = ["--project-root", mangaDir];
 
   if (STEPS_WITH_OUTPUT.has(step)) args.push("--output-root", outputDir);
-  if (items) args.push("--item-range", items);
+  if (items && !STEPS_WITHOUT_ITEMS.has(step)) args.push("--item-range", items);
   if (name) args.push("--project-name", name);
 
   if (step === "video") {
@@ -31,9 +35,12 @@ function buildRunArgs() {
       args.push("--build-long-video");
       const bgm = $("cfg-bgm").value.trim();
       if (bgm) args.push("--background-music", bgm);
+      if ($("run-normalize").checked) args.push("--normalize-audio");
     }
     if ($("run-ow-audio").checked) args.push("--overwrite-audio");
     if ($("run-ow-video").checked) args.push("--overwrite-video");
+  } else if (step === "video-normalize-audio") {
+    args.push("--replace");
   } else if (step === "video-check") {
     args.push("--strict");
   } else if (step === "video-audio") {

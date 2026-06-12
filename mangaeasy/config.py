@@ -56,14 +56,21 @@ def load_config() -> dict:
         sys.exit(1)
 
 
+_warned_missing_system_config = False
+
+
 def load_system_config() -> dict:
     """Return the full parsed config.system.json (system-wide settings).
 
     Falls back to an empty dict if the file is missing so callers can use
     .get() with their own defaults — avoids hard failures on first run.
     """
+    global _warned_missing_system_config
     if not SYSTEM_CONFIG_FILE.exists():
-        print(f"[WARN] config.system.json not found at {SYSTEM_CONFIG_FILE} — using defaults")
+        # Many helpers re-read the config; one warning per process is enough.
+        if not _warned_missing_system_config:
+            print(f"[WARN] config.system.json not found at {SYSTEM_CONFIG_FILE} — using defaults")
+            _warned_missing_system_config = True
         return {}
     try:
         return json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8"))

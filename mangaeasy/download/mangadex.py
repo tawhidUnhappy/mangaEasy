@@ -11,7 +11,8 @@ import re
 
 import requests
 
-from mangaeasy.config import PROJECT_ROOT, load_download_config
+from mangaeasy.config import load_download_config
+from mangaeasy.paths import manga_dir
 
 API_BASE = "https://api.mangadex.org"
 
@@ -132,7 +133,7 @@ def main() -> None:
 
     chapter_str = str(chapter).zfill(2)
     lang = dl_cfg.get("translated_language", "en")
-    output_dir = PROJECT_ROOT / "manga" / str(dl_cfg.get("name")) / chapter_str / "download"
+    output_dir = manga_dir(str(dl_cfg.get("name"))) / chapter_str / "download"
     use_data_saver = bool(dl_cfg.get("use_data_saver", False))
     delay = float(dl_cfg.get("download_delay", 0.5))
 

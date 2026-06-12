@@ -14,7 +14,7 @@ Make sure these are **not** committed (they are git-ignored by default):
 
 - `.venv/`, `.cache/`, `.hf_cache/`
 - generated runtime output: `audio/`, `output/`, `work/`, `download_logs/`
-- user media: `manga/`, `music/`, `fonts/`, `background_image/`, `vocal/`
+- user media: `library/` (chapters; `manga/` on old projects), `music/`, `fonts/`, `background_image/`, `vocal/`
 - local `config.json` and `config.system.json`
 - sibling external tools: `kokoro-82m/`, `index-tts/`, `magi-v3/`
 

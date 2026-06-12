@@ -14,6 +14,7 @@ from PIL import Image, ImageOps
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
 from mangaeasy.images.watermark_util import apply_watermark
+from mangaeasy.paths import manga_dir
 from mangaeasy.video.render import (
     collect_pairs,
     build_pcm_clips,
@@ -54,7 +55,7 @@ def _write_concat_list(videos: list[Path], out: Path) -> None:
 def _setup_join(suffix: str = "") -> tuple[str, Path, list[Path], Path, Path]:
     dl   = load_download_config()
     name = str(dl["name"])
-    manga_root = PROJECT_ROOT / "manga" / name
+    manga_root = manga_dir(name)
 
     if not manga_root.exists():
         print(f"[ERROR] Manga folder not found: {manga_root}")
@@ -83,7 +84,7 @@ def main() -> None:
     syscfg = load_system_config()
     dl     = load_download_config()
     name   = str(dl["name"])
-    manga_root = PROJECT_ROOT / "manga" / name
+    manga_root = manga_dir(name)
 
     if not manga_root.exists():
         print(f"[ERROR] Manga folder not found: {manga_root}")

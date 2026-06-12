@@ -18,14 +18,40 @@ def _path_cfg() -> dict:
     return load_system_config().get("paths", {})
 
 
-# ── Chapter dirs ──────────────────────────────────────────────────────────────
+# ── Library / chapter dirs ────────────────────────────────────────────────────
+
+def library_dir() -> Path:
+    """The folder that holds every manga — one subfolder per title.
+
+    Named library/ so it can't be confused with a single manga's own folder
+    (library/{name}/ holds that manga's chapters). Renameable via
+    config.system.json → paths.library_subdir. Projects created before the
+    rename keep working: if ./manga exists and ./library does not, the legacy
+    folder is used.
+    """
+    configured = _path_cfg().get("library_subdir")
+    if configured:
+        return PROJECT_ROOT / configured
+    library = PROJECT_ROOT / "library"
+    legacy = PROJECT_ROOT / "manga"
+    if legacy.is_dir() and not library.is_dir():
+        return legacy
+    return library
+
+
+def manga_dir(name: str | None = None) -> Path:
+    """One manga's own folder (holds its chapter subfolders)."""
+    if name is None:
+        name = str(_dl()["name"])
+    return library_dir() / name
+
 
 def chapter_dir(name: str | None = None, chapter: int | None = None) -> Path:
     if name is None or chapter is None:
         dl = _dl()
         name    = name    or str(dl["name"])
         chapter = chapter if chapter is not None else int(dl["chapter"])
-    return PROJECT_ROOT / "manga" / name / f"{chapter:02d}"
+    return manga_dir(name) / f"{chapter:02d}"
 
 
 def download_dir(name=None, chapter=None) -> Path:
@@ -66,7 +92,7 @@ def output_video(name=None, chapter=None) -> Path:
 # ── Temp dirs ─────────────────────────────────────────────────────────────────
 
 def tmp_dir(name=None, chapter=None) -> Path:
-    """Temporary build artefacts live inside the chapter folder (manga/{name}/{ch}/tmp/).
+    """Temporary build artefacts live inside the chapter folder (library/{name}/{ch}/tmp/).
 
     Everything for a chapter stays together; the folder is removed after
     render unless config.system.json → render.keep_tmp is true.

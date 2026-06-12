@@ -17,6 +17,7 @@ from PIL import Image
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
 from mangaeasy.panels.ai import detect_panels_ai
+from mangaeasy.paths import chapter_dir
 from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.flask_utils import LogBroadcaster, make_app, register_shutdown, run_app
 
@@ -34,8 +35,8 @@ class MangaCropperCore:
         dl = load_download_config()
         self.manga_name = str(dl.get("name", "unknown"))
         self.chapter    = int(dl.get("chapter", 1))
-        self.image_dir  = PROJECT_ROOT / "manga" / self.manga_name / f"{self.chapter:02d}" / "download"
-        self.panel_dir  = PROJECT_ROOT / "manga" / self.manga_name / f"{self.chapter:02d}" / "panels"
+        self.image_dir  = chapter_dir(self.manga_name, self.chapter) / "download"
+        self.panel_dir  = chapter_dir(self.manga_name, self.chapter) / "panels"
         self.state_file = self.panel_dir / "boxes_state.json"
         self.panel_dir.mkdir(parents=True, exist_ok=True)
 

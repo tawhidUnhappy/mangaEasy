@@ -33,6 +33,7 @@ config.system.json
 *.out
 
 # User content and local media
+/library/
 /manga/
 /static/
 /templates/

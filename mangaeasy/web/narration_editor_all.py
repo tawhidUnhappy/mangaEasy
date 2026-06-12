@@ -10,6 +10,7 @@ from typing import Any
 from flask import jsonify, render_template, request, send_from_directory
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.paths import manga_dir
 from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.flask_utils import make_app, register_shutdown, run_app
 
@@ -143,7 +144,7 @@ def _compute_chapter_ranges(narrations: list[dict[str, Any]]) -> dict[str, tuple
     return ranges
 
 
-MANGA_ROOT = PROJECT_ROOT / "manga" / _name
+MANGA_ROOT = manga_dir(_name)
 NARRATIONS, CHAPTER_JSON_PATHS, CHAPTER_PANEL_DIRS = _load_all_chapters(MANGA_ROOT)
 CHAPTER_RANGES = _compute_chapter_ranges(NARRATIONS)
 
