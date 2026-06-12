@@ -66,6 +66,21 @@
       <label>Name <input id="cfg-name" class="text" spellcheck="false" placeholder="my_manga"></label>
       <label>Chapter <input id="cfg-chapter" type="number" min="0" class="text"></label>
     </div>
+
+    <h2>Music &amp; voice <span class="hint">(used by TTS and background music steps)</span></h2>
+    <div class="folder-row">
+      <label class="folder-label" for="cfg-bgm">Background music</label>
+      <input id="cfg-bgm" class="text grow mono" spellcheck="false" placeholder="music/background.mp3">
+      <button class="btn" data-browse-file="cfg-bgm" data-exts="mp3,wav,m4a,flac,ogg,aac">Browse…</button>
+    </div>
+    <p class="hint indent">Any music file — it plays quietly under the narration in the finished video.</p>
+    <div class="folder-row">
+      <label class="folder-label" for="cfg-voice">Voice reference</label>
+      <input id="cfg-voice" class="text grow mono" spellcheck="false" placeholder="vocal/my_voice.wav">
+      <button class="btn" data-browse-file="cfg-voice" data-exts="wav,mp3,flac,m4a">Browse…</button>
+    </div>
+    <p class="hint indent">A short, clean voice sample (5–15&nbsp;s). IndexTTS clones this voice for the narration. Leave empty to use the Kokoro stock voice.</p>
+
     <div class="row">
       <button id="cfg-save" class="btn primary">Save settings</button>
       <span id="cfg-status" class="hint"></span>
@@ -180,6 +195,8 @@
         <option value="download">download — fetch chapter from MangaDex</option>
         <option value="init-chapter">init-chapter — create chapter folders</option>
         <option value="process-panels">process-panels — upscale / clean panels</option>
+        <option value="index-tts">index-tts — generate narration audio (clones your voice reference)</option>
+        <option value="fade-audio">fade-audio — smooth fade in/out on narration audio</option>
         <option value="render-video">render-video — render chapter video</option>
         <option value="add-bgm">add-bgm — add background music</option>
         <option value="join-chapters">join-chapters — join all chapters + BGM</option>
@@ -215,7 +232,7 @@
 <!-- ── Folder picker (fallback when no native dialog is available) ─────── -->
 <div id="folder-modal" class="modal hidden">
   <div class="modal-box">
-    <div class="modal-title">Choose a folder</div>
+    <div class="modal-title" id="fm-title">Choose a folder</div>
     <div class="row">
       <button id="fm-up" class="btn small" title="Go to the parent folder">⬆ Up</button>
       <input id="fm-path" class="text grow mono" spellcheck="false">
@@ -232,6 +249,6 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/app/main.js') }}"></script>
 </body>
 </html>

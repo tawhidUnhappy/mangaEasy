@@ -51,6 +51,10 @@ folder when the current directory doesn't look like a project.
   (Browse… applies it immediately).
 - Edit the manga settings (`config.json`: manga URL/ID, name, chapter) as a
   simple form.
+- **Music & voice** — pick the background music file and the voice reference
+  WAV (the voice IndexTTS clones for narration) with file dialogs. Files
+  inside the project folder are stored as portable relative paths. Used by
+  `index-tts`, `add-bgm`, `join-chapters` and the long-video build.
 - `config.system.json` lives under **Advanced** as validated JSON (seeded from
   the bundled example on first use). Saving creates the files if they don't
   exist.

@@ -23,8 +23,6 @@ def main() -> None:
     print(f"       {narration_json.name}")
     print(f"       {novel_txt.name}")
 
-    input("\nPress Enter to exit...")
-
 
 if __name__ == "__main__":
     main()

@@ -198,5 +198,6 @@ textarea {
   cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .fm-dir:hover { background: #2d2d30; }
+.fm-dir.fm-file { color: #9bc7ee; }
 .fm-empty { color: #777; font-size: 12px; padding: 14px 10px; }
 .fm-err { color: #e05252; }
