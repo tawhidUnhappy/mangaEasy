@@ -107,10 +107,8 @@
 
     <div class="panel">
       <h3><span class="step-no">1</span> Get the chapter <span id="wf-st-download" class="badge wf-badge"></span></h3>
+      <p id="wf-manga-summary" class="hint"></p>
       <div class="form-grid">
-        <label>MangaDex URL / ID
-          <input id="wf-manga-id" class="text" spellcheck="false" placeholder="https://mangadex.org/title/…"></label>
-        <label>Manga name <input id="wf-name" class="text" spellcheck="false" placeholder="my_manga"></label>
         <label>Chapter <input id="wf-chapter" type="number" min="0" class="text"></label>
         <label>Language
           <select id="wf-lang">
@@ -135,8 +133,8 @@
         <button id="wf-download" class="btn primary">⬇ Download from MangaDex</button>
         <button class="btn" data-wf-open="download">Open download folder</button>
       </div>
-      <p class="hint">Got the pages from another site or scraped them yourself? Just drop the
-        image files into the download folder — the next steps don't care where pages came from.</p>
+      <p class="hint">Got the pages from another source? Drop the images into the download
+        folder — the rest of the steps don't care where pages came from.</p>
     </div>
 
     <div class="panel">
@@ -269,25 +267,23 @@
       <p class="hint">Progress streams into the log console below. Only one job runs at a time.</p>
     </div>
 
-    <h2>Manga chapter tools</h2>
-    <p class="hint">Classic per-chapter commands. They use the manga settings from the <b>Project</b> tab and work inside the project folder.</p>
-    <div class="row">
-      <select id="chap-cmd">
-        <option value="download">download — fetch chapter from MangaDex</option>
-        <option value="init-chapter">init-chapter — create chapter folders</option>
-        <option value="process-panels">process-panels — upscale / clean panels</option>
-        <option value="index-tts">index-tts — generate narration audio (clones your voice reference)</option>
-        <option value="fade-audio">fade-audio — smooth fade in/out on narration audio</option>
-        <option value="render-video">render-video — render chapter video</option>
-        <option value="add-bgm">add-bgm — add background music</option>
-        <option value="join-chapters">join-chapters — join all chapters + BGM</option>
-        <option value="timestamps">timestamps — per-panel timestamps</option>
-        <option value="to-pdf">to-pdf — export chapter PDF</option>
-        <option value="increment-chapter">increment-chapter — bump chapter number</option>
-      </select>
-      <input id="chap-args" class="text grow" placeholder="extra args (optional)" spellcheck="false">
-      <button id="chap-run" class="btn">Run</button>
-    </div>
+    <details class="advanced">
+      <summary>Advanced chapter utilities</summary>
+      <p class="hint">Low-level per-chapter commands for edge cases. Routine download → narrate → render is handled by the <b>Make a video</b> tab.</p>
+      <div class="row">
+        <select id="chap-cmd">
+          <option value="init-chapter">init-chapter — create chapter folder structure</option>
+          <option value="process-panels">process-panels — upscale / mirror / clean panels</option>
+          <option value="fade-audio">fade-audio — apply fade in/out to narration audio</option>
+          <option value="join-chapters">join-chapters — concatenate all chapter videos + BGM</option>
+          <option value="timestamps">timestamps — generate per-panel timestamps file</option>
+          <option value="to-pdf">to-pdf — export chapter images to PDF</option>
+          <option value="increment-chapter">increment-chapter — bump the chapter counter in config</option>
+        </select>
+        <input id="chap-args" class="text grow" placeholder="extra args (optional)" spellcheck="false">
+        <button id="chap-run" class="btn">Run</button>
+      </div>
+    </details>
   </section>
 
   <!-- ── Editors ───────────────────────────────────────────────────────── -->

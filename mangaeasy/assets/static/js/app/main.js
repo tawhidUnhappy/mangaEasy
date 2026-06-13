@@ -21,6 +21,11 @@ import { initRun, updateStepUI } from "./run.js";
 import { renderEditors } from "./editors.js";
 import { pollStatus } from "./status.js";
 
+function switchTab(name) {
+  const btn = document.querySelector(`.tab[data-tab="${name}"]`);
+  if (btn) btn.click();
+}
+
 function initTabs() {
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -29,6 +34,11 @@ function initTabs() {
       btn.classList.add("active");
       $(`tab-${btn.dataset.tab}`).classList.add("active");
     });
+  });
+  // Delegated handler for .tab-link buttons rendered by JS (e.g. workflow summary).
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest(".tab-link[data-tab]");
+    if (el) switchTab(el.dataset.tab);
   });
 }
 

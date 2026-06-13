@@ -9,8 +9,6 @@ let saveTimer = null;
 
 function fields() {
   return {
-    manga_id: $("wf-manga-id").value.trim(),
-    name: $("wf-name").value.trim(),
     chapter: parseInt($("wf-chapter").value, 10) || 1,
     language: $("wf-lang").value,
   };
@@ -22,11 +20,23 @@ function setBadge(id, done, doneText, todoText) {
   el.className = `badge wf-badge ${done ? "installed" : "unconfigured"}`;
 }
 
+function updateMangaSummary(data) {
+  const p = $("wf-manga-summary");
+  if (!p) return;
+  if (data.name || data.manga_id) {
+    const nameStr = data.name ? `<b>${data.name}</b>` : "(unnamed)";
+    const idStr = data.manga_id ? ` &nbsp;·&nbsp; <span class="mono" style="font-size:11px">${data.manga_id}</span>` : "";
+    p.innerHTML = `Manga: ${nameStr}${idStr} &nbsp;<button class="btn small tab-link" data-tab="project">Edit in Project ↗</button>`;
+  } else {
+    p.innerHTML = `No manga configured yet — <button class="btn small tab-link" data-tab="project">Set it in the Project tab ↗</button>`;
+  }
+}
+
 function render(data) {
   wf = data;
-  // Don't clobber a field the user is typing in.
+  updateMangaSummary(data);
+  // Don't clobber fields the user is actively typing in.
   for (const [id, value] of [
-    ["wf-manga-id", data.manga_id], ["wf-name", data.name],
     ["wf-chapter", data.chapter], ["wf-lang", data.language],
   ]) {
     if (document.activeElement !== $(id)) $(id).value = value;
@@ -105,7 +115,7 @@ function videoSteps() {
 }
 
 export function initWorkflow() {
-  for (const id of ["wf-manga-id", "wf-name", "wf-chapter", "wf-lang"]) {
+  for (const id of ["wf-chapter", "wf-lang"]) {
     $(id).addEventListener("change", scheduleSave);
   }
 
