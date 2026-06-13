@@ -10,16 +10,22 @@ Follows MangaDex API etiquette:
     machine-exact.
   - Paginates the chapter feed so manga with > 100 chapters in a
     language work correctly.
-  - Skips images that already exist and are non-empty (safe to re-run).
+  - Skips images that already exist and are non-empty (safe to re-run /
+    resume interrupted downloads).
+  - Caches chapter metadata locally so repeated runs skip the API feed
+    lookup.  Pass --fresh to bypass the cache.
 """
 
 from __future__ import annotations
 
+import argparse
+import json
 import os
 import random
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Tuple
 from urllib.parse import urlparse
@@ -31,6 +37,7 @@ from mangaeasy.config import load_download_config
 from mangaeasy.paths import manga_dir
 
 # ── Constants ─────────────────────────────────────────────────────────────────
+_IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 
 API_BASE   = "https://api.mangadex.org"
 REPORT_URL = "https://api.mangadex.network/report"
@@ -128,6 +135,31 @@ def _report_image(
         )
     except Exception:
         pass
+
+
+# ── Metadata cache ────────────────────────────────────────────────────────────
+# Stored at <chapter_dir>/.mdx_cache.json so it survives download/ deletion
+# and lets subsequent runs skip the chapter-feed API lookup entirely.
+
+_CACHE_FILE = ".mdx_cache.json"
+
+
+def _load_cache(ch_dir: Path) -> dict | None:
+    p = ch_dir / _CACHE_FILE
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _save_cache(ch_dir: Path, data: dict) -> None:
+    ch_dir.mkdir(parents=True, exist_ok=True)
+    (ch_dir / _CACHE_FILE).write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 # ── MangaDex API calls ────────────────────────────────────────────────────────
@@ -285,6 +317,16 @@ def download_images(
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="mangaeasy download",
+        description="Download a manga chapter from MangaDex.",
+    )
+    parser.add_argument(
+        "--fresh", action="store_true",
+        help="Bypass the local cache and re-fetch all metadata from MangaDex.",
+    )
+    args = parser.parse_args()
+
     dl_cfg = load_download_config()
 
     raw_id = str(dl_cfg.get("manga_id", "")).strip()
@@ -301,25 +343,80 @@ def main() -> None:
     chapter_str    = str(chapter).zfill(2)
     lang           = dl_cfg.get("translated_language", "en")
     output_dir     = manga_dir(str(dl_cfg.get("name"))) / chapter_str / "download"
+    ch_dir         = output_dir.parent   # <library>/<name>/<chapter_str>/
     use_data_saver = bool(dl_cfg.get("use_data_saver", False))
     delay          = float(dl_cfg.get("download_delay", 1.5))
 
     print("=== MangaDex downloader ===")
-    print(f"  User-Agent: {_USER_AGENT}")
-    print(f"  Manga     : {manga_id}")
-    print(f"  Chapter   : {chapter_str}  Language: {lang}")
-    print(f"  Output    : {output_dir}")
-    print(f"  Quality   : {'data-saver' if use_data_saver else 'original'}")
-    print(f"  Img delay : {delay}s ± 20 %")
+    print(f"  User-Agent : {_USER_AGENT}")
+    print(f"  Manga      : {manga_id}")
+    print(f"  Chapter    : {chapter_str}  Language: {lang}")
+    print(f"  Output     : {output_dir}")
+    print(f"  Quality    : {'data-saver' if use_data_saver else 'original'}")
+    print(f"  Img delay  : {delay}s ± 20 %")
+
+    # ── Load / clear cache ─────────────────────────────────────────────────
+    cache: dict | None = None
+    if args.fresh:
+        cache_file = ch_dir / _CACHE_FILE
+        if cache_file.exists():
+            cache_file.unlink()
+            print("  Cache      : cleared (--fresh)")
+        else:
+            print("  Cache      : --fresh (no cache to clear)")
+    else:
+        cache = _load_cache(ch_dir)
+        if cache:
+            when = cache.get("fetched_at", "?")
+            print(f"  Cache      : hit (fetched {when[:19]})")
+        else:
+            print("  Cache      : miss — will fetch from MangaDex")
     print("===========================\n")
 
-    sess           = _session()
-    chapter_id     = find_chapter_id(sess, manga_id, str(chapter), lang)
-    at_home        = fetch_at_home(sess, chapter_id)
-    urls, fnames   = build_image_urls(at_home, use_data_saver)
+    sess = _session()
 
-    print(f"[INFO] {len(urls)} page(s) to download.\n", flush=True)
+    # ── Chapter ID ─────────────────────────────────────────────────────────
+    # Cache the UUID forever — it never changes for a given manga/chapter/lang.
+    if cache and cache.get("chapter_id"):
+        chapter_id = cache["chapter_id"]
+        print(f"[INFO] Cached chapter ID: {chapter_id}", flush=True)
+    else:
+        chapter_id = find_chapter_id(sess, manga_id, str(chapter), lang)
+
+    # ── At-home CDN ────────────────────────────────────────────────────────
+    # Always fetch a fresh CDN URL — these rotate frequently.
+    at_home = fetch_at_home(sess, chapter_id)
+    urls, fnames = build_image_urls(at_home, use_data_saver)
+    total = len(urls)
+
+    # ── Persist / refresh cache ────────────────────────────────────────────
+    _save_cache(ch_dir, {
+        "manga_id":   manga_id,
+        "chapter":    chapter_str,
+        "lang":       lang,
+        "chapter_id": chapter_id,
+        "image_hash": at_home["chapter"]["hash"],
+        "filenames":  fnames,
+        "total":      total,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    print(f"[INFO] {total} page(s) to download.\n", flush=True)
     download_images(sess, urls, fnames, output_dir, delay, chapter_str)
+
+    # ── Missing-page report ────────────────────────────────────────────────
+    actual = (
+        sum(1 for p in output_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
+        if output_dir.is_dir() else 0
+    )
+    if actual < total:
+        print(
+            f"\n[WARN] {actual}/{total} pages present — "
+            f"{total - actual} missing. Run again to resume.",
+            flush=True,
+        )
+    else:
+        print(f"\n[INFO] All {total} pages present ✓", flush=True)
 
 
 if __name__ == "__main__":

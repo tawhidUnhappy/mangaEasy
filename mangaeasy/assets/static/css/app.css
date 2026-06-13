@@ -193,7 +193,7 @@ textarea {
 .ch-table { font-size: 12.5px; margin: 4px 0 2px; }
 .ch-row {
   display: grid;
-  grid-template-columns: 44px repeat(4, 1fr);
+  grid-template-columns: 44px repeat(4, 1fr) 24px;
   align-items: center;
   padding: 3px 8px;
   border-radius: 3px;
@@ -204,9 +204,59 @@ textarea {
 .ch-num { font-family: Consolas, monospace; color: #ccc; font-weight: 600; }
 .ch-cell { text-align: center; color: #555; }
 .ch-cell.done { color: #6fd388; }
+.ch-cell.warn { color: #e07a40; }
 .ch-empty { color: #555; font-size: 12px; padding: 6px 2px; display: block; }
+/* delete button in each row */
+.ch-del-btn {
+  background: none; border: none; color: #3a3a3d; cursor: pointer;
+  padding: 1px 3px; font-size: 12px; line-height: 1; border-radius: 3px;
+  transition: color 0.15s;
+}
+.ch-row:hover .ch-del-btn { color: #666; }
+.ch-del-btn:hover { color: #c94040 !important; background: #2a1515; }
+/* expanded delete-options row */
+.ch-del-row {
+  display: none; align-items: center; flex-wrap: wrap; gap: 5px;
+  padding: 5px 8px 6px 52px;
+  background: #1a1010; border-bottom: 1px solid #2e1515;
+  font-size: 11px;
+}
+.ch-del-row.open { display: flex; }
+.ch-del-label { color: #666; white-space: nowrap; margin-right: 2px; }
+.ch-del-action { opacity: 0.55; }
+.ch-del-action.has-data { opacity: 1; }
+.ch-del-all { margin-left: 4px; }
+.ch-del-cancel {
+  background: none; border: none; color: #555; cursor: pointer;
+  padding: 2px 6px; font-size: 13px; margin-left: auto;
+}
+.ch-del-cancel:hover { color: #ccc; }
 
-/* ── Batch download range inputs ─────────────────────────────────────── */
+/* ── Download mode toggle (Single / Range) ───────────────────────────── */
+.dl-mode-bar {
+  display: flex;
+  width: fit-content;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid #3a3a3d;
+  margin: 10px 0 6px;
+}
+.dl-tab {
+  background: #252528; color: #777; border: none;
+  padding: 5px 16px; font-size: 12.5px; cursor: pointer;
+  border-right: 1px solid #3a3a3d;
+  transition: background 0.12s, color 0.12s;
+}
+.dl-tab:last-child { border-right: none; }
+.dl-tab.active { background: #007acc; color: #fff; }
+.dl-tab:hover:not(.active) { background: #2e2e32; color: #ccc; }
+.dl-range-panel { margin: 4px 0 4px; }
+.dl-range-panel.hidden { display: none; }
+.dl-opts-row { margin: 6px 0 2px; }
+.dl-opt { font-size: 12px; color: #888; cursor: pointer; user-select: none; }
+.dl-opt input { margin-right: 5px; vertical-align: -1px; }
+
+/* ── Shared number inputs for chapter ranges ─────────────────────────── */
 .bdl-range-label {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; color: #ccc;

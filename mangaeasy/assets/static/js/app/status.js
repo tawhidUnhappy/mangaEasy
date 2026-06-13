@@ -6,6 +6,7 @@ import { loadDoctor } from "./setup.js";
 import { updateEditors } from "./editors.js";
 import { refreshWorkflow } from "./workflow.js";
 import { loadChapters } from "./chapters.js";
+import { updateDownloadUI } from "./download.js";
 
 export async function pollStatus() {
   let st;
@@ -23,17 +24,10 @@ export async function pollStatus() {
     ind.textContent = "idle";
   }
 
-  const isBatchDl = store.jobRunning && st.job && st.job.kind === "batch-download";
-
   $("run-start").disabled = store.jobRunning;
   $("chap-run").disabled  = store.jobRunning;
   $("run-stop").disabled  = !(store.jobRunning && st.job && st.job.kind === "run");
-  if ($("bdl-run"))  $("bdl-run").disabled  = store.jobRunning;
-  if ($("bdl-stop")) $("bdl-stop").disabled = !isBatchDl;
-  if ($("bdl-status")) {
-    if (isBatchDl) $("bdl-status").textContent = `${st.job.name}…`;
-    else if (wasRunning && !store.jobRunning) $("bdl-status").textContent = "";
-  }
+  updateDownloadUI(store.jobRunning, st.job);
 
   if (store.jobRunning && st.job && st.job.kind === "run") {
     $("run-status").textContent = `running: ${st.job.name}…`;

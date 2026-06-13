@@ -17,6 +17,7 @@ import { initUiState, loadUiState } from "./uistate.js";
 import { initSetup, loadDoctor } from "./setup.js";
 import { initProject, loadProject } from "./project.js";
 import { initWorkflow, refreshWorkflow } from "./workflow.js";
+import { initDownload } from "./download.js";
 import { initRun, updateStepUI } from "./run.js";
 import { initChapters, loadChapters } from "./chapters.js";
 import { renderEditors } from "./editors.js";
@@ -53,6 +54,7 @@ function initTabs() {
   initSetup();
   initProject();
   initWorkflow();
+  initDownload();
   initRun();
   initChapters();
   renderEditors();

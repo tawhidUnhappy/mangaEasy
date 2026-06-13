@@ -119,7 +119,7 @@ export function initWorkflow() {
     $(id).addEventListener("change", scheduleSave);
   }
 
-  $("wf-download").addEventListener("click", () => runSingle("download"));
+  // wf-download removed — download is owned by download.js
   $("wf-cut").addEventListener("click", () => launchEditor("cut-page"));
   $("wf-arrange").addEventListener("click", () => launchEditor("panel-editor"));
   $("wf-narrate").addEventListener("click", () => launchEditor("narration-editor"));

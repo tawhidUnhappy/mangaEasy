@@ -106,8 +106,10 @@
       chapter below; music and voice come from the <b>Project</b> tab.</p>
 
     <div class="panel">
-      <h3><span class="step-no">1</span> Get the chapter <span id="wf-st-download" class="badge wf-badge"></span></h3>
+      <h3><span class="step-no">1</span> Download pages <span id="wf-st-download" class="badge wf-badge"></span></h3>
       <p id="wf-manga-summary" class="hint"></p>
+
+      <!-- chapter + language: shared by all workflow steps -->
       <div class="form-grid">
         <label>Chapter <input id="wf-chapter" type="number" min="0" class="text"></label>
         <label>Language
@@ -129,12 +131,35 @@
           </select>
         </label>
       </div>
-      <div class="row">
-        <button id="wf-download" class="btn primary">⬇ Download from MangaDex</button>
-        <button class="btn" data-wf-open="download">Open download folder</button>
+
+      <!-- single / range mode toggle -->
+      <div class="dl-mode-bar">
+        <button class="dl-tab active" data-dlmode="single">Single chapter</button>
+        <button class="dl-tab" data-dlmode="range">Range</button>
       </div>
-      <p class="hint">Got the pages from another source? Drop the images into the download
-        folder — the rest of the steps don't care where pages came from.</p>
+
+      <!-- range controls (hidden until range mode is selected) -->
+      <div id="dl-range-fields" class="dl-range-panel hidden">
+        <label class="bdl-range-label">Download chapters
+          <input id="dl-from" type="number" min="1" class="text bdl-num" value="1">
+          &nbsp;to&nbsp;
+          <input id="dl-to" type="number" min="1" class="text bdl-num" value="8">
+        </label>
+        <p class="hint" style="margin:4px 0 0">Language above applies to all chapters. Already-downloaded chapters are skipped automatically.</p>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <button id="dl-run" class="btn primary">⬇ Download</button>
+        <button id="dl-stop" class="btn danger" disabled>■ Stop</button>
+        <span id="dl-status" class="hint"></span>
+        <button class="btn" data-wf-open="download">Open folder</button>
+      </div>
+      <div class="dl-opts-row">
+        <label class="dl-opt" title="Re-fetch chapter ID and page list from MangaDex, bypassing the local cache">
+          <input type="checkbox" id="dl-fresh"> Force fresh metadata
+        </label>
+      </div>
+      <p class="hint">Already have pages? Drop them into the download folder — steps 2–4 don't care where they came from. Interrupted downloads resume automatically (existing pages are skipped).</p>
     </div>
 
     <div class="panel">
@@ -187,22 +212,6 @@
       </div>
       <p id="chapters-summary" class="hint" style="margin:0 0 6px"></p>
       <div id="chapters-grid"></div>
-    </div>
-
-    <!-- ── Batch download ───────────────────────────────────────────────── -->
-    <div class="panel">
-      <h3>Batch download from MangaDex</h3>
-      <div class="row">
-        <label class="bdl-range-label">Chapters
-          <input id="bdl-start" type="number" min="1" class="text bdl-num" value="1">
-          to
-          <input id="bdl-end" type="number" min="1" class="text bdl-num" value="8">
-        </label>
-        <button id="bdl-run" class="btn primary">⬇ Download</button>
-        <button id="bdl-stop" class="btn danger" disabled>■ Stop</button>
-        <span id="bdl-status" class="hint"></span>
-      </div>
-      <p class="hint">Downloads each chapter in sequence using the manga URL from your Project settings. Watch progress in the Terminal tab.</p>
     </div>
 
     <div class="panel">

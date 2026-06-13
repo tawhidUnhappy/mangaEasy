@@ -9,6 +9,7 @@ along the current chapter is.
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -21,7 +22,8 @@ from mangaeasy.web.app.state import lock, log, state
 
 bp = Blueprint("workflow", __name__)
 
-IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+IMAGE_EXTS  = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+_CACHE_FILE = ".mdx_cache.json"   # written by mangadex.py inside <ch_dir>/
 
 
 def _library_dir(root: Path, sys_cfg: dict) -> Path:
@@ -44,6 +46,16 @@ def _count_files(folder: Path, exts: set[str]) -> int:
     if not folder.is_dir():
         return 0
     return sum(1 for p in folder.iterdir() if p.suffix.lower() in exts)
+
+
+def _read_chapter_cache(ch_dir: Path) -> dict | None:
+    p = ch_dir / _CACHE_FILE
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 @bp.route("/api/workflow", methods=["GET", "POST"])
@@ -163,15 +175,103 @@ def api_workflow_chapters():
             ch_num = int(ch_dir.name)
         except ValueError:
             continue
+        cache    = _read_chapter_cache(ch_dir)
+        expected = cache.get("total") if cache else None
         chapters.append({
             "chapter":    ch_num,
             "downloaded": _count_files(ch_dir / "download", IMAGE_EXTS),
+            "expected":   expected,    # total pages known from MangaDex (None = never fetched)
+            "cached":     cache is not None,
             "panels":     _count_files(ch_dir / panels_sub,  IMAGE_EXTS),
             "audio":      _count_files(ch_dir / audio_sub,   {".wav"}),
             "video":      bool(list(ch_dir.glob("*.mp4"))),
         })
 
     return jsonify({"chapters": chapters, "name": name})
+
+
+@bp.route("/api/workflow/chapters/<int:chapter_num>/cache", methods=["DELETE"])
+def api_clear_chapter_cache(chapter_num: int):
+    """Delete the cached MangaDex metadata for one chapter.
+
+    The next download will re-fetch chapter ID and image list from the API.
+    """
+    root: Path = state["project_root"]
+    cfg = _read_json(root / "config.json") or {}
+    sys_cfg = _read_json(root / "config.system.json") or {}
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    name = str(dl.get("name") or "")
+    if not name:
+        return jsonify({"error": "no manga name configured"}), 400
+
+    lib = _library_dir(root, sys_cfg)
+    ch_dir = lib / name / f"{chapter_num:02d}"
+    cache_file = ch_dir / _CACHE_FILE
+
+    if cache_file.exists():
+        cache_file.unlink()
+        log(f"[cache] cleared ch{chapter_num:02d} cache")
+        return jsonify({"cleared": True})
+    return jsonify({"cleared": False, "note": "no cache file found"})
+
+
+@bp.route("/api/workflow/chapters/<int:chapter_num>/delete", methods=["POST"])
+def api_delete_chapter_data(chapter_num: int):
+    """Delete one or more stages of a chapter's generated files.
+
+    Body: {"what": "download" | "panels" | "audio" | "video" | "all"}
+    narration_*.json is never touched — it contains user-authored content.
+    """
+    body = request.get_json(silent=True) or {}
+    what = str(body.get("what", "")).strip()
+    valid = {"download", "panels", "audio", "video", "all"}
+    if what not in valid:
+        return jsonify({"error": f"'what' must be one of: {', '.join(sorted(valid))}"}), 400
+
+    root: Path = state["project_root"]
+    cfg = _read_json(root / "config.json") or {}
+    sys_cfg = _read_json(root / "config.system.json") or {}
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    name = str(dl.get("name") or "")
+    if not name:
+        return jsonify({"error": "no manga name configured"}), 400
+
+    lib = _library_dir(root, sys_cfg)
+    ch_dir = lib / name / f"{chapter_num:02d}"
+    if not ch_dir.is_dir():
+        return jsonify({"error": f"chapter {chapter_num:02d} folder not found"}), 404
+
+    paths_cfg = sys_cfg.get("paths") or {}
+    panels_sub = paths_cfg.get("panels_subdir", "panels")
+    audio_sub = paths_cfg.get("audio_subdir", "audio")
+
+    removed: list[str] = []
+
+    def rm_tree(path: Path) -> None:
+        if path.is_dir():
+            shutil.rmtree(path)
+            removed.append(path.name + "/")
+
+    def rm_glob(pattern: str) -> None:
+        files = list(ch_dir.glob(pattern))
+        for f in files:
+            f.unlink(missing_ok=True)
+        if files:
+            removed.append(f"{len(files)}×{pattern}")
+
+    if what in ("download", "all"):
+        rm_tree(ch_dir / "download")
+    if what in ("panels", "all"):
+        rm_tree(ch_dir / panels_sub)
+    if what in ("audio", "all"):
+        rm_tree(ch_dir / audio_sub)
+    if what in ("video", "all"):
+        rm_glob("*.mp4")
+    if what == "all":
+        rm_tree(ch_dir / "work")
+
+    log(f"[delete] ch{chapter_num:02d} {what}: {', '.join(removed) or 'nothing to remove'}")
+    return jsonify({"deleted": removed, "chapter": chapter_num})
 
 
 @bp.route("/api/workflow/batch-download", methods=["POST"])
@@ -186,6 +286,8 @@ def api_batch_download():
 
     if start < 1 or end < start or end > 999:
         return jsonify({"error": "range must be 1–999 and start ≤ end"}), 400
+
+    fresh: bool = bool(body.get("fresh", False))
 
     root: Path = state["project_root"]
     cfg_path = root / "config.json"
@@ -225,7 +327,8 @@ def api_batch_download():
             cfg.pop("_comment", None)
             cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
 
-            proc = jobs.spawn_cli("download", [], root)
+            dl_args = ["--fresh"] if fresh else []
+            proc = jobs.spawn_cli("download", dl_args, root)
             job["proc"] = proc
             assert proc.stdout is not None
             for line in proc.stdout:
