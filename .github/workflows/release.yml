@@ -42,6 +42,17 @@ jobs:
       - name: Install project dependencies
         run: uv sync --dev
 
+      # Generate .icns BEFORE PyInstaller so the spec can embed it into the .app
+      - name: "[macOS] Generate icon.icns"
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p icon.iconset
+          for size in 16 32 64 128 256 512; do
+            sips -z $size $size packaging/icon.png --out icon.iconset/icon_${size}x${size}.png          > /dev/null
+            sips -z $((size*2)) $((size*2)) packaging/icon.png --out icon.iconset/icon_${size}x${size}@2x.png > /dev/null
+          done
+          iconutil -c icns icon.iconset -o packaging/icon.icns
+
       - name: Build standalone bundle
         run: uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm
 
@@ -164,7 +175,7 @@ jobs:
 
       - name: "[macOS] Portable tar.gz"
         if: runner.os == 'macOS'
-        run: tar -czf mangaEasy-macos.tar.gz -C dist mangaEasy
+        run: tar -czf mangaEasy-macos.tar.gz -C dist mangaEasy.app
 
       - name: "[macOS] Build .pkg installer"
         if: runner.os == 'macOS'
@@ -172,23 +183,24 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
 
-          # ── payload: goes to /opt/mangaEasy ───────────────
-          mkdir -p pkg-payload/opt/mangaEasy
-          cp -r dist/mangaEasy/. pkg-payload/opt/mangaEasy/
-          chmod +x pkg-payload/opt/mangaEasy/mangaeasy
+          # Install .app bundle to /Applications
+          mkdir -p pkg-payload/Applications
+          cp -r dist/mangaEasy.app pkg-payload/Applications/
 
-          # ── scripts: postinstall creates /usr/local/bin symlink ──
+          # postinstall: create /usr/local/bin/mangaeasy wrapper for CLI use
           mkdir -p pkg-scripts
           cat > pkg-scripts/postinstall << 'SCRIPT'
           #!/bin/bash
           set -e
           mkdir -p /usr/local/bin
-          ln -sf /opt/mangaEasy/mangaeasy /usr/local/bin/mangaeasy
-          chmod +x /opt/mangaEasy/mangaeasy
+          cat > /usr/local/bin/mangaeasy << 'LAUNCHER'
+          #!/bin/bash
+          exec /Applications/mangaEasy.app/Contents/MacOS/mangaeasy "$@"
+          LAUNCHER
+          chmod +x /usr/local/bin/mangaeasy
           SCRIPT
           chmod +x pkg-scripts/postinstall
 
-          # ── build component package ───────────────────────
           pkgbuild \
             --root pkg-payload \
             --scripts pkg-scripts \
