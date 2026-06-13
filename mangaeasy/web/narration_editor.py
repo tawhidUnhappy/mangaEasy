@@ -28,7 +28,12 @@ DEFAULT_MODEL   = os.environ.get("WHISPER_MODEL",   _w_cfg.get("model",   "mediu
 DEFAULT_DEVICE  = os.environ.get("WHISPER_DEVICE",  _w_cfg.get("device",  "auto")).lower().strip()
 DEFAULT_COMPUTE = os.environ.get("WHISPER_COMPUTE", _w_cfg.get("compute", "float16"))
 
-from faster_whisper import WhisperModel
+try:
+    from faster_whisper import WhisperModel as _WhisperModel
+    _WHISPER_AVAILABLE = True
+except ImportError:
+    _WhisperModel = None  # type: ignore[assignment]
+    _WHISPER_AVAILABLE = False
 
 
 app = make_app(__name__)
@@ -65,10 +70,15 @@ WHISPER_ACTIVE_COMPUTE = None
 def init_whisper_auto():
     global whisper_model, WHISPER_ACTIVE_DEVICE, WHISPER_ACTIVE_COMPUTE, WHISPER_ACTIVE_MODEL
 
+    if not _WHISPER_AVAILABLE:
+        print("[WARN] faster-whisper not installed — transcription disabled. "
+              "Re-install mangaeasy with the whisper extra to enable it.")
+        return
+
     def _try(device: str, compute: str) -> bool:
         global whisper_model
         try:
-            whisper_model = WhisperModel(DEFAULT_MODEL, device=device, compute_type=compute)
+            whisper_model = _WhisperModel(DEFAULT_MODEL, device=device, compute_type=compute)
             return True
         except Exception as exc:
             print(f"[WARN] Whisper init failed: {device}/{compute} | {exc}")
