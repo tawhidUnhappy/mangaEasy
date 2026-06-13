@@ -7,7 +7,7 @@ const PERSIST_VALUES = [
   "run-output-dir", "run-step", "run-tts",
   "run-encoder", "run-device", "run-items", "run-name",
 ];
-const PERSIST_CHECKS = ["run-long", "run-normalize", "run-ow-audio", "run-ow-video"];
+const PERSIST_CHECKS = ["run-long", "run-normalize", "run-ow-audio", "run-ow-video", "wf-normalize"];
 
 let saveTimer = null;
 

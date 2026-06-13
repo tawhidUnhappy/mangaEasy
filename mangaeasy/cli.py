@@ -64,6 +64,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
 
     # ── Manga chapter workflow: render & export ───────────────────────────────
     "fade-audio":           ("mangaeasy.audio.fade",                           "main",        "Manga: render",    "Apply fades to chapter narration audio."),
+    "normalize-chapter-audio": ("mangaeasy.audio.normalize_chapter",           "main",        "Manga: render",    "YouTube loudness-normalize the chapter video (−14 LUFS, two-pass, replaces in place)."),
     "render-video":         ("mangaeasy.video.render",                         "main",        "Manga: render",    "Render a chapter video from panels + audio."),
     "add-bgm":              ("mangaeasy.video.add_bg",                         "main",        "Manga: render",    "Add background music to a chapter video."),
     "join-chapters":        ("mangaeasy.video.join",                           "main",        "Manga: render",    "Rebuild chapters from panels + audio and add BGM."),

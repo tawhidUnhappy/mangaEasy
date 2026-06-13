@@ -192,6 +192,10 @@
         <button id="wf-video" class="btn">🎬 Only video</button>
         <button class="btn" data-wf-open="chapter">Open output folder</button>
       </div>
+      <div class="opts" style="margin-top:6px">
+        <label title="After rendering, run two-pass EBU R 128 loudness normalization (−14 LUFS integrated, −1.5 dBTP) on the final chapter video — the YouTube standard. The original is kept as a .before_normalize.mp4 backup.">
+          <input type="checkbox" id="wf-normalize"> YouTube loudness (−14 LUFS)</label>
+      </div>
       <p class="hint">Audio clones your <b>voice reference</b> with IndexTTS, then the video is
         rendered from panels + audio and your <b>background music</b> is mixed in. The finished
         MP4 lands in the chapter folder. One job runs at a time — watch the log below.</p>

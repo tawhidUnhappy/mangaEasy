@@ -118,6 +118,7 @@ async function launchEditor(name) {
 function videoSteps() {
   const steps = ["fade-audio", "render-video"];
   if (wf && wf.bgm_set) steps.push("add-bgm");
+  if ($("wf-normalize").checked) steps.push("normalize-chapter-audio");
   return steps;
 }
 
