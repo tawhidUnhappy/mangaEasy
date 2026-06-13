@@ -1,6 +1,6 @@
 /* run.js — Create videos tab: pipeline steps and chapter commands. */
 
-import { $, api, appendLog } from "./core.js";
+import { $, api, appendLog, store } from "./core.js";
 import { pollStatus } from "./status.js";
 
 const STEPS_WITH_OUTPUT = new Set([
@@ -17,12 +17,13 @@ export function updateStepUI() {
 }
 
 function buildRunArgs() {
-  const step = $("run-step").value;
-  const mangaDir = $("run-manga-dir").value.trim() || "content";
+  const step     = $("run-step").value;
+  // manga dir comes from the workflow state (mangas/<name>) — no manual input needed
+  const mangaDir = store.mangaDir || "mangas";
   const outputDir = $("run-output-dir").value.trim() || "output";
-  const name = $("run-name").value.trim();
+  const name  = $("run-name").value.trim();
   const items = $("run-items").value.trim();
-  const args = ["--project-root", mangaDir];
+  const args  = ["--project-root", mangaDir];
 
   if (STEPS_WITH_OUTPUT.has(step)) args.push("--output-root", outputDir);
   if (items && !STEPS_WITHOUT_ITEMS.has(step)) args.push("--item-range", items);

@@ -27,19 +27,19 @@ _CACHE_FILE = ".mdx_cache.json"   # written by mangadex.py inside <ch_dir>/
 
 
 def _library_dir(root: Path, sys_cfg: dict) -> Path:
-    """Mirror of mangaeasy.paths.library_dir, but for the *selected* project.
+    """Return the folder that holds per-manga subfolders.
 
-    The app process resolved its own PROJECT_ROOT at startup, so the package
-    helper would point at the wrong folder — recompute against `root`.
+    New projects use <root>/mangas/.  Existing projects with library/ or
+    manga/ dirs are detected and used as-is so old data keeps working.
+    Override by setting paths.library_subdir in config.system.json.
     """
     sub = (sys_cfg.get("paths") or {}).get("library_subdir")
     if sub:
         return root / sub
-    library = root / "library"
-    legacy = root / "manga"
-    if legacy.is_dir() and not library.is_dir():
-        return legacy
-    return library
+    for candidate in (root / "mangas", root / "library", root / "manga"):
+        if candidate.is_dir():
+            return candidate
+    return root / "mangas"   # default for new projects
 
 
 def _count_files(folder: Path, exts: set[str]) -> int:
@@ -98,15 +98,19 @@ def api_workflow():
         or "en"
     )
 
+    lib_dir   = _library_dir(root, sys_cfg)
+    manga_dir = str(lib_dir / name) if name else ""
+
     info: dict = {
-        "manga_id": str(dl.get("manga_id") or ""),
-        "name": name,
-        "chapter": chapter,
-        "language": language,
-        "bgm_set": bool((sys_cfg.get("bgm") or {}).get("file")),
+        "manga_id":  str(dl.get("manga_id") or ""),
+        "name":      name,
+        "manga_dir": manga_dir,   # absolute path to <mangas>/<name>/ — used by batch pipeline
+        "chapter":   chapter,
+        "language":  language,
+        "bgm_set":   bool((sys_cfg.get("bgm") or {}).get("file")),
         "voice_set": bool((sys_cfg.get("tts") or {}).get("speaker_wav")),
-        "paths": None,
-        "status": None,
+        "paths":     None,
+        "status":    None,
     }
     if not name:
         return jsonify(info)

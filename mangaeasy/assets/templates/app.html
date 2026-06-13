@@ -215,14 +215,8 @@
     </div>
 
     <div class="panel">
-      <h3><span class="step-no">1</span> Choose folders</h3>
-      <div class="folder-row">
-        <label class="folder-label" for="run-manga-dir">Manga folder</label>
-        <input id="run-manga-dir" class="text grow mono" value="content" spellcheck="false">
-        <button class="btn" data-browse="run-manga-dir">Browse…</button>
-        <button class="btn" data-open="run-manga-dir" title="Show this folder in your file manager">Open</button>
-      </div>
-      <p class="hint indent">Where your manga lives: one subfolder per item/chapter. Relative names (like <code>content</code>) are inside the project folder.</p>
+      <h3><span class="step-no">1</span> Folders</h3>
+      <p class="hint">Manga: <span id="run-manga-summary" class="mono" style="color:#ccc"></span> &nbsp;<button class="btn small tab-link" data-tab="project">Edit in Project ↗</button></p>
 
       <div class="folder-row">
         <label class="folder-label" for="run-output-dir">Output folder</label>

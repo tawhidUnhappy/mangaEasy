@@ -1,7 +1,7 @@
 /* workflow.js — "Make a video" tab: guided chapter flow
    download → crop → narrate → generate, with per-step progress badges. */
 
-import { $, api, appendLog } from "./core.js";
+import { $, api, appendLog, store } from "./core.js";
 import { pollStatus } from "./status.js";
 
 let wf = null;          // last /api/workflow payload
@@ -34,6 +34,13 @@ function updateMangaSummary(data) {
 
 function render(data) {
   wf = data;
+  store.mangaDir = data.manga_dir || "";   // shared with run.js for batch pipeline
+
+  // Keep the Batch tab's manga path display in sync.
+  const runSummary = document.getElementById("run-manga-summary");
+  if (runSummary)
+    runSummary.textContent = data.manga_dir || (data.name ? `mangas/${data.name}` : "(no manga set)");
+
   updateMangaSummary(data);
   // Don't clobber fields the user is actively typing in.
   for (const [id, value] of [

@@ -4,7 +4,7 @@
 import { $, api } from "./core.js";
 
 const PERSIST_VALUES = [
-  "run-manga-dir", "run-output-dir", "run-step", "run-tts",
+  "run-output-dir", "run-step", "run-tts",
   "run-encoder", "run-device", "run-items", "run-name",
 ];
 const PERSIST_CHECKS = ["run-long", "run-normalize", "run-ow-audio", "run-ow-video"];
