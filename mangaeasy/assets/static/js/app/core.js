@@ -18,6 +18,7 @@ export async function api(path, opts = {}) {
 /* ── Log console (SSE) ─────────────────────────────────────────────────── */
 
 let logLines = null;
+let autoScroll = true;
 
 export function appendLog(ts, msg) {
   if (!logLines) return;
@@ -28,17 +29,30 @@ export function appendLog(ts, msg) {
   const tsSpan = document.createElement("span");
   tsSpan.className = "ts";
   tsSpan.textContent = ts;
+  const msgSpan = document.createElement("span");
+  msgSpan.className = "msg";
+  msgSpan.textContent = msg;
   div.appendChild(tsSpan);
-  div.appendChild(document.createTextNode(msg));
+  div.appendChild(msgSpan);
   logLines.appendChild(div);
   while (logLines.childNodes.length > 2000) logLines.removeChild(logLines.firstChild);
-  logLines.scrollTop = logLines.scrollHeight;
+  if (autoScroll) logLines.scrollTop = logLines.scrollHeight;
 }
 
 export function initLogConsole() {
   logLines = $("log-lines");
+  const statusEl = $("term-status");
+  const scrollCb = $("term-autoscroll");
+
+  if (scrollCb) {
+    scrollCb.addEventListener("change", () => { autoScroll = scrollCb.checked; });
+  }
+
+  $("log-clear").addEventListener("click", () => (logLines.innerHTML = ""));
 
   const events = new EventSource("/log_stream");
+  events.onopen = () => { if (statusEl) statusEl.textContent = "connected"; };
+  events.onerror = () => { if (statusEl) statusEl.textContent = "reconnecting…"; };
   events.onmessage = (e) => {
     try {
       const entry = JSON.parse(e.data);
@@ -46,11 +60,4 @@ export function initLogConsole() {
       appendLog(entry.ts, entry.msg);
     } catch { /* ignore malformed entries */ }
   };
-
-  $("log-clear").addEventListener("click", () => (logLines.innerHTML = ""));
-  $("console-toggle").addEventListener("click", () => {
-    const c = $("console");
-    c.classList.toggle("collapsed");
-    $("console-toggle").textContent = c.classList.contains("collapsed") ? "Show" : "Hide";
-  });
 }

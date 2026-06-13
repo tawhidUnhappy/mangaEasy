@@ -16,6 +16,7 @@
     <button class="tab" data-tab="flow">3 · Make a video</button>
     <button class="tab" data-tab="run">Batch videos</button>
     <button class="tab" data-tab="editors">Editors</button>
+    <button class="tab" data-tab="terminal">Terminal</button>
   </nav>
   <div id="job-indicator" class="idle">idle</div>
 </header>
@@ -296,18 +297,18 @@
     <div id="editor-cards"></div>
   </section>
 
-</main>
+  <!-- ── Terminal ─────────────────────────────────────────────────────── -->
+  <section id="tab-terminal" class="tab-page terminal-page">
+    <div id="term-bar">
+      <span class="term-label">▶ Log output</span>
+      <label class="term-scroll-opt"><input type="checkbox" id="term-autoscroll" checked> Auto-scroll</label>
+      <button id="log-clear" class="btn small">Clear</button>
+      <span id="term-status" class="term-status"></span>
+    </div>
+    <div id="log-lines"></div>
+  </section>
 
-<!-- ── Log console ─────────────────────────────────────────────────────── -->
-<div id="console">
-  <div id="console-bar">
-    <span class="label">Logs</span>
-    <span class="spacer"></span>
-    <button id="log-clear" class="btn small">Clear</button>
-    <button id="console-toggle" class="btn small">Hide</button>
-  </div>
-  <div id="log-lines"></div>
-</div>
+</main>
 
 <!-- ── Folder picker (fallback when no native dialog is available) ─────── -->
 <div id="folder-modal" class="modal hidden">

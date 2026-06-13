@@ -42,8 +42,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="mangaeasy",
-    console=True,   # keep True so CLI commands show output in their terminal;
-                    # launcher.py hides the window when starting the GUI app
+    console=False,  # GUI subsystem — no console window, taskbar icon works correctly
     icon=ICON,
     upx=False,
 )
@@ -68,7 +67,7 @@ if _sys.platform == "darwin":
         info_plist={
             "CFBundleName": "mangaEasy",
             "CFBundleDisplayName": "mangaEasy",
-            "CFBundleShortVersionString": "0.6.0",
+            "CFBundleShortVersionString": "0.6.2",
             "NSHighResolutionCapable": True,
             "NSRequiresAquaSystemAppearance": False,  # supports dark mode
         },
