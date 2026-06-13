@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 
 from flask import Blueprint, jsonify, request
@@ -71,8 +72,17 @@ def api_delete_tool(name: str):
     except ValueError:
         return jsonify({"error": "path is outside the managed tools directory"}), 400
 
+    def _force_remove(func, fpath, _exc):
+        # Git repos on Windows leave object files read-only; clear the bit and retry.
+        import stat
+        try:
+            os.chmod(fpath, stat.S_IWRITE)
+            func(fpath)
+        except Exception:
+            pass
+
     try:
-        shutil.rmtree(path)
+        shutil.rmtree(path, onerror=_force_remove)
         log(f"[setup] deleted tool '{name}' ({path})")
         return jsonify({"deleted": True})
     except Exception as exc:
