@@ -357,7 +357,8 @@
             !wouldOverlapAny(newTop, newBottom, dragging.panelIndex)) {
           panels[dragging.panelIndex].top    = newTop;
           panels[dragging.panelIndex].bottom = newBottom;
-          normalizePanels();
+          // No normalizePanels() here — that calls localStorage.setItem()
+          // synchronously on every pixel, blocking the main thread mid-drag.
           scheduleRedrawAll();
         }
         return;
@@ -402,7 +403,12 @@
     });
 
     window.addEventListener('mouseup', () => {
-      if (dragging) suppressClickOnce();
+      if (dragging) {
+        suppressClickOnce();
+        // Normalize and save exactly once when the drag finishes.
+        normalizePanels();
+        scheduleRedrawAll();
+      }
       dragging = null; dragMoved = false;
     });
 
