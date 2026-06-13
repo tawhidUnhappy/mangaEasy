@@ -26,6 +26,9 @@ def spawn_cli(command: str, args: list[str], cwd: Path) -> subprocess.Popen:
     env = dict(os.environ)
     env["MANGAEASY_PROJECT_ROOT"] = str(cwd)
     env.setdefault("PYTHONUNBUFFERED", "1")
+    # Force UTF-8 I/O so subprocess print() calls with non-ASCII characters
+    # (arrows, checkmarks, …) don't crash on Windows where the default is cp1252.
+    env["PYTHONIOENCODING"] = "utf-8"
     full = cli_command(command, *args)
     log(f"$ mangaeasy {command} {' '.join(args)}")
     return subprocess.Popen(
@@ -36,6 +39,7 @@ def spawn_cli(command: str, args: list[str], cwd: Path) -> subprocess.Popen:
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
         text=True,
+        encoding="utf-8",
         bufsize=1,
         **popen_kwargs(),
     )
