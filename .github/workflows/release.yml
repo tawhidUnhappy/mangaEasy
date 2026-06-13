@@ -25,10 +25,12 @@ jobs:
         uses: actions/checkout@v4
 
       # setup-uv installs uv AND the pinned Python in one step
+      # uv-version must match the local version that generated uv.lock
       - name: Set up uv + Python 3.12
         uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: "3.12"
+          uv-version: "0.11.16"
 
       # pywebview needs GTK/webkit headers on Linux so PyInstaller can import it during analysis
       - name: Install system deps (Linux only)
