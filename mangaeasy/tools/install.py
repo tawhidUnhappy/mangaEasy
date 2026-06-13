@@ -245,12 +245,16 @@ def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
     target = dest / (spec.model_subdir or "checkpoints")
     log(f"Downloading model {spec.model_repo} -> {target}")
     _require(["uvx"], log)
+    # PYTHONUTF8=1 prevents Windows charmap errors when hf CLI prints Unicode
+    # success symbols (e.g. ✓ U+2713) to a pipe that uses a legacy code page.
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     _run(
         [
             "uvx", "--from", "huggingface-hub[cli,hf_xet]",
             "hf", "download", spec.model_repo, "--local-dir", str(target),
         ],
         log,
+        env=env,
     )
 
 
