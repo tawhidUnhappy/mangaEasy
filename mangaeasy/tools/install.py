@@ -291,16 +291,23 @@ def _install_uv_project(
     if gpu_mode == "cuda" and spec.needs_gpu:
         index_url = _torch_index_url("cuda")
         assert index_url is not None
-        log(f"Reinstalling torch with CUDA wheels ({index_url})…")
+        log(f"Reinstalling torch/torchvision/torchaudio with CUDA wheels ({index_url})…")
+        log("(this downloads ~3–5 GB; progress appears below)")
         venv_python = dest / ".venv" / (
             "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
         )
+        # --no-deps: only swap the three CUDA binary wheels; do NOT let uv
+        # re-resolve and upgrade other deps (e.g. numpy). uv sync already
+        # locked everything to the versions in the tool's uv.lock — upgrading
+        # numpy here breaks packages like matplotlib that were compiled against
+        # NumPy 1.x.
         _run(
             ["uv", "pip", "install",
              "--python", str(venv_python),
              "torch", "torchvision", "torchaudio",
              "--index-url", index_url,
-             "--force-reinstall", "--quiet"],
+             "--force-reinstall",
+             "--no-deps"],
             log, cwd=dest, env=tool_env(),
         )
 

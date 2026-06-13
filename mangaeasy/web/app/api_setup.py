@@ -77,7 +77,7 @@ def api_setup_gpu():
                      "--python", python,
                      "torch", "torchvision",
                      "--index-url", index_url,
-                     "--force-reinstall", "--quiet"],
+                     "--force-reinstall"],
                     log,
                 )
                 log("[setup-gpu] Done — restart mangaeasy to activate GPU acceleration.")
