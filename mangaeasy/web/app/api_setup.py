@@ -92,6 +92,40 @@ def api_setup_gpu():
     return jsonify({"started": True})
 
 
+@bp.route("/api/install-whisper", methods=["POST"])
+def api_install_whisper():
+    """Install faster-whisper into mangaeasy's own venv."""
+    import sys
+
+    with lock:
+        if jobs.job_running():
+            return jsonify({"error": "another job is already running"}), 409
+
+        python = sys.executable
+
+        def work():
+            from mangaeasy.tools.install import InstallError, _run
+            try:
+                log(f"[install-whisper] Installing faster-whisper into mangaeasy env ({python})")
+                _run(
+                    ["uv", "pip", "install",
+                     "--python", python,
+                     "faster-whisper>=1.2.1",
+                     "--quiet"],
+                    log,
+                )
+                log("[install-whisper] Done — restart mangaeasy to enable narration transcription.")
+            except InstallError as exc:
+                log(f"[install-whisper] FAILED: {exc}")
+            except Exception as exc:
+                log(f"[install-whisper] unexpected error: {exc}")
+
+        thread = threading.Thread(target=work, daemon=True)
+        state["job"] = {"kind": "install-whisper", "name": "faster-whisper", "thread": thread, "proc": None}
+        thread.start()
+    return jsonify({"started": True})
+
+
 @bp.route("/api/install-tool/<name>", methods=["DELETE"])
 def api_delete_tool(name: str):
     import shutil

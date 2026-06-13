@@ -60,6 +60,33 @@ export async function loadDoctor() {
     }
   }
 
+  // Whisper (faster-whisper) — optional narration transcription
+  const whisperOk = report.whisper;
+  const whisperLabel = whisperOk
+    ? "Whisper (narration transcription) · installed"
+    : "Whisper not installed — narration transcription disabled";
+  grid.insertAdjacentHTML("beforeend",
+    `<div class="prereq" title="${whisperOk ? "faster-whisper is importable" : "faster-whisper package not found in mangaeasy env"}">
+       <span class="dot ${whisperOk ? "ok" : "bad"}"></span>${whisperLabel}
+       ${whisperOk ? "" : `<button id="btn-install-whisper" class="btn small" style="margin-left:8px" ${store.jobRunning ? "disabled" : ""}>Install Whisper</button>`}
+     </div>`);
+
+  if (!whisperOk) {
+    document.getElementById("btn-install-whisper")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = "Installing…";
+      try {
+        await api("/api/install-whisper", { method: "POST" });
+        appendLog("", "Installing faster-whisper (watch logs below). Restart app when done.");
+      } catch (err) {
+        appendLog("", `Whisper install failed: ${err.message}`);
+        btn.disabled = false;
+        btn.textContent = "Install Whisper";
+      }
+    });
+  }
+
   const cards = $("tool-cards");
   cards.innerHTML = "";
   for (const [key, info] of Object.entries(report.tools)) {

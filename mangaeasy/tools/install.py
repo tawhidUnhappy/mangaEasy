@@ -448,12 +448,20 @@ def doctor() -> dict:
             "notes": spec.notes,
         }
 
+    whisper_installed = False
+    try:
+        import importlib.util
+        whisper_installed = importlib.util.find_spec("faster_whisper") is not None
+    except Exception:
+        pass
+
     return {
         "tools_home": str(tools_home()),
         "git_lfs": _git_lfs_ok(),
         "gpu": _has_gpu(),
         "cuda": cuda_available,
         "cuda_device": cuda_device,
+        "whisper": whisper_installed,
         "executables": executables,
         "tools": tools,
     }
