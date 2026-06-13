@@ -7,6 +7,9 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Prevent OS-level text/image selection while dragging panel handles */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #toolbar {
@@ -106,5 +109,10 @@ button:disabled { opacity: 0.35; cursor: default; box-shadow: none; transform: n
 .page { position: relative; margin: 0 auto; }
 .page + .page { margin-top: 0; }
 .page-inner { position: relative; }
-.page img { display: block; width: 100%; height: auto; }
+.page img {
+  display: block; width: 100%; height: auto;
+  /* hitLayer canvas handles all pointer events; prevent native image drag */
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
 .page canvas { position: absolute; left: 0; top: 0; }

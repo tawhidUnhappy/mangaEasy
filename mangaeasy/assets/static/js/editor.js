@@ -618,5 +618,10 @@
     }
   }
 
+  // Prevent the browser from starting a native drag or text selection
+  // when the user drags a panel handle and the mouse leaves the canvas.
+  document.addEventListener('dragstart',   e => e.preventDefault());
+  document.addEventListener('selectstart', e => e.preventDefault());
+
   loadImagesList();
 })();

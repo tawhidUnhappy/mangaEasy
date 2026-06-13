@@ -123,14 +123,28 @@ def run(app: Flask) -> int:
         print("[app] server did not start in time.")
         return 1
 
+    from mangaeasy.web.app import window_state as ws
+    saved = ws.load()
+
     # Keep the window handle so the pick-folder/file APIs can show native dialogs.
-    state["window"] = window.create_window(
-        "mangaEasy", url, width=1240, height=820, min_size=(900, 600)
+    win = window.create_window(
+        "mangaEasy", url,
+        width=saved["width"], height=saved["height"],
+        x=saved["x"], y=saved["y"],
+        min_size=(900, 600),
     )
-    if sys.platform == "win32":
-        window.start(func=_win_apply_icon)
-    else:
-        window.start()
+    state["window"] = win
+
+    # Save geometry when the user closes the window.
+    win.events.closing += lambda: ws.save(win)
+
+    def _start_func():
+        if sys.platform == "win32":
+            _win_apply_icon()
+        if saved["maximized"]:
+            win.maximize()
+
+    window.start(func=_start_func)
     state["window"] = None
     cleanup()
     return 0
