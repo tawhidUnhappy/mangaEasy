@@ -224,7 +224,8 @@ def _torch_index_url(mode: str) -> str | None:
 # ── Install steps ──────────────────────────────────────────────────────────────
 
 
-def _clone_or_update(git_url: str, dest: Path, ref: str | None, log: LogFn) -> None:
+def _clone_or_update(git_url: str, dest: Path, ref: str | None, log: LogFn,
+                     skip_lfs_smudge: bool = False) -> None:
     if (dest / ".git").exists():
         log(f"Updating existing clone at {dest}")
         _run(["git", "-C", str(dest), "fetch", "--all", "--tags"], log)
@@ -232,8 +233,8 @@ def _clone_or_update(git_url: str, dest: Path, ref: str | None, log: LogFn) -> N
             _run(["git", "-C", str(dest), "checkout", ref], log)
             _run(["git", "-C", str(dest), "pull", "--ff-only"], log)
     else:
-        cmd = ["git", "clone", git_url, str(dest)]
-        _run(cmd, log)
+        clone_env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"} if skip_lfs_smudge else None
+        _run(["git", "clone", git_url, str(dest)], log, env=clone_env)
         if ref:
             _run(["git", "-C", str(dest), "checkout", ref], log)
 
@@ -271,21 +272,9 @@ def _install_uv_project(
             f"in mangaeasy/tools/install.py (or install it manually)."
         )
     _require(["git", "uv"], log)
-    _clone_or_update(spec.git_url, dest, ref, log)
-
-    if _git_lfs_ok():
-        _run(["git", "-C", str(dest), "lfs", "install"], log)
-        try:
-            _run(["git", "-C", str(dest), "lfs", "pull"], log)
-        except InstallError:
-            # GitHub LFS bandwidth exhausted or repo has no LFS files — not fatal.
-            # If this tool has a model_repo, _download_model will fetch weights
-            # from Hugging Face instead.
-            log("[warn] git lfs pull failed (GitHub LFS bandwidth may be exhausted). "
-                "Model weights will be downloaded from Hugging Face.")
-    else:
-        log("[warn] git-lfs not found; skipping lfs pull. "
-            "Model weights will be downloaded from Hugging Face.")
+    # Skip LFS smudge during clone so GitHub LFS bandwidth is never consumed.
+    # Any large model files are fetched from Hugging Face by _download_model().
+    _clone_or_update(spec.git_url, dest, ref, log, skip_lfs_smudge=True)
 
     sync_cmd = ["uv", "sync", "--all-extras"]
     for extra in spec.exclude_extras:
@@ -293,16 +282,18 @@ def _install_uv_project(
         sync_cmd += ["--no-extra", extra]
     _run(sync_cmd, log, cwd=dest)
 
-    # uv.toml doesn't allow [sources], so we can't steer torch to a different
-    # index via that file. Instead, after uv has created the venv we use pip
-    # to force-reinstall torch with the CUDA wheel — this replaces the CPU
-    # build that uv pulled from PyPI.
+    # uv venvs do not include pip, so use `uv pip install` to force-reinstall
+    # torch with the CUDA wheel when the project's own uv sync pulled a CPU build.
     if gpu_mode == "cuda" and spec.needs_gpu:
         index_url = _torch_index_url("cuda")
         assert index_url is not None
         log(f"Reinstalling torch with CUDA wheels ({index_url})…")
+        venv_python = dest / ".venv" / (
+            "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+        )
         _run(
-            [*python_command(dest), "-m", "pip", "install",
+            ["uv", "pip", "install",
+             "--python", str(venv_python),
              "torch", "torchvision",
              "--index-url", index_url,
              "--force-reinstall", "--quiet"],
