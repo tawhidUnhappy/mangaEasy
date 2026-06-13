@@ -2,6 +2,7 @@
 
 > Turn manga panels (or any folder of images + narration) into narrated videos — one installable tool, one command.
 
+[![GitHub Release](https://img.shields.io/github/v/release/tawhidUnhappy/mangaEasy?label=download&color=blue)](https://github.com/tawhidUnhappy/mangaEasy/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Install with uv](https://img.shields.io/badge/install-uv%20tool-261230.svg)](https://docs.astral.sh/uv/)
@@ -30,8 +31,9 @@ Usage:
 ## Contents
 
 - [Features](#features)
+- [Download — no Python needed](#download--no-python-needed)
 - [Requirements](#requirements)
-- [Install](#install)
+- [Install (developers / advanced)](#install-developers--advanced)
 - [The desktop app](#the-desktop-app)
 - [Install the AI tools (one command)](#install-the-ai-tools-one-command)
 - [Quick start: image folders → video](#quick-start-image-folders--video)
@@ -64,6 +66,32 @@ Usage:
   narration web editors, watermarking, PDF export, and more.
 - **Cross-platform** — Windows, macOS, and Linux.
 
+## Download — no Python needed
+
+The easiest way to get mangaEasy is to download the pre-built standalone app
+from the [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest).
+Python and uv are **not required** — everything is bundled.
+
+| Platform | File | How to run |
+|---|---|---|
+| **Windows 11 / 10** | `mangaEasy-windows.zip` | Extract the zip → double-click **`mangaeasy.exe`** |
+| **Linux (x64)** | `mangaEasy-linux.tar.gz` | Extract → run **`./mangaEasy/mangaeasy`** |
+| **macOS** | `mangaEasy-macos.tar.gz` | Extract → run **`./mangaEasy/mangaeasy`** |
+
+Double-clicking the exe (or running it with no arguments) opens the control
+centre in your browser at `http://127.0.0.1:5000`. From there, use **Setup**
+to download ffmpeg and the AI tools on first launch.
+
+> **macOS Gatekeeper note:** the first time you may need to right-click → Open
+> to bypass the "unidentified developer" warning, or run
+> `xattr -cr mangaEasy` in the terminal after extracting.
+
+> **Linux:** make the file executable first: `chmod +x mangaEasy/mangaeasy`
+
+See [docs/install.md](docs/install.md) for full installation instructions.
+
+---
+
 ## Requirements
 
 - Python **3.10+**
@@ -79,9 +107,9 @@ AMD / Intel / Apple GPU you get hardware video encoding, and with an NVIDIA GPU
 the TTS and panel-detection models run much faster — but none of it is needed
 to use the tool.
 
-## Install
+## Install (developers / advanced)
 
-### As a tool (recommended)
+### As a uv tool
 
 ```bash
 uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
@@ -324,11 +352,12 @@ work/<project>/                        # scratch / intermediates
 
 ## Documentation
 
+- [Installation guide](docs/install.md) — standalone download, uv tool, and from-source options
 - [The desktop app](docs/app.md) — the `mangaeasy app` control center
 - [Installing AI tools](docs/install-tools.md) — what `install-tool` sets up for each tool
 - [Architecture](docs/architecture.md) — how the package and external tools fit together
 - [External tools](docs/external-tools.md) — Kokoro, IndexTTS, MAGI
-- [Publishing](docs/publishing.md) — release checklist
+- [Publishing](docs/publishing.md) — release checklist and CI workflow
 
 ## Contributing
 
