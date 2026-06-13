@@ -73,7 +73,7 @@ TOOLS: dict[str, ToolSpec] = {
         # to exactly match torch's, plus aio/cufile libs Windows lacks).
         exclude_extras=["deepspeed"],
         needs_gpu=True,
-        notes="High-quality voice-cloning TTS; the default engine for `mangaeasy video` on NVIDIA GPU machines. Needs git-lfs and a large model download.",
+        notes="High-quality voice-cloning TTS; the default engine for `mangaeasy video` on NVIDIA GPU machines. ~5.9 GB model download from Hugging Face (config, gpt.pth, s2mel.pth, bpe.model).",
     ),
     "magi-v3": ToolSpec(
         key="magi-v3",
@@ -275,9 +275,17 @@ def _install_uv_project(
 
     if _git_lfs_ok():
         _run(["git", "-C", str(dest), "lfs", "install"], log)
-        _run(["git", "-C", str(dest), "lfs", "pull"], log)
+        try:
+            _run(["git", "-C", str(dest), "lfs", "pull"], log)
+        except InstallError:
+            # GitHub LFS bandwidth exhausted or repo has no LFS files — not fatal.
+            # If this tool has a model_repo, _download_model will fetch weights
+            # from Hugging Face instead.
+            log("[warn] git lfs pull failed (GitHub LFS bandwidth may be exhausted). "
+                "Model weights will be downloaded from Hugging Face.")
     else:
-        log("[warn] git-lfs not found; skipping lfs pull. Install git-lfs if model files are missing.")
+        log("[warn] git-lfs not found; skipping lfs pull. "
+            "Model weights will be downloaded from Hugging Face.")
 
     sync_cmd = ["uv", "sync", "--all-extras"]
     for extra in spec.exclude_extras:
