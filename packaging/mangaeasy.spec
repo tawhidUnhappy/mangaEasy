@@ -14,14 +14,18 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent  # repo root (spec lives in packaging/)
-PKG = ROOT / "mangaeasy"
+PKG  = ROOT / "mangaeasy"
+ICON = ROOT / "packaging" / "icon.ico"
 
 hiddenimports = collect_submodules("mangaeasy") + collect_submodules("webview")
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT)],
-    datas=[(str(PKG), "mangaeasy")],
+    datas=[
+        (str(PKG), "mangaeasy"),
+        (str(ROOT / "packaging" / "icon.png"), "."),  # bundled for Linux/macOS window icon
+    ],
     hiddenimports=hiddenimports,
     excludes=["torch", "torchvision", "transformers", "faster_whisper"],
     noarchive=False,
@@ -35,7 +39,9 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="mangaeasy",
-    console=True,          # subcommands are CLI tools; the app shows logs here too
+    console=True,   # keep True so CLI commands show output in their terminal;
+                    # launcher.py hides the window when starting the GUI app
+    icon=str(ICON),
     upx=False,
 )
 

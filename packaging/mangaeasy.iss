@@ -24,6 +24,8 @@ AllowNoIcons=yes
 ; Output goes to the repo root so the workflow can easily find it
 OutputDir=..\dist
 OutputBaseFilename=mangaEasy-Setup-{#MyAppVersion}
+SetupIconFile=..\packaging\icon.ico
+UninstallDisplayIcon={app}\mangaeasy.exe
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

@@ -92,12 +92,11 @@ jobs:
           VERSION="${VERSION#v}"
 
           # ── package directory layout ──────────────────────
-          mkdir -p deb/opt/mangaEasy
-          mkdir -p deb/usr/share/applications
-          mkdir -p deb/DEBIAN
+          mkdir -p deb/opt/mangaEasy deb/usr/share/applications deb/usr/share/icons/hicolor/512x512/apps deb/DEBIAN
 
           cp -r dist/mangaEasy/. deb/opt/mangaEasy/
           chmod +x deb/opt/mangaEasy/mangaeasy
+          cp packaging/icon.png deb/usr/share/icons/hicolor/512x512/apps/mangaeasy.png
 
           # ── postinst: create /usr/local/bin symlink ───────
           cat > deb/DEBIAN/postinst << 'SCRIPT'
@@ -123,7 +122,8 @@ jobs:
           Name=mangaEasy
           Comment=Manga to video automation
           Exec=/opt/mangaEasy/mangaeasy app
-          Terminal=true
+          Icon=mangaeasy
+          Terminal=false
           Type=Application
           Categories=Multimedia;Video;
           EOF
