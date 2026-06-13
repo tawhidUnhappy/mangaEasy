@@ -33,8 +33,15 @@ jobs:
       - name: Install Python via uv
         run: uv python install
 
-      - name: Install project dependencies (including dev for PyInstaller)
-        run: uv sync --frozen --dev --no-extra deepspeed
+      # Install system libs so pywebview can be imported during PyInstaller analysis
+      - name: Install system deps (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+
+      - name: Install project dependencies
+        run: uv sync --dev
 
       - name: Build standalone bundle
         run: uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm
@@ -226,6 +233,8 @@ jobs:
 
       - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: "mangaEasy ${{ github.ref_name }}"
           draft: false
