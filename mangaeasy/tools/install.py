@@ -298,7 +298,7 @@ def _install_uv_project(
         _run(
             ["uv", "pip", "install",
              "--python", str(venv_python),
-             "torch", "torchvision",
+             "torch", "torchvision", "torchaudio",
              "--index-url", index_url,
              "--force-reinstall", "--quiet"],
             log, cwd=dest, env=tool_env(),

@@ -60,9 +60,11 @@ import torch
 try:
     from indextts.infer_v2 import IndexTTS2
 except Exception as exc:
-    print(f"[FATAL] Could not import IndexTTS2: {exc}")
-    print("  Make sure you are running from the external index-tts uv environment:")
-    print("    mangaeasy index-tts")
+    print(f"[FATAL] Could not import IndexTTS2: {exc}", flush=True)
+    traceback.print_exc()
+    print(flush=True)
+    print("  Likely cause: torchaudio was installed as a CPU build but torch was", flush=True)
+    print("  reinstalled with CUDA wheels. Fix: go to Setup tab → Reinstall index-tts.", flush=True)
     sys.exit(1)
 
 
