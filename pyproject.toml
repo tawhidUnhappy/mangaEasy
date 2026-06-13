@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "mangaeasy"
 version = "0.5.0"
 description = "General manga and image-to-video automation with isolated external AI tool envs"
