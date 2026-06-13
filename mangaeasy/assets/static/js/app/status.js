@@ -40,10 +40,14 @@ export async function pollStatus() {
 
   updateEditors(st.editors);
 
-  // refresh tool cards, workflow progress, and chapter overview when any job finishes
+  // Always refresh workflow so panel/page/narration counts stay current even
+  // when no job is running (e.g. after saving panels in the editor, which is
+  // a separate process and never triggers the job-finished event).
+  refreshWorkflow();
+
+  // Heavier refreshes only when a job just finished.
   if (wasRunning && !store.jobRunning) {
     loadDoctor();
-    refreshWorkflow();
     loadChapters();
   }
 }
