@@ -207,6 +207,35 @@ textarea {
   content: ''; display: block; height: 2px;
 }
 
+/* ── Terminal sub-tabs ───────────────────────────────────────────────── */
+#term-stab-nav {
+  display: flex; background: #111; border-bottom: 1px solid #222; flex-shrink: 0; padding: 0 6px;
+}
+.term-stab {
+  background: none; border: none; color: #666;
+  padding: 6px 18px; font-size: 12.5px; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: color 0.12s;
+}
+.term-stab:hover { color: #ccc; }
+.term-stab.active { color: #6cc0ff; border-bottom-color: #007acc; }
+
+.term-pane { display: none; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.term-pane.active { display: flex; }
+
+/* xterm shell bar + container */
+#xterm-bar {
+  height: 36px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px;
+  background: #141414; border-bottom: 1px solid #2a2a2a;
+}
+#xterm-container {
+  flex: 1; min-height: 0; background: #0d0d0d; padding: 6px; overflow: hidden;
+}
+/* make xterm fill its container */
+#xterm-container .xterm { height: 100%; }
+#xterm-container .xterm-viewport { overflow-y: auto !important; }
+
 /* ── Chapter overview table ──────────────────────────────────────────── */
 .ch-table { font-size: 12.5px; margin: 4px 0 2px; }
 .ch-row {

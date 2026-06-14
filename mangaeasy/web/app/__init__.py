@@ -21,6 +21,7 @@ All endpoints bind to 127.0.0.1 only.
 from __future__ import annotations
 
 from flask import Flask, render_template
+from flask_sock import Sock
 
 from mangaeasy import __version__
 from mangaeasy.web.flask_utils import register_shutdown
@@ -38,13 +39,16 @@ def create_app() -> Flask:
     register_shutdown(flask_app)
     broadcaster.register_route(flask_app)
 
-    from mangaeasy.web.app import api_fs, api_project, api_run, api_setup, api_workflow
+    sock = Sock(flask_app)
+
+    from mangaeasy.web.app import api_fs, api_project, api_run, api_setup, api_workflow, api_terminal
 
     flask_app.register_blueprint(api_setup.bp)
     flask_app.register_blueprint(api_project.bp)
     flask_app.register_blueprint(api_fs.bp)
     flask_app.register_blueprint(api_run.bp)
     flask_app.register_blueprint(api_workflow.bp)
+    api_terminal.register_ws(sock)
 
     @flask_app.route("/")
     def index():

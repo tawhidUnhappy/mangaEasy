@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>mangaEasy</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/xterm/xterm.css') }}">
 </head>
 <body>
 
@@ -394,14 +395,34 @@
 
   <!-- ── Terminal ─────────────────────────────────────────────────────── -->
   <section id="tab-terminal" class="tab-page terminal-page">
-    <div id="term-bar">
-      <span class="term-label">▶ Log output</span>
-      <label class="term-scroll-opt"><input type="checkbox" id="term-autoscroll" checked> Auto-scroll</label>
-      <button id="log-copy" class="btn small">Copy</button>
-      <button id="log-clear" class="btn small">Clear</button>
-      <span id="term-status" class="term-status"></span>
+
+    <div id="term-stab-nav">
+      <button class="term-stab active" data-stab="log">Log</button>
+      <button class="term-stab" data-stab="shell">Shell</button>
     </div>
-    <div id="log-lines"></div>
+
+    <!-- Log pane (SSE job output) -->
+    <div id="term-pane-log" class="term-pane active">
+      <div id="term-bar">
+        <span class="term-label">▶ Log output</span>
+        <label class="term-scroll-opt"><input type="checkbox" id="term-autoscroll" checked> Auto-scroll</label>
+        <button id="log-copy" class="btn small">Copy</button>
+        <button id="log-clear" class="btn small">Clear</button>
+        <span id="term-status" class="term-status"></span>
+      </div>
+      <div id="log-lines"></div>
+    </div>
+
+    <!-- Shell pane (xterm.js PTY) -->
+    <div id="term-pane-shell" class="term-pane">
+      <div id="xterm-bar">
+        <span class="term-label">▶ Shell</span>
+        <span style="flex:1"></span>
+        <button id="xterm-reconnect" class="btn small">Reconnect</button>
+      </div>
+      <div id="xterm-container"></div>
+    </div>
+
   </section>
 
 </main>
@@ -429,6 +450,8 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='vendor/xterm/xterm.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/xterm/addon-fit.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/app/main.js') }}"></script>
 </body>
 </html>

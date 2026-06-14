@@ -22,6 +22,7 @@ import { initRun, updateStepUI } from "./run.js";
 import { initChapters, loadChapters } from "./chapters.js";
 import { renderEditors } from "./editors.js";
 import { pollStatus } from "./status.js";
+import { initTerminal } from "./terminal.js";
 
 function switchTab(name) {
   const btn = document.querySelector(`.tab[data-tab="${name}"]`);
@@ -64,6 +65,7 @@ function initTabs() {
   initRun();
   initChapters();
   renderEditors();
+  initTerminal();
 
   await Promise.allSettled([
     loadDoctor(), loadProject(), refreshWorkflow(), loadUiState(), pollStatus(), loadChapters(),
