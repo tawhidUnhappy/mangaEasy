@@ -1,4 +1,6 @@
-/* core.js — shared helpers: DOM lookup, API fetch, log console, progress bar, global flags. */
+/* core.js — shared helpers: DOM lookup, API fetch, progress bar, SSE events. */
+
+import { write as termWrite } from "./terminal.js";
 
 export const $ = (id) => document.getElementById(id);
 
@@ -15,110 +17,100 @@ export async function api(path, opts = {}) {
   return data;
 }
 
+/* appendLog: writes app-level JS messages to the xterm terminal.
+   Backend job output arrives via WebSocket directly (no DOM needed). */
+export function appendLog(ts, msg) {
+  const prefix = ts ? `\x1b[2m[${ts}]\x1b[0m ` : "\x1b[2m[app]\x1b[0m ";
+  termWrite(prefix + msg + "\r\n");
+}
+
 /* ── Progress bar ──────────────────────────────────────────────────────── */
 
-export function updateProgress(value, total, label) {
+let _progressStart = null;
+let _lastProg = { value: 0, total: 0, label: "" };
+
+function _fmtTime(secs) {
+  secs = Math.max(0, Math.floor(secs));
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+export function startProgressTimer() {
+  _progressStart = Date.now();
+}
+
+export function updateProgress(value, total, label = "") {
+  _lastProg = { value, total, label };
+  _renderProgress();
+}
+
+function _renderProgress() {
+  const { value, total, label } = _lastProg;
   const wrap = $("job-progress-wrap");
   const fill = $("job-progress-fill");
-  const ind  = $("job-indicator");
+  const info = $("job-progress-label");
   if (!wrap) return;
+
   wrap.style.display = "";
+
   if (total > 0) {
     wrap.classList.remove("indeterminate");
-    const pct = Math.min(100, Math.round(value / total * 100));
+    const pct = Math.min(100, Math.round((value / total) * 100));
     fill.style.width = pct + "%";
-    if (ind && ind.classList.contains("busy") && label) {
-      ind.textContent = `${label}  ${value}/${total}`;
+
+    if (info) {
+      info.style.display = "";
+      let parts = [];
+      if (label) parts.push(label);
+      parts.push(`${value}/${total} (${pct}%)`);
+      if (_progressStart && value > 0) {
+        const elapsed = (Date.now() - _progressStart) / 1000;
+        parts.push(_fmtTime(elapsed) + " elapsed");
+        if (value < total) {
+          const rate = value / elapsed;
+          parts.push("~" + _fmtTime((total - value) / rate) + " left");
+        }
+      }
+      info.textContent = parts.join("  ·  ");
     }
   } else {
     wrap.classList.add("indeterminate");
     fill.style.width = "35%";
+    if (info) {
+      info.style.display = "";
+      let parts = [label || "working…"];
+      if (_progressStart) {
+        const elapsed = (Date.now() - _progressStart) / 1000;
+        parts.push(_fmtTime(elapsed) + " elapsed");
+      }
+      info.textContent = parts.join("  ·  ");
+    }
   }
 }
+
+/* Tick the elapsed time every second without waiting for new SSE events. */
+setInterval(() => { if (_progressStart) _renderProgress(); }, 1000);
 
 export function clearProgress() {
+  _progressStart = null;
+  _lastProg = { value: 0, total: 0, label: "" };
   const wrap = $("job-progress-wrap");
   const fill = $("job-progress-fill");
+  const info = $("job-progress-label");
   if (wrap) { wrap.style.display = "none"; wrap.classList.remove("indeterminate"); }
   if (fill) fill.style.width = "0%";
+  if (info) info.style.display = "none";
 }
 
-/* ── Log console (SSE) ─────────────────────────────────────────────────── */
+/* ── SSE — progress + action events only (no DOM log) ─────────────────── */
 
-let logLines = null;
-let autoScroll = true;
-
-// Detect tqdm-style lines (non-TTY mode writes each frame with \n, not \r).
-// Also catches FFmpeg frame= progress output.
-function _isProgressLine(msg) {
-  return /\d+%\|/.test(msg) ||           // tqdm bar: "45%|████  |"
-         /^\s*frame=\s*\d+/.test(msg);   // ffmpeg:   "frame=  123 fps=..."
-}
-
-export function appendLog(ts, msg) {
-  if (!logLines) return;
-
-  // If this and the previous line are both progress frames, overwrite in place
-  // instead of appending — mirrors \r terminal behaviour for non-TTY processes.
-  const isProgress = _isProgressLine(msg);
-  const last = logLines.lastElementChild;
-  if (isProgress && last && last.dataset.progress === "1") {
-    last.querySelector(".ts").textContent = ts;
-    last.querySelector(".msg").textContent = msg;
-    if (autoScroll) logLines.scrollTop = logLines.scrollHeight;
-    return;
-  }
-
-  const div = document.createElement("div");
-  div.className = "log-line";
-  if (isProgress) div.dataset.progress = "1";
-  if (/\b(error|failed|fatal)\b/i.test(msg)) div.classList.add("err");
-  else if (/\[warn\]|warning/i.test(msg)) div.classList.add("warn");
-  const tsSpan = document.createElement("span");
-  tsSpan.className = "ts";
-  tsSpan.textContent = ts;
-  const msgSpan = document.createElement("span");
-  msgSpan.className = "msg";
-  msgSpan.textContent = msg;
-  div.appendChild(tsSpan);
-  div.appendChild(msgSpan);
-  logLines.appendChild(div);
-  while (logLines.childNodes.length > 2000) logLines.removeChild(logLines.firstChild);
-  if (autoScroll) logLines.scrollTop = logLines.scrollHeight;
-}
-
-export function initLogConsole() {
-  logLines = $("log-lines");
-  const statusEl = $("term-status");
-  const scrollCb = $("term-autoscroll");
-
-  if (scrollCb) {
-    scrollCb.addEventListener("change", () => { autoScroll = scrollCb.checked; });
-  }
-
-  $("log-clear").addEventListener("click", () => (logLines.innerHTML = ""));
-
-  $("log-copy").addEventListener("click", () => {
-    const text = [...logLines.querySelectorAll(".log-line")]
-      .map(el => {
-        const ts  = el.querySelector(".ts")?.textContent  || "";
-        const msg = el.querySelector(".msg")?.textContent || "";
-        return ts ? `${ts}  ${msg}` : msg;
-      })
-      .join("\n");
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = $("log-copy");
-      const prev = btn.textContent;
-      btn.textContent = "Copied!";
-      setTimeout(() => { btn.textContent = prev; }, 1500);
-    }).catch(() => {});
-  });
-
+export function initSSE() {
   const events = new EventSource("/log_stream");
-  events.onerror = () => { if (statusEl) statusEl.textContent = "reconnecting…"; };
   let _firstOpen = true;
+
+  events.onerror = () => {};
   events.onopen = () => {
-    if (statusEl) statusEl.textContent = "connected";
     if (!_firstOpen) window.dispatchEvent(new CustomEvent("sse-reconnect"));
     _firstOpen = false;
   };
@@ -127,6 +119,7 @@ export function initLogConsole() {
     try {
       const entry = JSON.parse(e.data);
       if (entry.ping) return;
+
       if (entry.action === "restart-app") {
         appendLog("", "[app] Restarting…");
         fetch("/api/restart", { method: "POST" }).catch(() => {});
@@ -141,7 +134,10 @@ export function initLogConsole() {
         updateProgress(entry.progress.value, entry.progress.total, entry.progress.label);
         return;
       }
-      appendLog(entry.ts, entry.msg);
-    } catch { /* ignore malformed entries */ }
+      // Legacy log lines (if any) — write to terminal
+      if (entry.ts !== undefined && entry.msg !== undefined) {
+        appendLog(entry.ts, entry.msg);
+      }
+    } catch { /* ignore malformed */ }
   };
 }

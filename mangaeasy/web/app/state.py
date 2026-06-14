@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 
 from mangaeasy.tools.external import mangaeasy_home
-from mangaeasy.web.flask_utils import LogBroadcaster
+from mangaeasy.web.flask_utils import LogBroadcaster, terminal_broadcaster
 
 ASSETS = Path(__file__).resolve().parents[2] / "assets"
 APP_STATE_FILE = mangaeasy_home() / "app_state.json"
@@ -21,7 +21,8 @@ broadcaster = LogBroadcaster(buf_size=400)
 
 
 def log(line: str) -> None:
-    broadcaster.broadcast(line)
+    """Write a text line to the integrated xterm terminal."""
+    terminal_broadcaster.write(line.rstrip() + "\r\n")
 
 
 def action(name: str) -> None:

@@ -11,7 +11,7 @@
      status.js   job status polling
 */
 
-import { initLogConsole, $ } from "./core.js";
+import { initSSE, $ } from "./core.js";
 import { initPicker } from "./picker.js";
 import { initUiState, loadUiState } from "./uistate.js";
 import { initSetup, loadDoctor } from "./setup.js";
@@ -54,7 +54,8 @@ function initTabs() {
 }
 
 (async function init() {
-  initLogConsole();
+  initTerminal();
+  initSSE();
   initTabs();
   initPicker();
   initUiState();

@@ -18,8 +18,8 @@ from flask import Blueprint, jsonify, request
 
 from mangaeasy.web.app import jobs
 from mangaeasy.web.app.api_project import _read_json
-from mangaeasy.web.app.jobs import iter_lines
 from mangaeasy.web.app.state import lock, log, progress, state
+from mangaeasy.web.flask_utils import terminal_broadcaster
 
 bp = Blueprint("workflow", __name__)
 
@@ -445,12 +445,16 @@ def api_batch_download():
             proc = jobs.spawn_cli("download", dl_args, root)
             job["proc"] = proc
             assert proc.stdout is not None
-            for line in iter_lines(proc.stdout):
-                log(line)
+            while True:
+                chunk = proc.stdout.read(512)
+                if not chunk:
+                    break
+                terminal_broadcaster.write_raw(chunk)
             code = proc.wait()
-            log(f"[download] chapter {ch:02d} exit {code}")
+            color = "\x1b[32m" if code == 0 else "\x1b[31m"
+            log(f"{color}[download] chapter {ch:02d} exit {code}\x1b[0m")
             if code != 0:
-                log(f"[batch-download] stopped — chapter {ch:02d} failed")
+                log(f"\x1b[31m[batch-download] stopped — chapter {ch:02d} failed\x1b[0m")
                 return
 
             downloaded_count += 1

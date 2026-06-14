@@ -1,8 +1,19 @@
-/* terminal.js — VS Code-style integrated shell using xterm.js + WebSocket PTY. */
+/* terminal.js — single integrated xterm.js terminal.
+   Connects to /ws/terminal (git bash PTY + job output broadcast).
+   Exports write() so other modules can send text without a DOM dependency. */
 
 let term = null;
 let fitAddon = null;
 let ws = null;
+let _earlyBuf = [];   // buffer writes that arrive before term is ready
+
+export function write(text) {
+  if (term) {
+    term.write(text);
+  } else {
+    _earlyBuf.push(text);
+  }
+}
 
 function _wsUrl() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -14,40 +25,35 @@ function _sendResize() {
   ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
 }
 
+let _reconnectTimer = null;
+
 function _connect() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  if (ws && ws.readyState <= WebSocket.OPEN) return;
+  clearTimeout(_reconnectTimer);
 
   ws = new WebSocket(_wsUrl());
   ws.binaryType = "arraybuffer";
 
   ws.onopen = () => {
     _sendResize();
-    term.focus();
   };
 
   ws.onmessage = (e) => {
-    if (typeof e.data === "string") {
-      term.write(e.data);
-    } else {
-      term.write(new Uint8Array(e.data));
-    }
+    if (!term) return;
+    term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data));
   };
 
   ws.onclose = () => {
-    term.write("\r\n\x1b[2m[session ended — click Reconnect to start a new shell]\x1b[0m\r\n");
+    if (term) term.write("\r\n\x1b[2m[shell disconnected — reconnecting…]\x1b[0m\r\n");
+    _reconnectTimer = setTimeout(_connect, 3000);
   };
 
   ws.onerror = () => {
-    term.write("\r\n\x1b[31m[WebSocket error — is the app server running?]\x1b[0m\r\n");
+    // onclose fires after onerror — reconnect handled there
   };
 }
 
-function _ensureTerminal() {
-  if (term) {
-    _connect();
-    return;
-  }
-
+export function initTerminal() {
   const container = document.getElementById("xterm-container");
   if (!container || !window.Terminal) return;
 
@@ -59,6 +65,7 @@ function _ensureTerminal() {
       background:    "#0d0d0d",
       foreground:    "#d4d4d4",
       cursor:        "#ffffff",
+      selectionBackground: "rgba(255,255,255,0.2)",
       black:         "#000000",
       red:           "#cc0000",
       green:         "#4caf50",
@@ -76,59 +83,41 @@ function _ensureTerminal() {
       brightCyan:    "#67e8f9",
       brightWhite:   "#ffffff",
     },
-    scrollback: 5000,
+    scrollback: 10000,
+    allowProposedApi: true,
   });
 
   fitAddon = new window.FitAddon.FitAddon();
   term.loadAddon(fitAddon);
   term.open(container);
 
+  // Flush buffered early writes
+  _earlyBuf.forEach(t => term.write(t));
+  _earlyBuf = [];
+
   requestAnimationFrame(() => {
     fitAddon.fit();
     _connect();
   });
 
+  // User keystrokes → PTY stdin
   term.onData((data) => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(data);
   });
 
+  // Resize → PTY winsize
   term.onResize(() => _sendResize());
-}
 
-export function initTerminal() {
-  // Sub-tab toggle
-  document.querySelectorAll(".term-stab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".term-stab").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".term-pane").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      const pane = document.getElementById(`term-pane-${btn.dataset.stab}`);
-      if (pane) pane.classList.add("active");
-
-      if (btn.dataset.stab === "shell") {
-        _ensureTerminal();
-        requestAnimationFrame(() => { if (fitAddon) fitAddon.fit(); });
-      }
+  // Re-fit when the terminal tab becomes visible
+  document.querySelector('.tab[data-tab="terminal"]')
+    ?.addEventListener("click", () => {
+      requestAnimationFrame(() => { if (fitAddon) fitAddon.fit(); });
     });
-  });
 
-  document.getElementById("xterm-reconnect")?.addEventListener("click", () => {
-    if (ws) ws.close();
-    if (!term) {
-      _ensureTerminal();
-    } else {
-      _connect();
-    }
-  });
-
-  // Keep xterm sized to its container
-  const container = document.getElementById("xterm-container");
-  if (container && window.ResizeObserver) {
+  // Keep sized to container
+  if (window.ResizeObserver) {
     new ResizeObserver(() => {
-      if (fitAddon) {
-        fitAddon.fit();
-        _sendResize();
-      }
+      if (fitAddon) { fitAddon.fit(); _sendResize(); }
     }).observe(container);
   }
 }

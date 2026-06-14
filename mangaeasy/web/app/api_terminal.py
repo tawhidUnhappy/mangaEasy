@@ -1,17 +1,23 @@
 """mangaeasy.web.app.api_terminal — xterm.js WebSocket PTY terminal.
 
-Spawns a real shell (cmd.exe on Windows, $SHELL on Unix) connected to a PTY
-so the client xterm.js instance gets proper ANSI sequences and interactive
-behaviour.  Registered via register_ws(sock) from create_app().
+Spawns a git bash shell (Windows) or $SHELL (Unix) connected to a PTY so
+the client xterm.js instance gets proper ANSI sequences and interactive
+behaviour.  Job output from the subprocess runner is also broadcast to the
+same xterm WebSocket via TerminalBroadcaster, so the user sees everything in
+one place.
+
+Registered via register_ws(sock) from create_app().
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import threading
 
+from mangaeasy.web.flask_utils import terminal_broadcaster
 from mangaeasy.web.app.state import state
 
 
@@ -20,31 +26,68 @@ def _cwd() -> str:
     return str(root) if root and str(root) != "None" else "."
 
 
+def _get_win32_shell() -> list[str]:
+    """Prefer git bash; fall back to cmd.exe."""
+    # shutil.which respects PATH — git installer adds bash.exe there
+    bash = shutil.which("bash")
+    if bash:
+        return [bash, "--login", "-i"]
+    for candidate in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+    ):
+        if os.path.exists(candidate):
+            return [candidate, "--login", "-i"]
+    return [os.environ.get("COMSPEC", "cmd.exe")]
+
+
 def register_ws(sock) -> None:
     """Attach the /ws/terminal WebSocket route to *sock* (a flask_sock.Sock)."""
 
     @sock.route("/ws/terminal")
     def ws_terminal(ws):
-        cwd = _cwd()
-        env = {**os.environ, "MANGAEASY_PROJECT_ROOT": cwd, "PYTHONIOENCODING": "utf-8"}
+        # Thread-safe send: both the PTY reader thread and terminal_broadcaster
+        # can call safe_send concurrently.
+        ws_lock = threading.Lock()
 
-        if sys.platform == "win32":
-            _run_win32(ws, cwd, env)
-        else:
-            _run_unix(ws, cwd, env)
+        def safe_send(text: str) -> None:
+            try:
+                with ws_lock:
+                    ws.send(text)
+            except Exception:
+                pass
+
+        terminal_broadcaster.add_client(safe_send)
+        cwd = _cwd()
+        env = {
+            **os.environ,
+            "MANGAEASY_PROJECT_ROOT": cwd,
+            "PYTHONIOENCODING": "utf-8",
+            "TERM": "xterm-256color",
+            "COLORTERM": "truecolor",
+        }
+
+        try:
+            if sys.platform == "win32":
+                _run_win32(ws, cwd, env, safe_send)
+            else:
+                _run_unix(ws, cwd, env, safe_send)
+        finally:
+            terminal_broadcaster.remove_client(safe_send)
 
 
 # ── Windows — winpty PtyProcess ─────────────────────────────────────────────
 
-def _run_win32(ws, cwd: str, env: dict) -> None:
+def _run_win32(ws, cwd: str, env: dict, safe_send) -> None:
     try:
         from winpty import PtyProcess
     except ImportError:
-        ws.send("\r\n\x1b[31mpywinpty not installed — cannot open terminal\x1b[0m\r\n")
+        safe_send("\r\n\x1b[31mpywinpty not installed — cannot open shell\x1b[0m\r\n")
         return
 
-    shell = os.environ.get("COMSPEC", "cmd.exe")
-    proc = PtyProcess.spawn([shell], cwd=cwd, env=env, dimensions=(24, 220))
+    shell = _get_win32_shell()
+    proc = PtyProcess.spawn(shell, cwd=cwd, env=env, dimensions=(24, 220))
 
     stop = threading.Event()
 
@@ -53,7 +96,7 @@ def _run_win32(ws, cwd: str, env: dict) -> None:
             try:
                 data = proc.read(4096)
                 if data:
-                    ws.send(data)
+                    safe_send(data)
             except Exception:
                 break
         try:
@@ -84,7 +127,7 @@ def _run_win32(ws, cwd: str, env: dict) -> None:
 
 # ── Unix — stdlib pty ───────────────────────────────────────────────────────
 
-def _run_unix(ws, cwd: str, env: dict) -> None:
+def _run_unix(ws, cwd: str, env: dict, safe_send) -> None:
     import pty
     import select
     import fcntl
@@ -96,15 +139,13 @@ def _run_unix(ws, cwd: str, env: dict) -> None:
     pid, fd = pty.fork()
 
     if pid == 0:
-        # Child: exec the shell
         try:
             os.chdir(cwd)
         except OSError:
             pass
-        os.execvpe(shell, [shell], env)
+        os.execvpe(shell, [shell, "--login", "-i"], env)
         os._exit(1)
 
-    # Parent
     stop = threading.Event()
 
     def _read():
@@ -114,7 +155,7 @@ def _run_unix(ws, cwd: str, env: dict) -> None:
                 if r:
                     data = os.read(fd, 4096)
                     if data:
-                        ws.send(data.decode("utf-8", errors="replace"))
+                        safe_send(data.decode("utf-8", errors="replace"))
             except OSError:
                 break
         try:

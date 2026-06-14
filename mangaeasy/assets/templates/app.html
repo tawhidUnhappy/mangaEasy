@@ -22,6 +22,7 @@
   <div id="job-indicator" class="idle">idle</div>
 </header>
 <div id="job-progress-wrap" style="display:none"><div id="job-progress-fill"></div></div>
+<div id="job-progress-label" style="display:none"></div>
 
 <main>
 
@@ -395,34 +396,7 @@
 
   <!-- ── Terminal ─────────────────────────────────────────────────────── -->
   <section id="tab-terminal" class="tab-page terminal-page">
-
-    <div id="term-stab-nav">
-      <button class="term-stab active" data-stab="log">Log</button>
-      <button class="term-stab" data-stab="shell">Shell</button>
-    </div>
-
-    <!-- Log pane (SSE job output) -->
-    <div id="term-pane-log" class="term-pane active">
-      <div id="term-bar">
-        <span class="term-label">▶ Log output</span>
-        <label class="term-scroll-opt"><input type="checkbox" id="term-autoscroll" checked> Auto-scroll</label>
-        <button id="log-copy" class="btn small">Copy</button>
-        <button id="log-clear" class="btn small">Clear</button>
-        <span id="term-status" class="term-status"></span>
-      </div>
-      <div id="log-lines"></div>
-    </div>
-
-    <!-- Shell pane (xterm.js PTY) -->
-    <div id="term-pane-shell" class="term-pane">
-      <div id="xterm-bar">
-        <span class="term-label">▶ Shell</span>
-        <span style="flex:1"></span>
-        <button id="xterm-reconnect" class="btn small">Reconnect</button>
-      </div>
-      <div id="xterm-container"></div>
-    </div>
-
+    <div id="xterm-container"></div>
   </section>
 
 </main>

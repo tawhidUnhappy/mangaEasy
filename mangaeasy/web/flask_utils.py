@@ -216,3 +216,48 @@ class LogBroadcaster:
                 content_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
+
+
+# ---------------------------------------------------------------------------
+# Terminal broadcaster — writes raw text to connected xterm WebSocket clients
+# ---------------------------------------------------------------------------
+
+class TerminalBroadcaster:
+    """Broadcast raw text/bytes to every connected xterm WebSocket client."""
+
+    def __init__(self) -> None:
+        self._sinks: list = []
+        self._lock = threading.Lock()
+
+    def add_client(self, send_fn) -> None:
+        with self._lock:
+            self._sinks.append(send_fn)
+
+    def remove_client(self, send_fn) -> None:
+        with self._lock:
+            try:
+                self._sinks.remove(send_fn)
+            except ValueError:
+                pass
+
+    def write(self, text: str) -> None:
+        if not text:
+            return
+        with self._lock:
+            dead = []
+            for fn in list(self._sinks):
+                try:
+                    fn(text)
+                except Exception:
+                    dead.append(fn)
+            for d in dead:
+                try:
+                    self._sinks.remove(d)
+                except ValueError:
+                    pass
+
+    def write_raw(self, data: bytes) -> None:
+        self.write(data.decode("utf-8", errors="replace"))
+
+
+terminal_broadcaster = TerminalBroadcaster()

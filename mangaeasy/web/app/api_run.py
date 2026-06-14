@@ -9,8 +9,8 @@ from flask import Blueprint, jsonify, request
 
 from mangaeasy import __version__
 from mangaeasy.web.app import jobs
-from mangaeasy.web.app.jobs import iter_lines
 from mangaeasy.web.app.state import lock, log, state
+from mangaeasy.web.flask_utils import terminal_broadcaster
 
 bp = Blueprint("run", __name__)
 
@@ -73,14 +73,18 @@ def api_run_chain():
                 proc = jobs.spawn_cli(command, args, state["project_root"])
                 job["proc"] = proc  # so /api/stop terminates the current step
                 assert proc.stdout is not None
-                for line in iter_lines(proc.stdout):
-                    log(line)
+                while True:
+                    chunk = proc.stdout.read(512)
+                    if not chunk:
+                        break
+                    terminal_broadcaster.write_raw(chunk)
                 code = proc.wait()
-                log(f"[{command}] finished with exit code {code}")
+                color = "\x1b[32m" if code == 0 else "\x1b[31m"
+                log(f"{color}[{command}] finished (exit {code})\x1b[0m")
                 if code != 0:
-                    log(f"[workflow] stopped — '{command}' failed; later steps were skipped.")
+                    log(f"\x1b[31m[workflow] stopped — '{command}' failed; later steps skipped.\x1b[0m")
                     return
-            log("[workflow] all steps finished ✓")
+            log("\x1b[32m[workflow] all steps finished ✓\x1b[0m")
 
         thread = threading.Thread(target=work, daemon=True)
         job["thread"] = thread
@@ -141,6 +145,7 @@ def _pump_editor(proc, name: str) -> None:
     """Like jobs.pump but intercepts MANGAEASY_OPEN_URL: lines."""
     assert proc.stdout is not None
     opened = False
+    from mangaeasy.web.app.jobs import iter_lines
     for line in iter_lines(proc.stdout):
         if line.startswith("MANGAEASY_OPEN_URL:"):
             url = line[len("MANGAEASY_OPEN_URL:"):]

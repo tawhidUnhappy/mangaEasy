@@ -1,7 +1,7 @@
 /* status.js — polls /api/status and updates the job indicator, run buttons,
    editor cards, and tool cards. */
 
-import { $, api, store, updateProgress, clearProgress } from "./core.js";
+import { $, api, store, updateProgress, clearProgress, startProgressTimer } from "./core.js";
 import { loadDoctor } from "./setup.js";
 import { updateEditors } from "./editors.js";
 import { refreshWorkflow } from "./workflow.js";
@@ -20,8 +20,8 @@ export async function pollStatus() {
     ind.className = "busy";
     ind.dataset.jobName = `${st.job.kind}: ${st.job.name}`;
     ind.textContent = ind.dataset.jobName;
-    // Show indeterminate bar when a job starts (SSE progress events may refine it).
-    if (!wasRunning) updateProgress(0, 0);
+    // Show indeterminate bar when a job starts; start the elapsed-time clock.
+    if (!wasRunning) { startProgressTimer(); updateProgress(0, 0); }
   } else {
     ind.className = "idle";
     ind.textContent = "idle";
