@@ -1480,7 +1480,7 @@ wheels = [
 
 [[package]]
 name = "mangaeasy"
-version = "0.9.19"
+version = "0.9.21"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
