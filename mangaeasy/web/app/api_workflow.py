@@ -345,13 +345,12 @@ def api_clean_narration():
         return jsonify({"mode": mode, "original": original, "remaining": len(kept), "removed": removed})
 
 
-@bp.route("/api/workflow/panels/ai-pdf", methods=["POST"])
-def api_panels_ai_pdf():
-    """Export a labelled, normalised PDF of chapter panels for AI narration context.
+@bp.route("/api/workflow/panels/ai-zip", methods=["POST"])
+def api_panels_ai_zip():
+    """Export watermarked copies of chapter panels as a ZIP for AI narration context.
 
     Each panel gets a dark filename banner added above it (never overlapping
-    content).  All panels are resized to a consistent width.  Originals are
-    untouched.  The PDF lands in the chapter folder.
+    content).  Originals are untouched.  The ZIP lands in the chapter folder.
     """
     root: Path = state["project_root"]
     cfg = _read_json(root / "config.json") or {}
@@ -374,15 +373,15 @@ def api_panels_ai_pdf():
         return jsonify({"error": "panels folder not found — complete step 2 first"}), 404
 
     safe_name = name.replace(" ", "_")
-    out_path = ch_dir / f"{safe_name}_ch{chapter:02d}_panels_for_ai.pdf"
+    out_path = ch_dir / f"{safe_name}_ch{chapter:02d}_panels_for_ai.zip"
 
     try:
-        from mangaeasy.images.ai_pdf import panels_to_ai_pdf
-        n = panels_to_ai_pdf(panels_path, out_path, log)
+        from mangaeasy.images.ai_zip import panels_to_ai_zip
+        n = panels_to_ai_zip(panels_path, out_path, log)
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
     except Exception as exc:
-        log(f"[ai-pdf] error: {exc}")
+        log(f"[ai-zip] error: {exc}")
         return jsonify({"error": str(exc)}), 500
 
     return jsonify({"ok": True, "panels": n, "path": str(out_path)})

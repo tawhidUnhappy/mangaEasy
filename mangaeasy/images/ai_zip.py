@@ -1,12 +1,13 @@
-"""mangaeasy.images.ai_pdf — labelled PDF from chapter panels for AI context.
+"""mangaeasy.images.ai_zip — labelled ZIP of chapter panels for AI context.
 
-Adds a filename banner ABOVE each panel (never overlapping content) and packs
-the result with img2pdf at original panel resolution.
+Stamps each panel with a filename banner ABOVE the image (never overlapping
+content) and packs all watermarked copies into a ZIP at original resolution.
 Original panel files are never modified.
 """
 
 from __future__ import annotations
 import io
+import zipfile
 from pathlib import Path
 from typing import Callable
 
@@ -49,15 +50,10 @@ def _to_rgb(img: Image.Image) -> Image.Image:
 
 
 def _stamp_label(img: Image.Image, label: str) -> Image.Image:
-    """Return a new image with a dark filename banner added ABOVE the panel.
-
-    Banner height scales with image width so text is always readable at any
-    panel resolution.  Panel content is never covered.
-    """
+    """Return a new image with a dark filename banner added ABOVE the panel."""
     img = _to_rgb(img)
     w, h = img.size
 
-    # Font size: 3 % of image width, clamped to [18, 90] px.
     font_size = max(18, min(90, int(w * 0.030)))
     font = _load_font(font_size)
 
@@ -79,48 +75,54 @@ def _stamp_label(img: Image.Image, label: str) -> Image.Image:
     return out
 
 
-def _to_jpeg_bytes(img: Image.Image) -> bytes:
+def _encode(img: Image.Image, ext: str) -> tuple[bytes, str]:
+    """Encode *img* matching the source format; return (bytes, archive_name_ext)."""
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=92, optimize=True, subsampling=0)
-    return buf.getvalue()
+    if ext in (".jpg", ".jpeg"):
+        img.save(buf, format="JPEG", quality=95, subsampling=0)
+        return buf.getvalue(), ext
+    else:
+        img.save(buf, format="PNG", optimize=True)
+        return buf.getvalue(), ".png"
 
 
-def panels_to_ai_pdf(
+def panels_to_ai_zip(
     panels_dir: Path,
     out_path: Path,
     log: Callable[[str], None] = print,
 ) -> int:
-    """Build a labelled PDF from *panels_dir* into *out_path* at original size.
+    """Pack watermarked copies of all panels into *out_path* (ZIP).
 
-    Does NOT modify any source files.
-    Returns the number of pages written.
+    Each panel gets a filename banner above it; originals are untouched.
+    Returns the number of panels included.
     """
-    try:
-        import img2pdf
-    except ImportError as exc:
-        raise RuntimeError("img2pdf is required — it is listed in project dependencies") from exc
-
     files = sorted(p for p in panels_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
     if not files:
         raise FileNotFoundError(f"no panel images found in {panels_dir}")
 
-    pages: list[bytes] = []
-    for p in files:
-        try:
-            img = Image.open(p)
-            img.load()
-        except Exception as exc:
-            log(f"[ai-pdf] skip {p.name}: {exc}")
-            continue
-        stamped = _stamp_label(img, p.name)
-        pages.append(_to_jpeg_bytes(stamped))
-        img.close()
-        log(f"[ai-pdf] labelled {p.name}")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    # ZIP_STORED: images are already compressed — deflating gains nothing and wastes CPU.
+    with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_STORED) as zf:
+        for p in files:
+            try:
+                img = Image.open(p)
+                img.load()
+            except Exception as exc:
+                log(f"[ai-zip] skip {p.name}: {exc}")
+                continue
 
-    if not pages:
+            stamped = _stamp_label(img, p.name)
+            img.close()
+
+            data, out_ext = _encode(stamped, p.suffix.lower())
+            zf.writestr(p.stem + out_ext, data)
+            count += 1
+            log(f"[ai-zip] {p.name}")
+
+    if count == 0:
+        out_path.unlink(missing_ok=True)
         raise FileNotFoundError("all panel images failed to load")
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_bytes(img2pdf.convert(pages))
-    log(f"[ai-pdf] ✓ {len(pages)} pages → {out_path.name}")
-    return len(pages)
+    log(f"[ai-zip] ✓ {count} panels → {out_path.name}")
+    return count

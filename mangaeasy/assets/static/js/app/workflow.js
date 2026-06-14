@@ -70,7 +70,7 @@ function render(data) {
     const el = document.getElementById(id);
     if (el) el.style.display = visible ? "" : "none";
   }
-  _show("wf-narr-export-pdf",   hasPanels);
+  _show("wf-narr-export-zip",   hasPanels);
   _show("wf-narr-clear",        hasPanels);
   _show("wf-narr-remove-empty", hasNarr);
   _show("wf-reset-av",          hasAv);
@@ -215,16 +215,16 @@ function makeResetBtn(id, { andRegen = false } = {}) {
 }
 
 function _initExportPdfBtn() {
-  const btn = $("wf-narr-export-pdf");
+  const btn = $("wf-narr-export-zip");
   btn.addEventListener("click", async () => {
     const orig = btn.textContent.trim();
     btn.disabled = true;
     btn.textContent = "Exporting…";
     try {
-      const result = await api("/api/workflow/panels/ai-pdf", { method: "POST" });
-      appendLog("", `[ai-pdf] ✓ ${result.panels} panels exported — open the chapter folder to find the PDF`);
+      const result = await api("/api/workflow/panels/ai-zip", { method: "POST" });
+      appendLog("", `[ai-zip] ✓ ${result.panels} panels — open the chapter folder to find the ZIP`);
     } catch (err) {
-      appendLog("", `[ai-pdf] failed: ${err.message}`);
+      appendLog("", `[ai-zip] failed: ${err.message}`);
     } finally {
       btn.disabled = false;
       btn.textContent = orig;
