@@ -382,6 +382,12 @@ def _set_badge(badge, count: int, done_fmt: str, todo_fmt: str) -> None:
         badge.text = todo_fmt; badge.props("color=grey")
 
 
+def _configured_bgm_file(cfg: dict, sys_cfg: dict) -> str:
+    bgm_cfg = sys_cfg.get("bgm") if isinstance(sys_cfg.get("bgm"), dict) else {}
+    audio_cfg = cfg.get("audio") if isinstance(cfg.get("audio"), dict) else {}
+    return str(bgm_cfg.get("file") or audio_cfg.get("bgm") or "").strip()
+
+
 # Language options (shared by Project + Workflow tabs)
 _LANGS = {
     "en": "English", "es": "Spanish", "es-la": "Spanish (LATAM)",
@@ -572,6 +578,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
             with ui.row().classes("items-center gap-2 w-full mb-2"):
                 bgm_inp = ui.input(placeholder="music/background.mp3").props(
                     "dense outlined").classes("flex-1 mono")
+                bgm_db_inp = ui.number(label="BGM volume", step=1, value=-25).props(
+                    "dense outlined suffix=dB").classes("w-32")
 
                 async def _browse_bgm() -> None:
                     p = await ni_run.io_bound(_pick_file, "mp3", "wav", "m4a", "flac")
@@ -592,6 +600,45 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 ui.button("Browse…", on_click=_browse_voice).props("flat dense size=sm")
 
+            def _sync_media_settings(cfg: dict, sc: dict) -> None:
+                bgm_value = str(bgm_inp.value or "").strip()
+                bgm_cfg = sc.get("bgm") if isinstance(sc.get("bgm"), dict) else {}
+                sc["bgm"] = bgm_cfg
+                audio_cfg = cfg.get("audio") if isinstance(cfg.get("audio"), dict) else {}
+
+                if bgm_value:
+                    bgm_cfg["file"] = bgm_value
+                    audio_cfg["bgm"] = bgm_value
+                    cfg["audio"] = audio_cfg
+                else:
+                    bgm_cfg.pop("file", None)
+                    audio_cfg.pop("bgm", None)
+                    if audio_cfg:
+                        cfg["audio"] = audio_cfg
+                    else:
+                        cfg.pop("audio", None)
+
+                try:
+                    bgm_cfg["volume_db"] = float(bgm_db_inp.value)
+                except (TypeError, ValueError):
+                    bgm_cfg["volume_db"] = -25.0
+
+                voice_value = str(voice_inp.value or "").strip()
+                tts_cfg = sc.get("tts") if isinstance(sc.get("tts"), dict) else {}
+                sc["tts"] = tts_cfg
+                cfg_tts = cfg.get("tts") if isinstance(cfg.get("tts"), dict) else {}
+                if voice_value:
+                    tts_cfg["speaker_wav"] = voice_value
+                    cfg_tts["speaker_wav"] = voice_value
+                    cfg["tts"] = cfg_tts
+                else:
+                    tts_cfg.pop("speaker_wav", None)
+                    cfg_tts.pop("speaker_wav", None)
+                    if cfg_tts:
+                        cfg["tts"] = cfg_tts
+                    else:
+                        cfg.pop("tts", None)
+
             def _save_project() -> None:
                 cfg, sc = _read_config()
                 dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
@@ -600,11 +647,9 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 dl["chapter"]             = int(chapter_inp.value or 1)
                 dl["translated_language"] = lang_inp.value
                 cfg["download"] = dl
-                if bgm_inp.value:
-                    cfg.setdefault("audio", {})["bgm"] = bgm_inp.value
-                if voice_inp.value:
-                    cfg.setdefault("tts", {})["speaker_wav"] = voice_inp.value
-                _write_config(cfg, None)
+                _sync_media_settings(cfg, sc)
+                _write_config(cfg, sc)
+                syscfg_area.value = json.dumps(sc, indent=2)
                 ui.notify("Settings saved", type="positive")
 
             ui.button("Save settings", on_click=_save_project, icon="save").props("color=primary")
@@ -630,8 +675,16 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 name_inp.value     = dl.get("name", "")
                 chapter_inp.value  = dl.get("chapter", 1)
                 lang_inp.value     = dl.get("translated_language", "en")
-                bgm_inp.value      = (cfg.get("audio") or {}).get("bgm", "")
-                voice_inp.value    = (cfg.get("tts") or {}).get("speaker_wav", "")
+                bgm_cfg = sc.get("bgm") if isinstance(sc.get("bgm"), dict) else {}
+                audio_cfg = cfg.get("audio") if isinstance(cfg.get("audio"), dict) else {}
+                bgm_inp.value = bgm_cfg.get("file") or audio_cfg.get("bgm", "")
+                try:
+                    bgm_db_inp.value = float(bgm_cfg.get("volume_db", -25))
+                except (TypeError, ValueError):
+                    bgm_db_inp.value = -25
+                sys_tts = sc.get("tts") if isinstance(sc.get("tts"), dict) else {}
+                cfg_tts = cfg.get("tts") if isinstance(cfg.get("tts"), dict) else {}
+                voice_inp.value = sys_tts.get("speaker_wav") or cfg_tts.get("speaker_wav", "")
                 try:
                     syscfg_area.value = json.dumps(sc, indent=2)
                 except Exception:
@@ -729,10 +782,12 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 norm_cb = ui.checkbox("YouTube loudness (−14 LUFS)").props("dense")
 
-                def _video_steps() -> list[str]:
-                    cfg, _ = _read_config()
-                    steps = ["fade-audio", "render-video"]
-                    if (cfg.get("audio") or {}).get("bgm"):
+                def _video_steps(include_audio_prep: bool = True) -> list[str]:
+                    cfg, sc = _read_config()
+                    steps = ["render-video"]
+                    if include_audio_prep:
+                        steps.insert(0, "fade-audio")
+                    if _configured_bgm_file(cfg, sc):
                         steps.append("add-bgm")
                     if norm_cb.value:
                         steps.append("normalize-chapter-audio")
@@ -741,11 +796,13 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 def _gen_all()   -> None: _save_wf_cfg_now(); _run_chain(["index-tts"] + _video_steps())
                 def _gen_audio() -> None: _save_wf_cfg_now(); _run_job("index-tts")
                 def _gen_video() -> None: _save_wf_cfg_now(); _run_chain(_video_steps())
+                def _rerender_video() -> None: _save_wf_cfg_now(); _run_chain(_video_steps(False))
 
                 with ui.row().classes("gap-2"):
                     ui.button("▶ Everything", on_click=_gen_all).props("color=primary")
                     ui.button("\U0001f399 Audio only", on_click=_gen_audio).props("flat dense")
                     ui.button("\U0001f3ac Video only", on_click=_gen_video).props("flat dense")
+                    ui.button("Re-render video", on_click=_rerender_video).props("flat dense")
 
                 with ui.expansion("Delete chapter data…", icon="delete"
                                   ).classes("mt-2 w-full"):
@@ -885,14 +942,35 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
         # ══════════════════════════════════════════════════════════════════════
         with ui.tab_panel("terminal").classes("p-0"):
             with ui.element("div").style("height:calc(100vh - 102px); width:100%"):
-                term = ui.terminal(max_lines=20_000).classes("w-full h-full")
+                term = ui.xterm({
+                    "cursorBlink": False,
+                    "disableStdin": True,
+                    "fontSize": 13,
+                    "fontFamily": "Consolas, 'Courier New', monospace",
+                    "scrollback": 20_000,
+                    "allowProposedApi": True,
+                    "theme": {
+                        "background": "#0d0d0d",
+                        "foreground": "#d4d4d4",
+                        "cursor": "#ffffff",
+                        "selectionBackground": "rgba(255,255,255,0.2)",
+                        "black": "#000000", "red": "#cc0000",
+                        "green": "#4caf50", "yellow": "#e6c000",
+                        "blue": "#4d9de0", "magenta": "#af87d7",
+                        "cyan": "#00bcd4", "white": "#d4d4d4",
+                        "brightBlack": "#555555", "brightRed": "#f87171",
+                        "brightGreen": "#6fd388", "brightYellow": "#fbbf24",
+                        "brightBlue": "#6cc0ff", "brightMagenta": "#c084fc",
+                        "brightCyan": "#67e8f9", "brightWhite": "#ffffff",
+                    },
+                }).classes("w-full h-full")
 
             _cur = {"i": 0}
 
             async def _drain() -> None:
                 new = _out[_cur["i"]:]
                 if new:
-                    term.push("".join(new))
+                    term.write("".join(new))
                     _cur["i"] = len(_out)
 
             ui.timer(0.05, _drain)

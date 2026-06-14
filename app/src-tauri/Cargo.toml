@@ -1,6 +1,6 @@
 [package]
 name = "mangaeasy"
-version = "0.9.24"
+version = "0.9.26"
 edition = "2021"
 
 [lib]
