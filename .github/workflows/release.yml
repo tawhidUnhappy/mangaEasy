@@ -95,8 +95,10 @@ jobs:
         run: |
           mkdir -p app/src-tauri/binaries
           URL="https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${{ matrix.uv-archive }}"
-          curl -fsSL "$URL" | tar -xz -C /tmp
-          UV_BIN=$(find /tmp -maxdepth 3 -name "uv" ! -name "uvx" -type f | head -1)
+          TMP_UV="$(mktemp -d)"
+          curl -fsSL "$URL" | tar -xz -C "$TMP_UV"
+          UV_BIN=$(find "$TMP_UV" -type f -name "uv" | head -1)
+          test -n "$UV_BIN"
           cp "$UV_BIN" "app/src-tauri/binaries/uv-${{ matrix.uv-triple }}"
           chmod +x "app/src-tauri/binaries/uv-${{ matrix.uv-triple }}"
 

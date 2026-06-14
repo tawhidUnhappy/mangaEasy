@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 use std::process::Stdio;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc;
 
@@ -65,7 +65,8 @@ pub async fn run_job(
 
     let root = {
         let state = app.state::<AppState>();
-        state.project_root.lock().unwrap().clone()
+        let project_root = state.project_root.lock().unwrap();
+        project_root.clone()
     };
 
     let uv = uv_path(&app);
@@ -174,7 +175,8 @@ pub async fn run_job(
 pub async fn stop_job(app: AppHandle) -> Result<(), String> {
     let pid = {
         let state = app.state::<AppState>();
-        state.job.lock().unwrap().as_ref().and_then(|j| j.pid)
+        let job = state.job.lock().unwrap();
+        job.as_ref().and_then(|j| j.pid)
     };
     if let Some(pid) = pid {
         kill_pid(pid);
@@ -280,15 +282,26 @@ pub async fn bootstrap_install(app: AppHandle) -> Result<(), String> {
             }
             Ok(mut child) => {
                 let (tx, mut rx) = mpsc::channel::<Vec<u8>>(64);
-                for stream in [child.stdout.take(), child.stderr.take()].into_iter().flatten() {
+                if let Some(mut out) = child.stdout.take() {
                     let tx2 = tx.clone();
                     tokio::spawn(async move {
-                        let mut s = stream;
                         let mut buf = vec![0u8; 256];
                         loop {
-                            match s.read(&mut buf).await {
+                            match out.read(&mut buf).await {
                                 Ok(0) | Err(_) => break,
                                 Ok(n) => { tx2.send(buf[..n].to_vec()).await.ok(); }
+                            }
+                        }
+                    });
+                }
+                if let Some(mut err) = child.stderr.take() {
+                    let tx3 = tx.clone();
+                    tokio::spawn(async move {
+                        let mut buf = vec![0u8; 256];
+                        loop {
+                            match err.read(&mut buf).await {
+                                Ok(0) | Err(_) => break,
+                                Ok(n) => { tx3.send(buf[..n].to_vec()).await.ok(); }
                             }
                         }
                     });

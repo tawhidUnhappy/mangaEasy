@@ -165,24 +165,23 @@ pub async fn pick_directory(app: AppHandle) -> Option<String> {
         .file()
         .set_title("Select project folder")
         .blocking_pick_folder()
-        .map(|p| p.to_string_lossy().into_owned())
+        .map(|p| p.to_string())
 }
 
 #[tauri::command]
 pub async fn pick_file(app: AppHandle, extensions: Vec<String>) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
-    use tauri_plugin_dialog::FileDialogBuilder;
     let mut builder = app.dialog().file().set_title("Select file");
     for ext in &extensions {
         builder = builder.add_filter("Media", &[ext.as_str()]);
     }
-    builder.blocking_pick_file().map(|p| p.to_string_lossy().into_owned())
+    builder.blocking_pick_file().map(|p| p.to_string())
 }
 
 #[tauri::command]
 pub async fn open_directory(app: AppHandle, path: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     app.opener()
-        .reveal_item_in_file_manager(std::path::Path::new(&path))
+        .reveal_item_in_dir(std::path::Path::new(&path))
         .map_err(|e| e.to_string())
 }

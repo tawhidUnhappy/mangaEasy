@@ -10,6 +10,12 @@ dist/
 build/
 build-tmp/
 *.egg-info/
+/app/node_modules/
+/app/tsconfig.tsbuildinfo
+/app/src-tauri/binaries/
+/app/src-tauri/gen/
+/app/src-tauri/icons/
+/app/src-tauri/target/
 
 # Local config (publish the *.example.json files instead)
 config.json

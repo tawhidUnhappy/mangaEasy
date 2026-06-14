@@ -13,10 +13,10 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:default",
-    "fs:allow-read-all",
-    "fs:allow-write-all",
+    "fs:read-all",
+    "fs:write-all",
     "opener:default",
     "opener:allow-open-url",
-    "opener:allow-reveal-item-in-file-manager"
+    "opener:allow-reveal-item-in-dir"
   ]
 }
