@@ -122,6 +122,44 @@ function videoSteps() {
   return steps;
 }
 
+function makeNarrBtn(id, mode) {
+  const btn = $(id);
+  let timer = null;
+  btn.addEventListener("click", async () => {
+    if (!btn._confirming) {
+      btn._confirming = true;
+      btn._orig = btn.textContent.trim();
+      btn.textContent = "Sure? (click again)";
+      timer = setTimeout(() => {
+        btn._confirming = false;
+        btn.textContent = btn._orig;
+      }, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    btn._confirming = false;
+    btn.disabled = true;
+    btn.textContent = "Working…";
+    try {
+      const result = await api("/api/workflow/narration/clean", {
+        method: "POST",
+        body: JSON.stringify({ mode }),
+      });
+      if (mode === "clear_text") {
+        appendLog("", `[narration] cleared text from ${result.entries} entries — ready for AI fill-in`);
+      } else {
+        appendLog("", `[narration] removed ${result.removed} empty entries, ${result.remaining} remain`);
+      }
+      await refreshWorkflow();
+    } catch (err) {
+      appendLog("", `narration clean failed: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btn._orig;
+    }
+  });
+}
+
 function makeResetBtn(id, { andRegen = false } = {}) {
   const btn = $(id);
   let timer = null;
@@ -176,6 +214,8 @@ export function initWorkflow() {
   $("wf-all").addEventListener("click", () => runChain(["index-tts", ...videoSteps()]));
   makeResetBtn("wf-reset-av");
   makeResetBtn("wf-reset-regen", { andRegen: true });
+  makeNarrBtn("wf-narr-clear", "clear_text");
+  makeNarrBtn("wf-narr-remove-empty", "remove_empty");
 
   document.querySelectorAll("[data-wf-open]").forEach((btn) =>
     btn.addEventListener("click", async () => {

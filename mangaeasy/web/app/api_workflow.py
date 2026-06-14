@@ -278,6 +278,62 @@ def api_delete_chapter_data(chapter_num: int):
     return jsonify({"deleted": removed, "chapter": chapter_num})
 
 
+@bp.route("/api/workflow/narration/clean", methods=["POST"])
+def api_clean_narration():
+    """Bulk-edit the chapter narration file.
+
+    Body: {"mode": "clear_text" | "remove_empty"}
+      clear_text    — keep every image entry but set narration to ""
+      remove_empty  — drop entries where narration is blank/whitespace
+    """
+    body = request.get_json(silent=True) or {}
+    mode = str(body.get("mode", "")).strip()
+    if mode not in ("clear_text", "remove_empty"):
+        return jsonify({"error": "mode must be 'clear_text' or 'remove_empty'"}), 400
+
+    root: Path = state["project_root"]
+    cfg = _read_json(root / "config.json") or {}
+    sys_cfg = _read_json(root / "config.system.json") or {}
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    name = str(dl.get("name") or "")
+    try:
+        chapter = int(dl.get("chapter") or 1)
+    except (TypeError, ValueError):
+        chapter = 1
+
+    if not name:
+        return jsonify({"error": "no manga name configured"}), 400
+
+    narration = _library_dir(root, sys_cfg) / name / f"{chapter:02d}" / f"narration_{chapter:02d}.json"
+    if not narration.exists():
+        return jsonify({"error": "narration file not found"}), 404
+
+    try:
+        data = json.loads(narration.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return jsonify({"error": f"could not read narration file: {exc}"}), 400
+
+    if not isinstance(data, list):
+        return jsonify({"error": "narration file is not a JSON array"}), 400
+
+    original = len(data)
+
+    if mode == "clear_text":
+        for entry in data:
+            if isinstance(entry, dict):
+                entry["narration"] = ""
+        narration.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        log(f"[narration] cleared text from {original} entries (ch{chapter:02d})")
+        return jsonify({"mode": mode, "entries": original})
+
+    else:  # remove_empty
+        kept = [e for e in data if isinstance(e, dict) and str(e.get("narration", "")).strip()]
+        removed = original - len(kept)
+        narration.write_text(json.dumps(kept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        log(f"[narration] removed {removed} empty entries, {len(kept)} remain (ch{chapter:02d})")
+        return jsonify({"mode": mode, "original": original, "remaining": len(kept), "removed": removed})
+
+
 @bp.route("/api/workflow/batch-download", methods=["POST"])
 def api_batch_download():
     """Download a range of chapters from MangaDex one by one as a single job."""

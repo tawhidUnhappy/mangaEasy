@@ -179,6 +179,16 @@
         <button id="wf-narrate" class="btn primary">📝 Open narration editor</button>
         <button class="btn" data-wf-open="chapter">Open chapter folder</button>
       </div>
+      <div class="row" style="margin-top:8px;gap:6px">
+        <button id="wf-narr-clear" class="btn small danger"
+          title="Set narration text to blank on every entry — keeps the image list so you can paste the file into an AI to fill it in. Click twice to confirm.">
+          ✕ Clear all narration text
+        </button>
+        <button id="wf-narr-remove-empty" class="btn small danger"
+          title="Delete entries where narration is already blank — only lines with text are kept. Click twice to confirm.">
+          ✕ Remove empty entries
+        </button>
+      </div>
       <p class="hint">Prefer to write it yourself (or with an AI)? Create
         <code id="wf-narration-name">narration_01.json</code> in the chapter folder:
         a JSON array of <code>{"image": "panel file", "narration": "text"}</code> entries.</p>
