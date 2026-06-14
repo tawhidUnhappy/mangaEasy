@@ -117,8 +117,52 @@ TOOLS: dict[str, ToolSpec] = {
 # ── Shell helpers ─────────────────────────────────────────────────────────────
 
 
-def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
-    log(f"$ {' '.join(cmd)}")
+# Strips ANSI colour/cursor codes and bare \r (progress-bar overwrites).
+_ANSI_RE = re.compile(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])|\r')
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
+def _run_pty_win32(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
+    """Run *cmd* inside a Windows ConPTY so the child flushes every line."""
+    from winpty import PtyProcess  # type: ignore[import-untyped]  # pywinpty
+
+    proc = PtyProcess.spawn(cmd, cwd=str(cwd) if cwd else None, env=env, dimensions=(50, 300))
+    pending = ""
+    while proc.isalive():
+        try:
+            chunk = proc.read(4096)
+        except Exception:
+            break
+        if not chunk:
+            continue
+        pending += _strip_ansi(chunk)
+        while "\n" in pending:
+            line, pending = pending.split("\n", 1)
+            stripped = line.rstrip()
+            if stripped:
+                log(stripped)
+    # drain any tail after process exits
+    try:
+        while True:
+            chunk = proc.read(4096)
+            if not chunk:
+                break
+            pending += _strip_ansi(chunk)
+    except Exception:
+        pass
+    if pending.strip():
+        log(pending.strip())
+    proc.wait()
+    rc = proc.exitstatus or 0
+    if rc != 0:
+        raise InstallError(f"command failed (exit {rc}): {subprocess.list2cmdline(cmd)}")
+
+
+def _run_pipe(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
+    """Run *cmd* with stdout/stderr merged into a pipe (output arrives in ~4 KB bursts)."""
     try:
         proc = subprocess.Popen(
             cmd,
@@ -127,6 +171,8 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             **popen_kwargs(),
         )
@@ -138,6 +184,22 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
     code = proc.wait()
     if code != 0:
         raise InstallError(f"command failed (exit {code}): {' '.join(cmd)}")
+
+
+def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
+    log(f"$ {' '.join(str(c) for c in cmd)}")
+    # On Windows use a ConPTY (pywinpty) so child processes see a real terminal
+    # and flush output line-by-line.  Falls back to a regular pipe if pywinpty
+    # is not installed yet (first run before the dep is available).
+    if sys.platform == "win32":
+        try:
+            _run_pty_win32(cmd, log, cwd=cwd, env=env)
+            return
+        except ImportError:
+            pass  # pywinpty not installed — fall through to pipe mode
+        except Exception as exc:
+            log(f"[warn] PTY launch failed ({exc}), retrying with pipe")
+    _run_pipe(cmd, log, cwd=cwd, env=env)
 
 
 def _which(exe: str) -> str | None:
