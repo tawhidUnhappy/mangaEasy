@@ -420,20 +420,9 @@ def _install_uv_project(
             log, cwd=dest, env=tool_env(),
         )
 
-    # torchaudio 2.8+ dropped its built-in audio backends and now requires
-    # torchcodec for torchaudio.save(). Install it into the index-tts venv
-    # regardless of CPU/CUDA mode; the binary wheel self-contains its deps.
-    if spec.key == "index-tts":
-        log("Installing torchcodec (required by torchaudio ≥2.8 for audio saving)…")
-        tc_cmd = [
-            "uv", "pip", "install",
-            "--python", str(venv_python),
-            "torchcodec",
-            "--no-deps",
-        ]
-        if gpu_mode == "cuda":
-            tc_cmd += ["--index-url", _torch_index_url("cuda")]
-        _run(tc_cmd, log, cwd=dest, env=tool_env())
+    # Note: torchaudio 2.8+ uses torchcodec for save() but torchcodec ships
+    # Linux-only wheels. On Windows we patch torchaudio.save() in tts.py with
+    # a stdlib wave fallback instead — no extra package needed.
 
     if spec.needs_gpu and not _has_gpu():
         log("[warn] no NVIDIA GPU detected; this tool will run on CPU, which is much slower.")

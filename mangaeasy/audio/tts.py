@@ -57,6 +57,48 @@ USE_RAW_NARRATION = bool(_tts_cfg.get("use_raw_narration", False))
 # ── Import IndexTTS2 ──────────────────────────────────────────────────────────
 import torch
 
+
+def _patch_torchaudio_save_win32() -> None:
+    """torchaudio 2.8+ routes torchaudio.save() through torchcodec by default.
+    torchcodec ships Linux-only wheels, so it can never be installed on Windows.
+    Wrap torchaudio.save with a stdlib `wave` fallback that activates whenever
+    the torchcodec import fails — no extra packages required."""
+    import sys
+    if sys.platform != "win32":
+        return
+    try:
+        import torchaudio  # may not be importable before IndexTTS2 venv is active
+    except ImportError:
+        return
+
+    _orig = torchaudio.save
+
+    def _save_compat(uri, src, sample_rate, channels_first: bool = True, **kw):
+        try:
+            _orig(uri, src, sample_rate, channels_first=channels_first, **kw)
+        except (ImportError, RuntimeError):
+            # torchcodec unavailable on Windows — write WAV via stdlib wave
+            import wave
+            import numpy as np
+            # torchaudio convention: src is [channels, samples] when channels_first
+            data = src.T.contiguous() if channels_first else src.contiguous()
+            pcm = data.numpy()
+            if pcm.dtype != np.int16:
+                pcm = pcm.astype(np.int16)
+            n_channels = pcm.shape[1] if pcm.ndim == 2 else 1
+            if pcm.ndim == 1:
+                pcm = pcm.reshape(-1, 1)
+            with wave.open(str(uri), "wb") as wf:
+                wf.setnchannels(n_channels)
+                wf.setsampwidth(2)          # 16-bit PCM
+                wf.setframerate(int(sample_rate))
+                wf.writeframes(pcm.tobytes())
+
+    torchaudio.save = _save_compat
+
+
+_patch_torchaudio_save_win32()
+
 try:
     from indextts.infer_v2 import IndexTTS2
 except Exception as exc:
