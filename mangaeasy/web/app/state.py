@@ -24,6 +24,11 @@ def log(line: str) -> None:
     broadcaster.broadcast(line)
 
 
+def action(name: str) -> None:
+    """Push a control action to all live SSE clients (e.g. 'refresh-doctor')."""
+    broadcaster.broadcast_action(name)
+
+
 def _load_app_state() -> dict:
     try:
         data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))

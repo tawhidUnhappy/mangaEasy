@@ -8,7 +8,7 @@ import threading
 from flask import Blueprint, jsonify, request
 
 from mangaeasy.web.app import jobs
-from mangaeasy.web.app.state import lock, log, state
+from mangaeasy.web.app.state import action, lock, log, state
 
 bp = Blueprint("setup", __name__)
 
@@ -44,6 +44,8 @@ def api_install_tool(name: str):
                 log(f"[install-tool] FAILED: {exc}")
             except Exception as exc:  # keep the app alive whatever happens
                 log(f"[install-tool] unexpected error: {exc}")
+            finally:
+                action("refresh-doctor")
 
         thread = threading.Thread(target=work, daemon=True)
         state["job"] = {"kind": "install", "name": name, "thread": thread, "proc": None}
@@ -85,6 +87,8 @@ def api_setup_gpu():
                 log(f"[setup-gpu] FAILED: {exc}")
             except Exception as exc:
                 log(f"[setup-gpu] unexpected error: {exc}")
+            finally:
+                action("refresh-doctor")
 
         thread = threading.Thread(target=work, daemon=True)
         state["job"] = {"kind": "setup-gpu", "name": "cuda-torch", "thread": thread, "proc": None}
@@ -107,6 +111,8 @@ def api_install_whisper():
                 log(f"[install-whisper] FAILED: {exc}")
             except Exception as exc:
                 log(f"[install-whisper] unexpected error: {exc}")
+            finally:
+                action("refresh-doctor")
 
         thread = threading.Thread(target=work, daemon=True)
         state["job"] = {"kind": "install-whisper", "name": "faster-whisper", "thread": thread, "proc": None}

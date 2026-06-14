@@ -134,6 +134,16 @@ class LogBroadcaster:
             for q in dead:
                 self._clients.remove(q)
 
+    def broadcast_action(self, action: str) -> None:
+        """Send a control signal to all SSE clients (not buffered in history)."""
+        entry = json.dumps({"action": action})
+        with self._lock:
+            for q in self._clients:
+                try:
+                    q.put_nowait(entry)
+                except queue.Full:
+                    pass
+
     def install(self) -> None:
         """Redirect sys.stdout and sys.stderr through this broadcaster."""
         broadcaster = self

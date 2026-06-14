@@ -90,6 +90,7 @@ export async function loadDoctor() {
   const cards = $("tool-cards");
   cards.innerHTML = "";
   for (const [key, info] of Object.entries(report.tools)) {
+    if (key === "faster-whisper") continue; // shown in the prereq section above
     let badge, action = "";
     if (info.installed) {
       badge = `<span class="badge installed">installed</span>`;
@@ -165,4 +166,8 @@ export async function loadDoctor() {
 
 export function initSetup() {
   $("doctor-refresh").addEventListener("click", loadDoctor);
+  // Auto-refresh the Setup tab whenever a background install job finishes.
+  window.addEventListener("sse-action", (e) => {
+    if (e.detail === "refresh-doctor") loadDoctor();
+  });
 }

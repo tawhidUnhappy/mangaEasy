@@ -73,6 +73,10 @@ export function initLogConsole() {
     try {
       const entry = JSON.parse(e.data);
       if (entry.ping) return;
+      if (entry.action) {
+        window.dispatchEvent(new CustomEvent("sse-action", { detail: entry.action }));
+        return;
+      }
       appendLog(entry.ts, entry.msg);
     } catch { /* ignore malformed entries */ }
   };
