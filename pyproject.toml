@@ -1,6 +1,6 @@
 [project]
 name = "mangaeasy"
-version = "0.9.23"
+version = "0.9.24"
 description = "General manga and image-to-video automation with isolated external AI tool envs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,6 +33,7 @@ dependencies = [
     "pywebview>=5.0",
     "pywinpty>=2.0; sys_platform == 'win32'",
     "flask-sock>=0.2.0",
+    "nicegui>=2.0.0",
 ]
 
 [project.optional-dependencies]
