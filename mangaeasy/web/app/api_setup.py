@@ -82,12 +82,13 @@ def api_setup_gpu():
                      "--force-reinstall"],
                     log,
                 )
-                log("[setup-gpu] Done — restart mangaeasy to activate GPU acceleration.")
+                log("[setup-gpu] Done — restarting app to activate GPU acceleration…")
+                action("restart-app")
             except InstallError as exc:
                 log(f"[setup-gpu] FAILED: {exc}")
+                action("refresh-doctor")
             except Exception as exc:
                 log(f"[setup-gpu] unexpected error: {exc}")
-            finally:
                 action("refresh-doctor")
 
         thread = threading.Thread(target=work, daemon=True)
@@ -118,6 +119,21 @@ def api_install_whisper():
         state["job"] = {"kind": "install-whisper", "name": "faster-whisper", "thread": thread, "proc": None}
         thread.start()
     return jsonify({"started": True})
+
+
+@bp.route("/api/restart", methods=["POST"])
+def api_restart():
+    """Restart the mangaeasy process in-place (new process, same port)."""
+    import os
+    import subprocess
+    import sys
+
+    def _do_restart():
+        subprocess.Popen([sys.executable] + sys.argv)
+        os._exit(0)
+
+    threading.Timer(1.0, _do_restart).start()
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/install-tool/<name>", methods=["DELETE"])

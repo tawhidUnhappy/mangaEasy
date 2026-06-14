@@ -67,12 +67,25 @@ export function initLogConsole() {
   });
 
   const events = new EventSource("/log_stream");
-  events.onopen = () => { if (statusEl) statusEl.textContent = "connected"; };
   events.onerror = () => { if (statusEl) statusEl.textContent = "reconnecting…"; };
+  let _firstOpen = true;
+  events.onopen = () => {
+    if (statusEl) statusEl.textContent = "connected";
+    if (!_firstOpen) window.dispatchEvent(new CustomEvent("sse-reconnect"));
+    _firstOpen = false;
+  };
+
   events.onmessage = (e) => {
     try {
       const entry = JSON.parse(e.data);
       if (entry.ping) return;
+      if (entry.action === "restart-app") {
+        appendLog("", "[app] Restarting…");
+        fetch("/api/restart", { method: "POST" }).catch(() => {});
+        // Wait for the new process to come up then reload the page
+        setTimeout(() => location.reload(), 3000);
+        return;
+      }
       if (entry.action) {
         window.dispatchEvent(new CustomEvent("sse-action", { detail: entry.action }));
         return;

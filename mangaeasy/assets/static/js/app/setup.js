@@ -60,37 +60,9 @@ export async function loadDoctor() {
     }
   }
 
-  // Whisper (faster-whisper) — optional narration transcription
-  const whisperOk = report.whisper;
-  const whisperLabel = whisperOk
-    ? "Whisper (narration transcription) · installed"
-    : "Whisper not installed — narration transcription disabled";
-  grid.insertAdjacentHTML("beforeend",
-    `<div class="prereq" title="${whisperOk ? "faster-whisper installed in isolated managed env (~/.mangaeasy/tools/faster-whisper)" : "faster-whisper not yet installed — gets its own isolated env, never conflicts with main deps"}">
-       <span class="dot ${whisperOk ? "ok" : "bad"}"></span>${whisperLabel}
-       ${whisperOk ? "" : `<button id="btn-install-whisper" class="btn small" style="margin-left:8px" ${store.jobRunning ? "disabled" : ""}>Install Whisper</button>`}
-     </div>`);
-
-  if (!whisperOk) {
-    document.getElementById("btn-install-whisper")?.addEventListener("click", async (e) => {
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      btn.textContent = "Installing…";
-      try {
-        await api("/api/install-whisper", { method: "POST" });
-        appendLog("", "Installing faster-whisper in isolated env — watch logs below.");
-      } catch (err) {
-        appendLog("", `Whisper install failed: ${err.message}`);
-        btn.disabled = false;
-        btn.textContent = "Install Whisper";
-      }
-    });
-  }
-
   const cards = $("tool-cards");
   cards.innerHTML = "";
   for (const [key, info] of Object.entries(report.tools)) {
-    if (key === "faster-whisper") continue; // shown in the prereq section above
     let badge, action = "";
     if (info.installed) {
       badge = `<span class="badge installed">installed</span>`;
@@ -166,8 +138,9 @@ export async function loadDoctor() {
 
 export function initSetup() {
   $("doctor-refresh").addEventListener("click", loadDoctor);
-  // Auto-refresh the Setup tab whenever a background install job finishes.
+  // Auto-refresh after any install job finishes or after the app restarts.
   window.addEventListener("sse-action", (e) => {
     if (e.detail === "refresh-doctor") loadDoctor();
   });
+  window.addEventListener("sse-reconnect", loadDoctor);
 }

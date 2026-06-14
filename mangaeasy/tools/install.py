@@ -83,10 +83,12 @@ TOOLS: dict[str, ToolSpec] = {
         env_deps=[
             "faster-whisper>=1.2.1",
             "huggingface-hub>=0.21",
+            # onnxruntime 1.24+ dropped Python 3.10 support; pin to keep it working
+            "onnxruntime>=1.14,<1.24",
         ],
         verify_import="faster_whisper",
         needs_gpu=False,
-        notes="Optional: fast Whisper audio transcription. Runs on CPU; ctranslate2 auto-uses CUDA if available. Whisper models download from Hugging Face on first use.",
+        notes="Optional: fast Whisper audio transcription. Runs on CPU; ctranslate2 auto-uses CUDA if available. Models download from Hugging Face on first use.",
     ),
     "magi-v3": ToolSpec(
         key="magi-v3",
@@ -239,6 +241,8 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
             return
         except ImportError:
             pass  # pywinpty not installed — fall through to pipe mode
+        except InstallError:
+            raise  # command itself failed — don't retry, propagate immediately
         except Exception as exc:
             log(f"[warn] PTY launch failed ({exc}), retrying with pipe")
     _run_pipe(cmd, log, cwd=cwd, env=env)
