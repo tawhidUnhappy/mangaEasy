@@ -77,8 +77,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--normalize-audio", action="store_true",
                         help="After the long video is built, loudness-normalize it in place "
                              "for YouTube (-14 LUFS integrated, two-pass).")
-    parser.add_argument("--background-style", choices=("blur", "black", "image"), default="black")
+    parser.add_argument("--background-style", choices=("blur", "black", "image"), default="blur")
     parser.add_argument("--background-image", type=Path, default=None)
+    parser.add_argument("--blur-sigma", type=float, default=28.0)
+    parser.add_argument("--blur-downscale", type=int, default=4)
+    parser.add_argument("--blur-backend", choices=("auto", "vulkan", "cpu"), default="auto")
+    parser.add_argument("--background-brightness", type=float, default=-0.06)
+    parser.add_argument("--background-saturation", type=float, default=1.08)
     parser.add_argument("--background-music", type=Path, default=None)
     parser.add_argument("--music-volume", type=float, default=0.035)
     parser.add_argument("--narration-volume", type=float, default=1.0)
@@ -137,6 +142,11 @@ def main() -> int:
         "--output-root", str(args.output_root),
         "--work-dir", str(args.work_dir),
         "--background-style", args.background_style,
+        "--blur-sigma", str(args.blur_sigma),
+        "--blur-downscale", str(args.blur_downscale),
+        "--blur-backend", args.blur_backend,
+        "--background-brightness", str(args.background_brightness),
+        "--background-saturation", str(args.background_saturation),
         "--audio-bitrate", args.audio_bitrate,
         "--render-mode", args.render_mode,
         "--encoder", args.encoder,

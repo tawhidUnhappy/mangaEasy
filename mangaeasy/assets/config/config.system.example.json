@@ -13,6 +13,12 @@
     "width": 1920,
     "height": 1080,
     "fps": 24,
+    "background_style": "blur",
+    "blur_backend": "auto",
+    "blur_downscale": 4,
+    "blur_sigma": 28.0,
+    "background_brightness": -0.06,
+    "background_saturation": 1.08,
     "background_image": "background_image/BACKGROUND.png",
     "encoder": {
       "nvenc_cq": 19,

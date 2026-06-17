@@ -38,6 +38,11 @@ from mangaeasy.paths import (
     output_video,
 )
 from mangaeasy.video import nvenc_available
+from mangaeasy.video.blur_background import (
+    BlurBackgroundOptions,
+    compose_blurred_panel_pil,
+    render_blurred_panel_ffmpeg,
+)
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
 AUDIO_EXTS = (".wav", ".mp3", ".flac", ".m4a", ".ogg")
@@ -125,6 +130,7 @@ def load_paths() -> dict:
         "chapter":          chapter,
         "target_res":       (w, h),
         "background_image": bg_img,
+        "video_config":     vid,
         "chapter_dir":      ch_dir,
         "image_root":       image_root,
         "raw_audio_root":   audio_dir(name, chapter),
@@ -159,6 +165,47 @@ def load_background(target_res: tuple[int, int], bg_path: Path) -> Image.Image:
     return Image.new("RGB", target_res, (0, 0, 0))
 
 
+def background_style(video_cfg: dict | None) -> str:
+    style = str((video_cfg or {}).get("background_style") or "blur").lower()
+    if style not in {"blur", "image", "black"}:
+        print(f"[WARN] Unknown video.background_style={style!r}; using blur")
+        return "blur"
+    return style
+
+
+def _tmp_frame_path(out_path: Path) -> Path:
+    return out_path.with_name(f"{out_path.stem}.tmp{out_path.suffix}")
+
+
+def _save_with_watermark(src: Path, dst: Path, watermark_cfg: dict | None) -> None:
+    if watermark_cfg and watermark_cfg.get("enabled"):
+        with Image.open(src).convert("RGBA") as frame:
+            apply_watermark(frame, watermark_cfg).save(dst, "PNG", optimize=True)
+    else:
+        src.replace(dst)
+
+
+def render_blurred_frame(
+    image_path: Path,
+    target_res: tuple[int, int],
+    out_path: Path,
+    video_cfg: dict | None = None,
+    watermark_cfg: dict | None = None,
+) -> None:
+    width, height = target_res
+    options = BlurBackgroundOptions.from_mapping(video_cfg)
+    tmp = _tmp_frame_path(out_path)
+    try:
+        try:
+            render_blurred_panel_ffmpeg(image_path, tmp, width, height, options, run, log=print)
+        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+            print(f"[WARN] ffmpeg blur failed for {image_path.name}; using PIL fallback ({exc})")
+            compose_blurred_panel_pil(image_path, tmp, width, height, options)
+        _save_with_watermark(tmp, out_path, watermark_cfg)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def render_frame(image_path: Path, canvas: Image.Image, target_res: tuple[int, int],
                  out_path: Path, watermark_cfg: dict | None = None) -> None:
     with Image.open(image_path).convert("RGBA") as image:
@@ -173,12 +220,23 @@ def render_frame(image_path: Path, canvas: Image.Image, target_res: tuple[int, i
 
 
 def prerender_frames(pairs: list, frames_dir: Path, target_res: tuple[int, int],
-                     bg_path: Path, watermark_cfg: dict | None = None) -> None:
+                     bg_path: Path, video_cfg: dict | None = None,
+                     watermark_cfg: dict | None = None) -> None:
     frames_dir.mkdir(parents=True, exist_ok=True)
-    canvas = load_background(target_res, bg_path)
+    style = background_style(video_cfg)
+    if style == "blur":
+        canvas = None
+    elif style == "black":
+        canvas = Image.new("RGB", target_res, (0, 0, 0))
+    else:
+        canvas = load_background(target_res, bg_path)
     for idx, (image, _) in enumerate(pairs, start=1):
         out = frames_dir / f"{image.stem}.png"
-        render_frame(image, canvas, target_res, out, watermark_cfg)
+        if style == "blur":
+            render_blurred_frame(image, target_res, out, video_cfg, watermark_cfg)
+        else:
+            assert canvas is not None
+            render_frame(image, canvas, target_res, out, watermark_cfg)
         print(f"[FRAME] {idx}/{len(pairs)} {out.name}")
 
 
@@ -315,7 +373,14 @@ def main() -> None:
     print(f"[INFO] Resolution: {paths['target_res'][0]}x{paths['target_res'][1]}  FPS: {fps}")
     print(f"[INFO] Watermark: {wm_cfg.get('enabled', False)}")
 
-    prerender_frames(pairs, paths["frames_dir"], paths["target_res"], paths["background_image"], wm_cfg)
+    prerender_frames(
+        pairs,
+        paths["frames_dir"],
+        paths["target_res"],
+        paths["background_image"],
+        paths["video_config"],
+        wm_cfg,
+    )
 
     pcm_paths    = build_pcm_clips(pairs, paths["pcm_dir"], sample_rate, channels)
     joined_audio = paths["build_dir"] / "chapter_joined.wav"

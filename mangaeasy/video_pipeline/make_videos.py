@@ -25,9 +25,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preset", default="p1")
     parser.add_argument("--cq", type=int, default=18)
     parser.add_argument("--audio-bitrate", default="128k")
-    parser.add_argument("--background-style", choices=("blur", "black", "image"), default="black")
+    parser.add_argument("--background-style", choices=("blur", "black", "image"), default="blur")
     parser.add_argument("--background-image", type=Path, default=None)
     parser.add_argument("--blur-sigma", type=float, default=28.0)
+    parser.add_argument("--blur-downscale", type=int, default=4)
+    parser.add_argument("--blur-backend", choices=("auto", "vulkan", "cpu"), default="auto")
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
     parser.add_argument("--keep-work", action="store_true")
@@ -59,6 +61,8 @@ def main() -> int:
             background_style=args.background_style,
             background_image=args.background_image.resolve() if args.background_image else None,
             blur_sigma=args.blur_sigma,
+            blur_downscale=args.blur_downscale,
+            blur_backend=args.blur_backend,
             background_brightness=args.background_brightness,
             background_saturation=args.background_saturation,
             keep_work=args.keep_work,

@@ -18,6 +18,12 @@ from mangaeasy.video_pipeline.ffmpeg_tools import (
     run,
     validate_video_stream,
 )
+from mangaeasy.video.blur_background import (
+    BlurBackgroundOptions,
+    blur_work_size,
+    render_blurred_panel_ffmpeg,
+    scaled_blur_sigma,
+)
 
 
 @dataclass(frozen=True)
@@ -38,9 +44,11 @@ class VideoBuildConfig:
     preset: str = "p1"
     cq: int = 18
     audio_bitrate: str = "128k"
-    background_style: str = "black"
+    background_style: str = "blur"
     background_image: Path | None = None
     blur_sigma: float = 28.0
+    blur_downscale: int = 4
+    blur_backend: str = "auto"
     background_brightness: float = -0.06
     background_saturation: float = 1.08
     keep_work: bool = False
@@ -65,6 +73,16 @@ def selected_item_dirs(config: VideoBuildConfig) -> list[Path]:
     )
 
 
+def blur_options(config: VideoBuildConfig) -> BlurBackgroundOptions:
+    return BlurBackgroundOptions(
+        sigma=config.blur_sigma,
+        downscale=config.blur_downscale,
+        backend=config.blur_backend,
+        brightness=config.background_brightness,
+        saturation=config.background_saturation,
+    )
+
+
 def video_filter(config: VideoBuildConfig) -> str:
     width = config.width
     height = config.height
@@ -76,12 +94,16 @@ def video_filter(config: VideoBuildConfig) -> str:
             f"scale={width}:{height}:out_range=tv,"
             f"fps={fps},format=yuv420p"
         )
+    options = blur_options(config)
+    small_w, small_h = blur_work_size(width, height, options)
+    sigma = scaled_blur_sigma(options)
     return (
         "split=2[bg][fg];"
         f"[bg]scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},gblur=sigma={config.blur_sigma},"
+        f"crop={width}:{height},setsar=1,scale={small_w}:{small_h},"
+        f"gblur=sigma={sigma:.3f}:steps=1,scale={width}:{height},"
         f"eq=brightness={config.background_brightness}:saturation={config.background_saturation}[bg];"
-        f"[fg]scale={width}:{height}:force_original_aspect_ratio=decrease[fg];"
+        f"[fg]scale={width}:{height}:force_original_aspect_ratio=decrease,setsar=1[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
         f"scale={width}:{height}:out_range=tv,fps={fps},format=yuv420p"
     )
@@ -101,6 +123,31 @@ def background_image_filter(config: VideoBuildConfig) -> str:
     )
 
 
+def composed_blur_frame_path(segment_path: Path) -> Path:
+    return segment_path.with_name(f"{segment_path.stem}_frame.png")
+
+
+def render_blurred_panel_frame(image_path: Path, frame_path: Path, config: VideoBuildConfig) -> None:
+    if frame_path.exists() and not config.overwrite:
+        return
+    frame_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = frame_path.with_name(f"{frame_path.stem}.tmp{frame_path.suffix}")
+    try:
+        backend = render_blurred_panel_ffmpeg(
+            image_path,
+            tmp_path,
+            config.width,
+            config.height,
+            blur_options(config),
+            run,
+            log=print,
+        )
+        tmp_path.replace(frame_path)
+        print(f"    blur background: {backend} one-frame composite", flush=True)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 def write_video_concat_file(paths: list[Path], work_dir: Path, chapter: str) -> Path:
     work_dir.mkdir(parents=True, exist_ok=True)
     concat_path = work_dir / f"{chapter}_segments.ffconcat"
@@ -111,11 +158,26 @@ def write_video_concat_file(paths: list[Path], work_dir: Path, chapter: str) -> 
     return concat_path
 
 
-def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path, config: VideoBuildConfig) -> None:
+def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path, config: VideoBuildConfig) -> Path | None:
     segment_path.parent.mkdir(parents=True, exist_ok=True)
     if segment_path.exists() and not config.overwrite:
-        return
+        return None
     encoder = choose_h264_encoder(config.encoder)
+    if config.background_style == "blur":
+        frame_path = composed_blur_frame_path(segment_path)
+        render_blurred_panel_frame(image_path, frame_path, config)
+        run(
+            [
+                "ffmpeg", "-hide_banner", "-y", "-loop", "1", "-framerate", str(config.fps),
+                "-i", str(frame_path),
+                "-vf", f"scale={config.width}:{config.height}:out_range=tv,fps={config.fps},format=yuv420p",
+                "-map", "0:v:0", *h264_encoder_args(encoder, config.preset, config.cq),
+                "-frames:v", str(frame_count),
+                "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+                "-an", "-movflags", "+faststart", str(segment_path),
+            ]
+        )
+        return frame_path
     if config.background_style == "image":
         if config.background_image is None:
             raise ValueError("--background-image is required when --background-style image is used.")
@@ -131,7 +193,7 @@ def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path,
                 "-an", "-movflags", "+faststart", str(segment_path),
             ]
         )
-        return
+        return None
     run(
         [
             "ffmpeg", "-hide_banner", "-y", "-loop", "1", "-framerate", str(config.fps),
@@ -141,6 +203,7 @@ def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path,
             "-an", "-movflags", "+faststart", str(segment_path),
         ]
     )
+    return None
 
 
 def build_item_narration_wav(
@@ -177,6 +240,7 @@ def build_item_narration_wav(
 def build_from_segments(chapter_dir: Path, assets: list[PanelAsset], work_dir: Path, output_path: Path, config: VideoBuildConfig) -> None:
     segment_dir = work_dir / "segments"
     segments: list[Path] = []
+    composed_frames: list[Path] = []
     for idx, asset in enumerate(assets, start=1):
         segment_path = segment_dir / f"{idx:04d}_{asset.image_path.stem}.mp4"
         print(
@@ -184,7 +248,9 @@ def build_from_segments(chapter_dir: Path, assets: list[PanelAsset], work_dir: P
             f"audio={asset.audio_duration:.3f}s visual={asset.visual_duration:.3f}s",
             flush=True,
         )
-        render_panel_segment(asset.image_path, asset.frame_count, segment_path, config)
+        composed_frame = render_panel_segment(asset.image_path, asset.frame_count, segment_path, config)
+        if composed_frame is not None:
+            composed_frames.append(composed_frame)
         segments.append(segment_path)
 
     concat_path = write_video_concat_file(segments, work_dir, chapter_dir.name)
@@ -212,6 +278,8 @@ def build_from_segments(chapter_dir: Path, assets: list[PanelAsset], work_dir: P
 
     if not config.keep_work:
         for path in segments:
+            path.unlink(missing_ok=True)
+        for path in composed_frames:
             path.unlink(missing_ok=True)
         video_only_path.unlink(missing_ok=True)
         concat_path.unlink(missing_ok=True)
@@ -289,6 +357,10 @@ def validate_config(config: VideoBuildConfig) -> None:
         raise ValueError("CQ must be non-negative.")
     if config.workers < 1:
         raise ValueError("--workers must be at least 1.")
+    if config.blur_downscale < 1:
+        raise ValueError("--blur-downscale must be at least 1.")
+    if config.blur_backend not in {"auto", "vulkan", "cpu"}:
+        raise ValueError("--blur-backend must be auto, vulkan, or cpu.")
     if config.background_style == "image":
         if config.render_mode != "segments":
             raise ValueError("--background-style image requires --render-mode segments.")
