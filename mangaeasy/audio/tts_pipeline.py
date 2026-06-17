@@ -118,6 +118,8 @@ def main() -> int:
     )
     print(f"[INFO] Generating {len(to_generate)} audio files...", flush=True)
 
+    generated = 0
+    failures: list[Path] = []
     for i, (text, dst) in enumerate(to_generate, 1):
         print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
         try:
@@ -127,11 +129,18 @@ def main() -> int:
                 output_path=str(dst),
                 verbose=False,
             )
+            generated += 1
         except Exception as exc:
             print(f"[ERROR] {dst.name}: {exc}")
             traceback.print_exc()
+            failures.append(dst)
 
-    print(f"\n[INFO] Done. Generated {len(to_generate)} files.")
+    print(f"\n[INFO] Done. Generated {generated} file(s).")
+    if failures:
+        print(f"[FATAL] Failed to generate {len(failures)} audio file(s):", flush=True)
+        for path in failures[:20]:
+            print(f"  {path}", flush=True)
+        return 1
     return 0
 
 

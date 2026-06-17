@@ -485,6 +485,46 @@ def _configured_bgm_file(cfg: dict, sys_cfg: dict) -> str:
     return str(bgm_cfg.get("file") or audio_cfg.get("bgm") or "").strip()
 
 
+def _library_manga_entries() -> tuple[Path, list[dict[str, object]]]:
+    from mangaeasy.web.app.api_workflow import _library_dir
+
+    root = state["project_root"]
+    cfg, sc = _read_config()
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    current_name = str(dl.get("name") or "")
+    library = _library_dir(root, sc)
+    entries: list[dict[str, object]] = []
+    if library.is_dir():
+        for folder in sorted(
+            (p for p in library.iterdir() if p.is_dir() and not p.name.startswith(".")),
+            key=lambda p: p.name.lower(),
+        ):
+            chapters = sorted(
+                (p.name for p in folder.iterdir() if p.is_dir() and p.name.isdigit()),
+                key=lambda name: int(name),
+            )
+            count = len(chapters)
+            label = f"{folder.name} ({count} chapter{'s' if count != 1 else ''})"
+            entries.append({
+                "name": folder.name,
+                "path": folder.resolve(),
+                "label": label,
+                "chapter_count": count,
+                "selected": folder.name == current_name,
+            })
+    return library, entries
+
+
+def _open_folder_in_manager(path: Path) -> None:
+    path = path.resolve()
+    if sys.platform == "win32":
+        os.startfile(str(path))  # noqa: S606 - local desktop convenience
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
+
 # Language options (shared by Project + Workflow tabs)
 _LANGS = {
     "en": "English", "es": "Spanish", "es-la": "Spanish (LATAM)",
@@ -521,6 +561,17 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
       .q-tab-panels .q-panel.scroll { height: 100%; }
       .q-tab-panel { height: 100%; box-sizing: border-box; }
       .q-tab-panel.full-bleed { padding: 0 !important; max-width: none !important; overflow: hidden; }
+      .q-tabs .q-tab {
+        min-height: 38px; color: #a8a8a8; border-radius: 6px 6px 0 0;
+        margin: 4px 2px 0; padding: 0 14px;
+      }
+      .q-tabs .q-tab:hover { background: #2d2d30; color: #fff; }
+      .q-tabs .q-tab.q-tab--active {
+        background: #0e3a5e; color: #fff; box-shadow: inset 0 -3px #6cc0ff;
+      }
+      .q-tabs .q-tab.q-tab--active .q-tab__label { font-weight: 600; }
+      .q-tabs .q-tab .q-tab__indicator { height: 3px; background: transparent; }
+      .q-tabs .q-tab.q-tab--active .q-tab__indicator { background: #6cc0ff; }
     </style>""")
 
     # ── header ────────────────────────────────────────────────────────────────
@@ -1032,14 +1083,37 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
         # 4 · BATCH VIDEOS
         # ══════════════════════════════════════════════════════════════════════
         with ui.tab_panel("run"):
-            ui.label("Turn every chapter folder (panels + narration) into a narrated video."
+            ui.label("Pick a manga from library/, choose a chapter range, then generate narrated videos."
                      ).classes("text-gray-400 text-[13px] mb-3")
+
+            with ui.card().classes("section w-full mb-3"):
+                ui.label("Manga and chapters").classes("text-white font-semibold mb-2")
+                with ui.row().classes("items-center gap-2 w-full mb-1"):
+                    manga_sel = ui.select({}, label="Manga folder").props(
+                        "dense outlined options-dense").classes("flex-1 mono")
+                    ui.button("Refresh", on_click=lambda: _refresh_batch_mangas()).props(
+                        "flat dense size=sm")
+
+                    async def _open_selected_manga() -> None:
+                        selected = _selected_batch_manga()
+                        if selected is None:
+                            return
+                        await ni_run.io_bound(_open_folder_in_manager, selected)
+
+                    ui.button("Open", on_click=_open_selected_manga).props("flat dense size=sm")
+                manga_hint = ui.label("").classes("text-gray-500 text-xs mb-2")
+                with ui.row().classes("items-center gap-3"):
+                    use_range_cb = ui.checkbox("Use chapter range", value=True).props("dense")
+                    range_from = ui.number(label="From", min=1, step=1, value=1).props(
+                        "dense outlined").classes("w-24")
+                    range_to = ui.number(label="To", min=1, step=1, value=24).props(
+                        "dense outlined").classes("w-24")
 
             with ui.card().classes("section w-full mb-3"):
                 ui.label("What to do").classes("text-white font-semibold mb-2")
                 with ui.grid(columns=2).classes("gap-3 w-full"):
                     _PIPELINE_STEPS = {
-                        "video":                 "Everything (audio + render + join)",
+                        "video":                 "Everything (IndexTTS + blur + long video)",
                         "video-check":           "Check items only",
                         "got-ocr2":              "Fill OCR fields (GOT-OCR 2.0)",
                         "video-audio":           "Audio only (Kokoro)",
@@ -1049,17 +1123,20 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         "video-normalize-audio": "Loudness-normalize joined audio",
                         "video-clean-audio":     "Delete generated audio",
                         "video-clean-video":     "Delete rendered videos",
+                        "video-validate":        "Validate generated output",
                     }
                     step_sel = ui.select(_PIPELINE_STEPS, value="video",
                                          label="Step").props("dense outlined")
                     _TTS = {"auto": "Auto", "indextts": "IndexTTS", "kokoro": "Kokoro"}
-                    tts_sel = ui.select(_TTS, value="auto",
+                    tts_sel = ui.select(_TTS, value="indextts",
                                         label="Voice engine").props("dense outlined")
                 with ui.row().classes("gap-4 mt-2"):
-                    long_cb  = ui.checkbox("Join into one long video", value=True).props("dense")
+                    long_cb  = ui.checkbox("Generate one long video", value=True).props("dense")
                     norm_bat = ui.checkbox("YouTube loudness", value=True).props("dense")
+                    bgm_cb   = ui.checkbox("Background music", value=True).props("dense")
                     ocr_force_cb = ui.checkbox("Redo all OCR (overwrite existing)", value=False).props("dense")
                     ocr_force_cb.bind_visibility_from(step_sel, "value", backward=lambda v: v == "got-ocr2")
+                bgm_hint = ui.label("").classes("text-gray-500 text-xs mt-1")
 
             with ui.card().classes("section w-full"):
                 ui.label("Output").classes("text-white font-semibold mb-2")
@@ -1074,17 +1151,188 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                     ui.button("Browse…", on_click=_browse_out).props("flat dense size=sm")
 
+                output_hint = ui.label("").classes("text-gray-500 text-xs mb-2")
+
+                def _selected_batch_manga() -> Path | None:
+                    raw = str(manga_sel.value or "").strip()
+                    if not raw:
+                        ui.notify("Pick a manga folder from library/ first", type="warning")
+                        return None
+                    path = Path(raw).expanduser()
+                    if not path.is_dir():
+                        ui.notify(f"Manga folder not found: {path}", type="negative")
+                        return None
+                    return path.resolve()
+
+                def _batch_output_root() -> Path:
+                    raw = str(out_dir_inp.value or "output").strip() or "output"
+                    path = Path(raw).expanduser()
+                    if not path.is_absolute():
+                        path = state["project_root"] / path
+                    return path.resolve()
+
+                def _batch_project_output_dir(manga_path: Path | None = None) -> Path | None:
+                    selected = manga_path or _selected_batch_manga()
+                    if selected is None:
+                        return None
+                    return _batch_output_root() / selected.name
+
+                def _batch_audio_root(manga_path: Path | None = None) -> Path | None:
+                    project_output = _batch_project_output_dir(manga_path)
+                    return None if project_output is None else project_output / "audio"
+
+                def _batch_range_arg() -> str | None:
+                    if not use_range_cb.value:
+                        return None
+                    start = int(range_from.value or 1)
+                    end = int(range_to.value or start)
+                    if end < start:
+                        start, end = end, start
+                    return f"{start:02d}-{end:02d}"
+
+                def _batch_base_args(*, output: bool = False, items: bool = True) -> list[str] | None:
+                    manga_path = _selected_batch_manga()
+                    if manga_path is None:
+                        return None
+                    args = ["--project-root", str(manga_path)]
+                    if output:
+                        args += ["--output-root", str(_batch_output_root())]
+                    item_range = _batch_range_arg() if items else None
+                    if item_range:
+                        args += ["--item-range", item_range]
+                    return args
+
+                def _append_audio_root(args: list[str], manga_path: Path | None = None) -> None:
+                    audio_root = _batch_audio_root(manga_path)
+                    if audio_root is not None:
+                        args += ["--audio-root", str(audio_root)]
+
+                def _append_bgm(args: list[str]) -> None:
+                    cfg, sc = _read_config()
+                    bgm = _configured_bgm_file(cfg, sc)
+                    if bgm_cb.value and bgm:
+                        args += ["--background-music", bgm]
+                    elif bgm_cb.value:
+                        ui.notify("No background music set in Project tab", type="warning")
+
+                def _refresh_batch_hints() -> None:
+                    library, entries = _library_manga_entries()
+                    selected = str(manga_sel.value or "")
+                    current = next((entry for entry in entries if str(entry["path"]) == selected), None)
+                    if current is not None:
+                        manga_hint.text = f"{current['chapter_count']} chapter folder(s) selected from {library}"
+                    elif entries:
+                        manga_hint.text = f"{len(entries)} manga folder(s) found in {library}"
+                    else:
+                        manga_hint.text = f"No manga folders found in {library}"
+                    cfg, sc = _read_config()
+                    bgm = _configured_bgm_file(cfg, sc)
+                    bgm_hint.text = f"BGM: {bgm}" if bgm else "BGM: not set in Project tab"
+                    selected_path = Path(selected) if selected else None
+                    audio_root = _batch_audio_root(selected_path) if selected_path else None
+                    if current is not None and audio_root is not None:
+                        output_hint.text = (
+                            f"Reusable files: {_batch_output_root() / selected_path.name} "
+                            f"(audio cache under {audio_root})"
+                        )
+                    else:
+                        output_hint.text = "Reusable files will be grouped under output/<manga name>/"
+
+                def _refresh_batch_mangas() -> None:
+                    _, entries = _library_manga_entries()
+                    options = {str(entry["path"]): str(entry["label"]) for entry in entries}
+                    selected = str(manga_sel.value or "")
+                    if selected not in options:
+                        selected_entry = next((entry for entry in entries if entry["selected"]), None)
+                        selected = str((selected_entry or entries[0])["path"]) if entries else ""
+                    manga_sel.options = options
+                    manga_sel.value = selected or None
+                    manga_sel.update()
+                    _refresh_batch_hints()
+
                 def _batch_start() -> None:
-                    if step_sel.value == "got-ocr2":
-                        args = ["--device", "auto"]
+                    step = step_sel.value
+                    if step == "got-ocr2":
+                        args = _batch_base_args(items=True)
+                        if args is None:
+                            return
+                        args += ["--device", "auto"]
                         if ocr_force_cb.value:
                             args.append("--force")
                         _run_job("got-ocr2", args)
                         return
-                    args = ["--output", out_dir_inp.value, "--tts", tts_sel.value]
-                    if not long_cb.value:   args.append("--no-long")
-                    if norm_bat.value:      args.append("--normalize")
-                    _run_job(step_sel.value, args)
+
+                    if step == "video":
+                        args = _batch_base_args(output=True, items=True)
+                        if args is None:
+                            return
+                        _append_audio_root(args)
+                        args += ["--tts", tts_sel.value, "--background-style", "blur", "--blur-backend", "auto"]
+                        if long_cb.value:
+                            args.append("--build-long-video")
+                            _append_bgm(args)
+                            if norm_bat.value:
+                                args.append("--normalize-audio")
+                        _run_job(step, args)
+                        return
+
+                    if step == "video-render":
+                        args = _batch_base_args(output=True, items=True)
+                        if args is None:
+                            return
+                        _append_audio_root(args)
+                        args += ["--background-style", "blur", "--blur-backend", "auto"]
+                        _run_job(step, args)
+                        return
+
+                    if step == "video-join":
+                        args = _batch_base_args(output=True, items=True)
+                        if args is None:
+                            return
+                        args.append("--overwrite")
+                        _append_bgm(args)
+                        _run_job(step, args)
+                        return
+
+                    if step == "video-normalize-audio":
+                        args = _batch_base_args(output=True, items=False)
+                        if args is None:
+                            return
+                        args.append("--replace")
+                        _run_job(step, args)
+                        return
+
+                    if step == "video-audio":
+                        args = _batch_base_args(items=True)
+                        if args is None:
+                            return
+                        _append_audio_root(args)
+                        args += ["--device", "auto"]
+                        _run_job(step, args)
+                        return
+
+                    if step == "video-audio-indextts":
+                        args = _batch_base_args(items=True)
+                        if args is None:
+                            return
+                        _append_audio_root(args)
+                        _run_job(step, args)
+                        return
+
+                    output_steps = {"video-validate", "video-clean-video"}
+                    audio_steps = {"video-check", "video-validate", "video-clean-audio"}
+                    args = _batch_base_args(output=step in output_steps, items=True)
+                    if args is None:
+                        return
+                    if step in audio_steps:
+                        _append_audio_root(args)
+                    if step in {"video-clean-audio", "video-clean-video"}:
+                        args.append("--yes")
+                    _run_job(step, args)
+
+                manga_sel.on("update:model-value", lambda _: _refresh_batch_hints())
+                ui.timer(0.1, _refresh_batch_mangas, once=True)
+                ui.timer(5.0, _refresh_batch_hints)
 
                 with ui.row().classes("gap-3 items-center"):
                     ui.button("▶ Start", on_click=_batch_start).props("color=primary")
