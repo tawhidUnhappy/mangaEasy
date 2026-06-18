@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -29,12 +30,26 @@ from mangaeasy.web.flask_utils import terminal_broadcaster
 # mirrors everything into a plain list so the in-app terminal can drain it.
 # ---------------------------------------------------------------------------
 _out: list[str] = []
+_ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+_TERMINAL_COPY_LIMIT = 2_000_000
 
 
 def _sink(text: str) -> None:
     _out.append(text)
     if len(_out) > 20_000:
         del _out[:5_000]
+
+
+def _terminal_log_text() -> str:
+    text = "".join(_out)
+    text = _ANSI_RE.sub("", text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    if len(text) > _TERMINAL_COPY_LIMIT:
+        text = (
+            f"[mangaEasy copied the last {_TERMINAL_COPY_LIMIT:,} characters]\n"
+            + text[-_TERMINAL_COPY_LIMIT:]
+        )
+    return text
 
 
 terminal_broadcaster.add_client(_sink)
@@ -541,6 +556,15 @@ _LANGS = {
 @ui.page("/")
 def page() -> None:  # noqa: C901 PLR0912 PLR0915
     ui.dark_mode(True)
+    stop_buttons = []
+
+    def _stop_button(*, dense: bool = False):
+        props = "color=negative" + (" dense" if dense else "")
+        button = ui.button("■ Stop", on_click=_stop_job).props(props)
+        button.visible = False
+        stop_buttons.append(button)
+        return button
+
     ui.add_head_html("""<style>
       body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; background:#1e1e1e; }
       .section { background:#232324 !important; border:1px solid #3a3a3e !important;
@@ -908,7 +932,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 with ui.row().classes("gap-2 mt-1"):
                     ui.button("⬇ Download", on_click=_dl_run).props("color=primary dense")
-                    ui.button("■ Stop", on_click=_stop_job).props("color=negative dense")
+                    _stop_button(dense=True)
 
             # ── Step 2: Panels ────────────────────────────────────────────────
             with ui.card().classes("section w-full"):
@@ -1336,7 +1360,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 with ui.row().classes("gap-3 items-center"):
                     ui.button("▶ Start", on_click=_batch_start).props("color=primary")
-                    ui.button("■ Stop",  on_click=_stop_job).props("color=negative")
+                    _stop_button()
 
         # ══════════════════════════════════════════════════════════════════════
         # 5 · TERMINAL
@@ -1427,29 +1451,66 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 )
 
         with ui.tab_panel("terminal").classes("p-0 full-bleed"):
-            with ui.element("div").style("height:100%; width:100%"):
-                term = ui.xterm({
-                    "cursorBlink": False,
-                    "disableStdin": True,
-                    "fontSize": 13,
-                    "fontFamily": "Consolas, 'Courier New', monospace",
-                    "scrollback": 20_000,
-                    "allowProposedApi": True,
-                    "theme": {
-                        "background": "#0d0d0d",
-                        "foreground": "#d4d4d4",
-                        "cursor": "#ffffff",
-                        "selectionBackground": "rgba(255,255,255,0.2)",
-                        "black": "#000000", "red": "#cc0000",
-                        "green": "#4caf50", "yellow": "#e6c000",
-                        "blue": "#4d9de0", "magenta": "#af87d7",
-                        "cyan": "#00bcd4", "white": "#d4d4d4",
-                        "brightBlack": "#555555", "brightRed": "#f87171",
-                        "brightGreen": "#6fd388", "brightYellow": "#fbbf24",
-                        "brightBlue": "#6cc0ff", "brightMagenta": "#c084fc",
-                        "brightCyan": "#67e8f9", "brightWhite": "#ffffff",
-                    },
-                }).classes("w-full h-full")
+            def _copy_terminal_log() -> None:
+                text = _terminal_log_text()
+                if not text.strip():
+                    ui.notify("Terminal log is empty", type="warning")
+                    return
+                payload = json.dumps(text)
+                ui.run_javascript(
+                    "(() => {"
+                    f"const text = {payload};"
+                    "async function copy(){"
+                    "  try { await navigator.clipboard.writeText(text); return; }"
+                    "  catch (err) {"
+                    "    const ta = document.createElement('textarea');"
+                    "    ta.value = text;"
+                    "    ta.style.position = 'fixed';"
+                    "    ta.style.opacity = '0';"
+                    "    document.body.appendChild(ta);"
+                    "    ta.focus();"
+                    "    ta.select();"
+                    "    document.execCommand('copy');"
+                    "    ta.remove();"
+                    "  }"
+                    "}"
+                    "copy();"
+                    "})();"
+                )
+                ui.notify("Terminal log copied", type="positive")
+
+            with ui.column().classes("w-full h-full gap-0"):
+                with ui.row().classes(
+                    "w-full h-10 bg-[#1a1a1a] border-b border-[#333] items-center px-3 gap-2"
+                ):
+                    ui.label("Terminal").classes("text-white text-sm font-semibold")
+                    ui.space()
+                    ui.button("Copy log", icon="content_copy", on_click=_copy_terminal_log).props(
+                        "flat dense size=sm color=blue"
+                    )
+                with ui.element("div").classes("w-full flex-1").style("min-height:0"):
+                    term = ui.xterm({
+                        "cursorBlink": False,
+                        "disableStdin": True,
+                        "fontSize": 13,
+                        "fontFamily": "Consolas, 'Courier New', monospace",
+                        "scrollback": 20_000,
+                        "allowProposedApi": True,
+                        "theme": {
+                            "background": "#0d0d0d",
+                            "foreground": "#d4d4d4",
+                            "cursor": "#ffffff",
+                            "selectionBackground": "rgba(255,255,255,0.2)",
+                            "black": "#000000", "red": "#cc0000",
+                            "green": "#4caf50", "yellow": "#e6c000",
+                            "blue": "#4d9de0", "magenta": "#af87d7",
+                            "cyan": "#00bcd4", "white": "#d4d4d4",
+                            "brightBlack": "#555555", "brightRed": "#f87171",
+                            "brightGreen": "#6fd388", "brightYellow": "#fbbf24",
+                            "brightBlue": "#6cc0ff", "brightMagenta": "#c084fc",
+                            "brightCyan": "#67e8f9", "brightWhite": "#ffffff",
+                        },
+                    }).classes("w-full h-full")
 
             _cur = {"i": 0}
 
@@ -1476,6 +1537,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
         global _prog_start
         running = jobs.job_running()
         job = state.get("job")
+        for button in stop_buttons:
+            button.visible = running
         active = bool(running or _prog.get("active") or time.monotonic() < float(_prog.get("done_until") or 0.0))
         if active:
             name = str((job or {}).get("name") or _prog.get("label") or "working")[:45]

@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import traceback
+import wave
 from pathlib import Path
 
 # ── Path bootstrap ─────────────────────────────────────────────────────────────
@@ -40,6 +41,63 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 CHECKPOINTS_DIR = _INDEX_TTS_DIR / "checkpoints"
 
 import torch
+
+
+def _patch_torchaudio_save_win32() -> None:
+    """Fall back to stdlib WAV writing when torchaudio asks for torchcodec.
+
+    Recent torchaudio releases route saves through torchcodec. TorchCodec does
+    not ship usable Windows wheels for this app's IndexTTS environment, so
+    IndexTTS can synthesize audio successfully and then fail at the final
+    `torchaudio.save()` call. Patch that exact failure path before IndexTTS is
+    imported so its internal save call lands here.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import numpy as np
+        import torchaudio
+    except ImportError:
+        return
+
+    original_save = torchaudio.save
+
+    def save_compat(uri, src, sample_rate, channels_first: bool = True, **kwargs):
+        try:
+            return original_save(uri, src, sample_rate, channels_first=channels_first, **kwargs)
+        except (ImportError, RuntimeError) as exc:
+            text = str(exc).lower()
+            if "torchcodec" not in text and "save_with_torchcodec" not in text:
+                raise
+
+            path = Path(uri)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = src.detach()
+            if getattr(data, "is_cuda", False):
+                data = data.cpu()
+            if channels_first and data.ndim > 1:
+                data = data.transpose(0, 1)
+            data = data.contiguous()
+            pcm = data.numpy()
+            if pcm.ndim == 1:
+                pcm = pcm.reshape(-1, 1)
+            if np.issubdtype(pcm.dtype, np.floating):
+                pcm = np.clip(pcm, -1.0, 1.0)
+                pcm = (pcm * 32767).astype(np.int16)
+            elif pcm.dtype != np.int16:
+                pcm = pcm.astype(np.int16)
+
+            with wave.open(str(path), "wb") as wav:
+                wav.setnchannels(int(pcm.shape[1]))
+                wav.setsampwidth(2)
+                wav.setframerate(int(sample_rate))
+                wav.writeframes(pcm.tobytes())
+            return None
+
+    torchaudio.save = save_compat
+
+
+_patch_torchaudio_save_win32()
 
 try:
     from indextts.infer_v2 import IndexTTS2
