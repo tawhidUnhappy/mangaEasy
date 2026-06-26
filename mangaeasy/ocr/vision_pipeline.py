@@ -71,7 +71,9 @@ _magi_processor = None
 
 
 def _get_device() -> str:
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    from mangaeasy.tools.external import resolve_device
+
+    return resolve_device("auto")
 
 
 def _load_magi() -> bool:

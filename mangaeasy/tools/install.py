@@ -4,8 +4,8 @@ These heavy tools (IndexTTS, MAGI v3, GOT-OCR 2.0, Kokoro) are deliberately kept
 their own isolated ``uv`` environments instead of being dependencies of
 mangaeasy, so their conflicting torch/transformers stacks never clash with the
 core install. This module clones / sets them up into the managed tools dir
-(``~/.mangaeasy/tools`` by default) so a globally-installed ``mangaeasy`` can
-find them from any folder.
+(``<app_root>/.mangaeasy/tools`` by default — self-contained, removed along
+with the install/repo folder).
 
 Used by the ``mangaeasy install-tool`` and ``mangaeasy doctor`` subcommands, and
 by the control-center app, which reuses :func:`install_tool` with a streaming
@@ -15,6 +15,7 @@ log callback.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -252,6 +253,13 @@ def _run_pipe(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | N
 
 
 def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
+    # Every install-tool subprocess (git clone, uv sync, hf download, …) runs
+    # under tool_env() by default so its caches (UV_CACHE_DIR, HF_HOME, …)
+    # always land under this install's own .mangaeasy/ dir, never the
+    # system-wide default — explicit `env=` callers (e.g. one-off env tweaks
+    # that already merged tool_env() themselves) are left untouched.
+    if env is None:
+        env = tool_env()
     log(f"$ {' '.join(str(c) for c in cmd)}")
     # On Windows use a ConPTY (pywinpty) so child processes see a real terminal
     # and flush output line-by-line.  Falls back to a regular pipe if pywinpty
@@ -362,7 +370,7 @@ def _clone_or_update(git_url: str, dest: Path, ref: str | None, log: LogFn,
             _run(["git", "-C", str(dest), "checkout", ref], log)
             _run(["git", "-C", str(dest), "pull", "--ff-only"], log)
     else:
-        clone_env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"} if skip_lfs_smudge else None
+        clone_env = {**tool_env(), "GIT_LFS_SKIP_SMUDGE": "1"} if skip_lfs_smudge else None
         _run(["git", "clone", git_url, str(dest)], log, env=clone_env)
         if ref:
             _run(["git", "-C", str(dest), "checkout", ref], log)
@@ -376,7 +384,7 @@ def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
     _require(["uvx"], log)
     # PYTHONUTF8=1 prevents Windows charmap errors when hf CLI prints Unicode
     # success symbols (e.g. ✓ U+2713) to a pipe that uses a legacy code page.
-    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    env = {**tool_env(), "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     _run(
         [
             "uvx", "--from", "huggingface-hub[cli,hf_xet]",
@@ -537,9 +545,18 @@ def install_tool(
     skip_model: bool = False,
     gpu: str = "auto",          # auto | cuda | cpu
     clone: bool = False,
+    update: bool = False,
     log: LogFn = print,
 ) -> Path:
-    """Provision one external tool. Reused by the CLI and the app."""
+    """Provision one external tool, or update an existing install.
+
+    There's no separate code path for "update" — `_clone_or_update()` already
+    pulls instead of cloning when the target has a `.git` dir, and `uv sync`/
+    `hf download --local-dir` are both idempotent. `update=True` only changes
+    the log line so the intent is visible; the GUI's "Update" button and
+    `install-tool --update` both just call this the same way as a fresh
+    install. Reused by the CLI and the app.
+    """
     if key not in TOOLS:
         raise InstallError(f"unknown tool '{key}'. Known: {', '.join(TOOLS)}")
     spec = TOOLS[key]
@@ -547,7 +564,8 @@ def install_tool(
     target.parent.mkdir(parents=True, exist_ok=True)
 
     gpu_mode = gpu if gpu in ("cuda", "cpu") else default_gpu_mode()
-    log(f"=== Installing {spec.title} -> {target} ===")
+    verb = "Updating" if update else "Installing"
+    log(f"=== {verb} {spec.title} -> {target} ===")
     if gpu_mode == "cuda":
         detail = "NVIDIA GPU detected" if gpu == "auto" else "forced with --cuda"
         log(f"Torch build: CUDA ({detail})")
@@ -569,24 +587,59 @@ def install_tool(
 # ── doctor ─────────────────────────────────────────────────────────────────────
 
 
-def doctor() -> dict:
-    """Structured environment report (also consumed by the app)."""
+def _update_available(path: Path, git_url: str | None) -> bool | None:
+    """Cheap "is a newer commit available" check for a git-cloned tool —
+    `git ls-remote` doesn't fetch any objects, just lists refs, so this stays
+    fast even over a network. Returns None when it doesn't apply (no git
+    clone here, e.g. a managed_env tool installed without --clone)."""
+    if git_url is None or not (path / ".git").exists():
+        return None
+    try:
+        local = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5, **popen_kwargs(),
+        )
+        remote = subprocess.run(
+            ["git", "ls-remote", git_url, "HEAD"],
+            capture_output=True, text=True, timeout=10, **popen_kwargs(),
+        )
+        if local.returncode != 0 or remote.returncode != 0:
+            return None
+        remote_head = remote.stdout.split()[0] if remote.stdout.strip() else None
+        return remote_head is not None and remote_head != local.stdout.strip()
+    except Exception:
+        return None
+
+
+def doctor(*, check_updates: bool = False) -> dict:
+    """Structured environment report (also consumed by the app).
+
+    `check_updates=True` adds a per-tool `update_available` field via
+    `git ls-remote` — opt-in and skipped by default since it needs network
+    round-trips per installed tool; the default fast path stays local-only.
+    """
     executables = {}
     for exe in ("git", "uv", "uvx", "ffmpeg", "ffprobe", "nvidia-smi"):
         # Use extended finder for nvidia-smi so Windows users without nvidia-smi
         # on PATH still see the real path instead of a false "missing".
         executables[exe] = _find_nvidia_smi() if exe == "nvidia-smi" else _which(exe)
 
-    # Check if torch CUDA is actually usable in this Python environment.
+    # Check if torch CUDA/MPS is actually usable in this Python environment.
+    # AMD ROCm and non-NVIDIA Linux GPUs aren't probed for — those fall back
+    # to CPU, same as before.
     cuda_available = False
     cuda_device: str | None = None
+    mps_available = False
     try:
         import torch  # type: ignore[import-untyped]
         cuda_available = bool(torch.cuda.is_available())
         if cuda_available:
             cuda_device = torch.cuda.get_device_name(0)
+        mps_backend = getattr(torch.backends, "mps", None)
+        mps_available = bool(mps_backend is not None and mps_backend.is_available())
     except Exception:
         pass
+    gpu_backend = "cuda" if cuda_available else "mps" if mps_available else "cpu"
 
     tools = {}
     for key, spec in TOOLS.items():
@@ -599,6 +652,7 @@ def doctor() -> dict:
             "git_url": spec.git_url,
             "needs_gpu": spec.needs_gpu,
             "notes": spec.notes,
+            "update_available": _update_available(path, spec.git_url) if check_updates and path else None,
         }
 
     # faster-whisper lives in its own managed isolated env (not the main venv)
@@ -611,6 +665,8 @@ def doctor() -> dict:
         "gpu": _has_gpu(),
         "cuda": cuda_available,
         "cuda_device": cuda_device,
+        "mps": mps_available,
+        "gpu_backend": gpu_backend,
         "whisper": whisper_installed,
         "executables": executables,
         "tools": tools,
@@ -618,7 +674,12 @@ def doctor() -> dict:
 
 
 def doctor_main() -> int:
-    report = doctor()
+    check_updates = "--check-updates" in sys.argv[1:]
+    if "--json" in sys.argv[1:]:
+        print(json.dumps(doctor(check_updates=check_updates)))
+        return 0
+
+    report = doctor(check_updates=check_updates)
     print("mangaeasy doctor\n")
     print(f"Tools dir: {report['tools_home']}\n")
 
@@ -666,6 +727,11 @@ def main() -> int:
     gpu_group.add_argument("--cuda", action="store_true",
                            help="Force CUDA torch builds (default: auto-detect).")
     parser.add_argument("--clone", action="store_true", help="(managed envs) also clone the upstream repo for reference.")
+    parser.add_argument("--update", action="store_true",
+                         help="Already installed: pull the latest git ref / re-sync deps / "
+                              "re-check model weights instead of a fresh install. (Re-running "
+                              "install-tool on an existing install already does this -- --update "
+                              "just makes the intent explicit in the log output.)")
     args = parser.parse_args()
 
     if args.list or not args.name:
@@ -686,6 +752,7 @@ def main() -> int:
             skip_model=args.skip_model,
             gpu="cpu" if args.cpu else "cuda" if args.cuda else "auto",
             clone=args.clone,
+            update=args.update,
         )
     except InstallError as exc:
         print(f"\n[install-tool] {exc}", file=sys.stderr)

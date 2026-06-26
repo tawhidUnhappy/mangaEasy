@@ -46,9 +46,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--voice", default="af_heart", help="Kokoro voice name or .pt voice tensor path.")
     parser.add_argument("--lang", default="a", help="Kokoro language code, for example a, b, en-us, fr-fr.")
     parser.add_argument("--speed", type=float, default=1.0)
-    parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
     parser.add_argument("--split-pattern", default=r"\n+")
     parser.add_argument("--prefetch", type=int, default=8)
+    parser.add_argument("--gpu-workers", type=int, default=1,
+                         help="Run this many Kokoro worker processes in parallel, each loading its "
+                              "own model copy, sharding the manifest between them. Multiplies VRAM "
+                              "use by this count -- only raise it if the GPU has headroom.")
     return parser.parse_args()
 
 
@@ -167,16 +171,25 @@ def build_manifest(
     return manifest, skipped
 
 
-def write_manifest(args: argparse.Namespace, manifest: list[dict[str, str]]) -> Path:
+def write_manifest(args: argparse.Namespace, manifest: list[dict[str, str]], suffix: str = "") -> Path:
     manifest_dir = args.work_dir.resolve() / "kokoro_manifests"
     manifest_dir.mkdir(parents=True, exist_ok=True)
-    path = manifest_dir / "latest_manifest.json"
+    path = manifest_dir / f"latest_manifest{suffix}.json"
     with path.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     return path
 
 
-def run_kokoro_worker(args: argparse.Namespace, manifest_path: Path) -> None:
+def shard_manifest(manifest: list[dict[str, str]], shards: int) -> list[list[dict[str, str]]]:
+    """Split into `shards` roughly-equal, non-empty chunks (fewer if the manifest is small)."""
+    if shards <= 1 or len(manifest) <= 1:
+        return [manifest]
+    size = -(-len(manifest) // shards)  # ceil division
+    chunks = [manifest[i:i + size] for i in range(0, len(manifest), size)]
+    return chunks
+
+
+def kokoro_worker_command(args: argparse.Namespace, manifest_path: Path) -> tuple[list[str], Path]:
     script_dir = Path(__file__).resolve().parent
     worker = script_dir / "kokoro_batch_worker.py"
     kokoro_root = selected_kokoro_root(args.kokoro_root)
@@ -196,6 +209,11 @@ def run_kokoro_worker(args: argparse.Namespace, manifest_path: Path) -> None:
         "--split-pattern",
         args.split_pattern,
     ]
+    return command, kokoro_root
+
+
+def run_kokoro_worker(args: argparse.Namespace, manifest_path: Path) -> None:
+    command, kokoro_root = kokoro_worker_command(args, manifest_path)
     print(f"\nRunning Kokoro worker from: {kokoro_root}", flush=True)
     print(" ".join(command), flush=True)
     env = configure_fast_env(tool_env(), kokoro_root)
@@ -205,6 +223,33 @@ def run_kokoro_worker(args: argparse.Namespace, manifest_path: Path) -> None:
         env=env,
         check=True,
     )
+
+
+def run_kokoro_workers_sharded(args: argparse.Namespace, manifest: list[dict[str, str]]) -> None:
+    """Split the manifest across `args.gpu_workers` worker processes and run them concurrently.
+    Each process loads its own Kokoro model copy, so this only helps when the GPU has VRAM
+    headroom beyond a single worker -- the default of 1 keeps today's behavior unchanged."""
+    chunks = shard_manifest(manifest, args.gpu_workers)
+    if len(chunks) == 1:
+        run_kokoro_worker(args, write_manifest(args, chunks[0]))
+        return
+
+    print(f"\nSharding {len(manifest)} audio file(s) across {len(chunks)} Kokoro worker process(es).",
+          flush=True)
+    jobs: list[tuple[list[str], Path]] = []
+    for index, chunk in enumerate(chunks):
+        manifest_path = write_manifest(args, chunk, suffix=f"_shard{index}")
+        jobs.append(kokoro_worker_command(args, manifest_path))
+
+    kokoro_root = jobs[0][1]
+    env = configure_fast_env(tool_env(), kokoro_root)
+    with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
+        futures = [
+            executor.submit(subprocess.run, command, cwd=cwd, env=env, check=True)
+            for command, cwd in jobs
+        ]
+        for future in futures:
+            future.result()
 
 
 def main() -> int:
@@ -249,10 +294,8 @@ def main() -> int:
         )
         return 0
 
-    manifest_path = write_manifest(args, manifest)
     print(f"\nQueued {len(manifest)} audio file(s); skipped {skipped} existing file(s).", flush=True)
-    print(f"Manifest: {manifest_path}", flush=True)
-    run_kokoro_worker(args, manifest_path)
+    run_kokoro_workers_sharded(args, manifest)
     print(f"\nGenerated {len(manifest)} audio file(s) with Kokoro.", flush=True)
     return 0
 

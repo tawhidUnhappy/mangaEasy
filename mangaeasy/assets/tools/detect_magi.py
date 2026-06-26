@@ -94,7 +94,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="MAGI v3 panel detection (standalone).")
     parser.add_argument("image", type=Path, help="Path to the page image.")
     parser.add_argument("--out", type=Path, required=True, help="Where to write the JSON result.")
-    parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
     parser.add_argument("--dtype", choices=("auto", "fp16", "fp32"), default="auto")
     args = parser.parse_args()
 

@@ -40,7 +40,13 @@ except ImportError:
 def _resolve_device(pref: str = "auto") -> str:
     if pref == "cpu":
         return "cpu"
-    if pref in ("cuda", "auto"):
+    if pref == "auto":
+        if torch is None:
+            return "cpu"
+        from mangaeasy.tools.external import resolve_device
+
+        return resolve_device("auto")
+    if pref == "cuda":
         if torch is None:
             return "cpu"
         return "cuda" if torch.cuda.is_available() else "cpu"

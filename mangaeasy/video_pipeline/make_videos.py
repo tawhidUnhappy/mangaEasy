@@ -34,7 +34,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--background-saturation", type=float, default=1.08)
     parser.add_argument("--keep-work", action="store_true")
     parser.add_argument("--render-mode", choices=("segments", "concat-images"), default="segments")
-    parser.add_argument("--workers", type=int, default=1, help="Number of item folders to render in parallel.")
+    parser.add_argument("--workers", type=int, default=3,
+                         help="Number of item folders to render in parallel. NVENC consumer GPUs "
+                              "typically cap at ~3 concurrent encode sessions, so going much "
+                              "higher than that won't add throughput.")
     return parser.parse_args()
 
 

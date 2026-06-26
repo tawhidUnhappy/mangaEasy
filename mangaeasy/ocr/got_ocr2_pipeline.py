@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
                         help="Item range such as 01-24 when using the item pipeline.")
     parser.add_argument("--force", action="store_true",
                         help="Replace existing `ocr` fields.")
-    parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto",
+    parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto",
                         help="Inference device. Default: auto.")
     parser.add_argument("--batch-size", type=int, default=1,
                         help="Panels per generation batch. Default: 1.")
@@ -162,13 +162,20 @@ def find_image(narration_path: Path, image_name: str) -> Path | None:
 def resolve_device(pref: str):
     import torch
 
+    from mangaeasy.tools.external import resolve_device as _resolve_device
+
     if pref == "cpu":
         return "cpu"
     if pref == "cuda":
         if not torch.cuda.is_available():
             raise RuntimeError("--device cuda was requested, but torch cannot see CUDA.")
         return "cuda"
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    if pref == "mps":
+        mps = getattr(torch.backends, "mps", None)
+        if mps is None or not mps.is_available():
+            raise RuntimeError("--device mps was requested, but torch cannot see an Apple Silicon GPU.")
+        return "mps"
+    return _resolve_device("auto")
 
 
 class GotOcr2Engine:

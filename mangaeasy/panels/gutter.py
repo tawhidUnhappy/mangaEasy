@@ -434,7 +434,7 @@ def main() -> None:
     ap.add_argument("--output", default="./tmp/cropped_panels")
     ap.add_argument("--config", default=str(PROJECT_ROOT / "config.json"))
     ap.add_argument("--sort", default="numeric", choices=["numeric", "lex", "none"])
-    ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda", "mps"])
     args = ap.parse_args()
     cfg = load_gutter_config(Path(args.config))
     _pipeline(Path(args.input), Path(args.output), cfg, sort_mode=args.sort, device=args.device)

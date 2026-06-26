@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -19,21 +20,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--voice", default="af_heart")
     parser.add_argument("--lang", default="a")
     parser.add_argument("--speed", type=float, default=1.0)
-    parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
     parser.add_argument("--split-pattern", default=r"\n+")
     parser.add_argument("--repo-id", default="hexgrad/Kokoro-82M")
     return parser.parse_args()
 
 
+def _mps_available() -> bool:
+    return sys.platform == "darwin" and getattr(torch.backends, "mps", None) is not None \
+        and torch.backends.mps.is_available()
+
+
 def resolve_device(requested: str) -> str:
-    if requested == "auto":
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    return requested
+    if requested != "auto":
+        return requested
+    if torch.cuda.is_available():
+        return "cuda"
+    if _mps_available():
+        return "mps"
+    return "cpu"
 
 
 def configure_torch(device: str) -> None:
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested, but PyTorch cannot see a CUDA GPU.")
+    if device == "mps" and not _mps_available():
+        raise RuntimeError("MPS was requested, but PyTorch cannot see an Apple Silicon GPU.")
     if torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.benchmark = True

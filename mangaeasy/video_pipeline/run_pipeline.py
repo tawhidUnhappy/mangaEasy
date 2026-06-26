@@ -86,7 +86,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--voice", default="af_heart")
     parser.add_argument("--lang", default="a")
     parser.add_argument("--speed", type=float, default=1.0)
-    parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
     parser.add_argument("--build-long-video", action="store_true")
     parser.add_argument("--normalize-audio", action="store_true",
                         help="After the long video is built, loudness-normalize it in place "
@@ -107,7 +107,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--video-preset", default="p1")
     parser.add_argument("--cq", type=int, default=18)
     parser.add_argument("--fps", type=int, default=15)
-    parser.add_argument("--video-workers", type=int, default=1)
+    parser.add_argument("--video-workers", type=int, default=3,
+                         help="Item folders to render in parallel. NVENC consumer GPUs typically "
+                              "cap at ~3 concurrent encode sessions, so going much higher than "
+                              "that won't add throughput.")
+    parser.add_argument("--gpu-workers", type=int, default=1,
+                         help="Run this many TTS worker processes in parallel during audio "
+                              "generation, each loading its own model copy. Multiplies VRAM use "
+                              "by this count -- only raise it if the GPU has headroom.")
     return parser.parse_args()
 
 
@@ -150,6 +157,8 @@ def main() -> int:
         audio_cmd.append("--resume")
     if args.archive_audio:
         audio_cmd.append("--archive-audio")
+    if args.gpu_workers != 1:
+        audio_cmd += ["--gpu-workers", str(args.gpu_workers)]
     if selected_items:
         audio_cmd += ["--items", *selected_items]
 
