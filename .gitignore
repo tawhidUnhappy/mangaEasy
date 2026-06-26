@@ -19,6 +19,9 @@ config.system.json
 /.cache/
 /.hf_cache/
 
+# This install's self-contained data: AI tool envs, app state, HF/torch/uv caches
+/.mangaeasy/
+
 # Generated runtime output
 /tmp/
 /tmp_video/
@@ -50,6 +53,18 @@ config.system.json
 /kokoro-82m/
 /index-tts/
 /magi-v3/
+
+# Isolated dev tooling (e.g. portable Node.js) — not vendored, not global
+/.tools/
+
+# Electron desktop app — node_modules + build output, not the app's source
+desktop/node_modules/
+desktop/out/
+desktop/dist/
+
+# PyInstaller-built Python backend, copied in fresh by CI/bootstrap before
+# electron-builder runs — not source, rebuilt from packaging/mangaeasy.spec
+/desktop/resources/backend/
 
 # Editor / assistant local state
 .claude/

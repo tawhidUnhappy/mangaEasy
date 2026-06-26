@@ -30,10 +30,7 @@ dependencies = [
     "img2pdf>=0.5.0",
     "pydub>=0.25.1",
     "numpy>=1.24.0",
-    "pywebview>=5.0",
     "pywinpty>=2.0; sys_platform == 'win32'",
-    "flask-sock>=0.2.0",
-    "nicegui>=3.1.0",
 ]
 
 [project.optional-dependencies]

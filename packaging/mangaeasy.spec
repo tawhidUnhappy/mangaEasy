@@ -26,7 +26,7 @@ elif _sys.platform == "win32":
 else:
     ICON  = str(ROOT / "packaging" / "icon.png")
 
-hiddenimports = collect_submodules("mangaeasy") + collect_submodules("webview")
+hiddenimports = collect_submodules("mangaeasy")
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],

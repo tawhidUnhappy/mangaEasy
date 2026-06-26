@@ -10,6 +10,7 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
 
 jobs:
   build:
@@ -21,10 +22,13 @@ jobs:
         include:
           - platform: windows
             os: windows-latest
+            electron-builder-flag: --win
           - platform: linux
             os: ubuntu-22.04
+            electron-builder-flag: --linux
           - platform: macos
             os: macos-latest
+            electron-builder-flag: --mac
 
     steps:
       - name: Checkout
@@ -35,6 +39,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Install uv
         run: python -m pip install uv
 
@@ -43,7 +52,7 @@ jobs:
         run: |
           echo "MANGAEASY_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Sync dependencies
+      - name: Sync Python dependencies
         run: uv sync --group dev
 
       - name: Sanity check package
@@ -51,46 +60,39 @@ jobs:
           uv run python -m compileall -q mangaeasy
           uv run mangaeasy --version
 
-      - name: Build standalone app
-        run: uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm --clean
+      # Vendors ffmpeg/uv/git-lfs into mangaeasy's own .mangaeasy/tools dir
+      # (see mangaeasy/tools/vendored.py) so the shipped app never needs to
+      # download them on a fresh install.
+      - name: Vendor core binaries (ffmpeg/uv/git-lfs)
+        run: uv run mangaeasy bootstrap-tools
 
-      - name: Install Inno Setup
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: choco install innosetup --yes --no-progress
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
 
-      - name: Create Windows installer
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc "/DMyAppVersion=$env:MANGAEASY_VERSION" "packaging\mangaeasy.iss"
+      # Builds the PyInstaller backend (packaging/mangaeasy.spec, excludes
+      # torch/transformers — those stay in isolated install-tool envs) and
+      # copies it into desktop/resources/backend/, then runs electron-builder
+      # for this platform. electron-builder.yml's extraResources bundles that
+      # backend folder straight into the installer/portable output, so the
+      # shipped app needs no system Python or uv at all.
+      - name: Bundle Python backend into desktop/resources/backend
+        working-directory: desktop
+        run: npm run bundle:backend
 
-      - name: Package Windows portable
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force release-assets | Out-Null
-          Compress-Archive -Path "dist\mangaEasy\*" -DestinationPath "release-assets\mangaEasy-windows.zip" -Force
-          Copy-Item "dist\mangaEasy-Setup-$env:MANGAEASY_VERSION.exe" "release-assets\"
+      - name: Build Electron app (installer + portable)
+        working-directory: desktop
+        run: npm run build && npx electron-builder ${{ matrix.electron-builder-flag }}
 
-      - name: Package Linux portable
-        if: matrix.platform == 'linux'
+      - name: Collect release assets
         shell: bash
         run: |
           mkdir -p release-assets
-          tar -C dist -czf "release-assets/mangaEasy-linux.tar.gz" mangaEasy
-
-      - name: Package macOS portable
-        if: matrix.platform == 'macos'
-        shell: bash
-        run: |
-          mkdir -p release-assets
-          if [ -d "dist/mangaEasy.app" ]; then
-            tar -C dist -czf "release-assets/mangaEasy-macos.tar.gz" mangaEasy.app
-          else
-            tar -C dist -czf "release-assets/mangaEasy-macos.tar.gz" mangaEasy
-          fi
+          cd desktop/dist
+          find . -maxdepth 1 -type f \( \
+            -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o \
+            -name "*.AppImage" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.snap" \
+          \) -exec cp {} ../../release-assets/ \;
 
       - name: Upload build assets
         uses: actions/upload-artifact@v4
@@ -119,20 +121,28 @@ jobs:
           body: |
             ## mangaEasy ${{ github.ref_name }}
 
-            Python + uv build. No Rust/Tauri wrapper is used.
+            Self-contained Electron desktop app — no system Python, uv, or
+            ffmpeg required. Everything lives under the install folder's own
+            `.mangaeasy/` directory; delete that folder (or uninstall) and
+            nothing is left behind anywhere else on the machine.
+
+            GPU acceleration (NVIDIA CUDA, Apple Silicon MPS) is detected and
+            configured automatically on first run — no manual setup needed.
+            Everything else falls back to CPU.
 
             ### Downloads
 
             #### Windows
-            - `mangaEasy-Setup-*.exe` - installer
-            - `mangaEasy-windows.zip` - portable folder
-
-            #### Linux
-            - `mangaEasy-linux.tar.gz` - portable folder
+            - `*-setup.exe` — installer
+            - `*-portable.exe` — no install, just run it
 
             #### macOS
-            - `mangaEasy-macos.tar.gz` - portable app/folder
+            - `*.dmg` — installer
+            - `*-mac.zip` — portable
 
-            Double-click the app or run `mangaeasy app` to open the control center.
+            #### Linux
+            - `*.AppImage` — portable, no install
+            - `*.deb` — installer (Debian/Ubuntu)
+            - `*.tar.gz` — portable archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
