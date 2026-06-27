@@ -121,8 +121,20 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     Every cache an external tool (or `uv` itself) might write lives under
     this install's own `.mangaeasy/` dir, never the user's home directory —
     `setdefault` so an explicit shell export still wins.
+
+    Always drops VIRTUAL_ENV/PYTHONHOME inherited from mangaeasy's own
+    process. Every caller launches a subprocess by an explicit absolute
+    python.exe path into some *other* tool's isolated venv (kokoro, IndexTTS,
+    MAGI, ...) -- but a few of those tools (e.g. misaki/spacy's
+    `en_core_web_sm` auto-download) fall back to bare `uv pip install` when
+    no `pip` module is present, and uv resolves that against VIRTUAL_ENV if
+    it's set. Left inherited, that silently installs into mangaeasy's own
+    venv instead of the tool's, which then can't find what it just
+    "successfully" installed.
     """
     env = dict(base or os.environ)
+    env.pop("VIRTUAL_ENV", None)
+    env.pop("PYTHONHOME", None)
     hf_cache = mangaeasy_home() / "hf_cache"
     env.setdefault("HF_HOME", str(hf_cache))
     env.setdefault("HF_HUB_CACHE", str(hf_cache / "hub"))

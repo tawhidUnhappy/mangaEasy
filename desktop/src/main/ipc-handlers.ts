@@ -136,12 +136,18 @@ export function registerIpcHandlers(): void {
   // ---- Batch tab path resolution ---------------------------------------------
 
   // Mirrors `_batch_output_root`/`_batch_project_output_dir`/`_batch_audio_root`/
-  // `_batch_faded_audio_root` — relative outDir resolves against the project
-  // root, not whatever cwd the renderer thinks it's in.
+  // `_batch_faded_audio_root`. A relative outDir (the default, "output")
+  // resolves *inside the manga's own library folder* -- so everything
+  // generated for a project (audio, rendered videos, the final long video)
+  // lives under library/<manga>/output/ instead of a separate top-level
+  // output/ tree, keeping each manga's data in one place. An absolute outDir
+  // (the user explicitly browsed to a custom shared location) keeps the old
+  // behavior of nesting per-manga under that shared root, since it may hold
+  // output for more than one project.
   ipcMain.handle('batch:resolve-paths', (_event, outDir: string, mangaPath: string) => {
-    const outputRoot = path.isAbsolute(outDir) ? outDir : path.join(getProjectRoot(), outDir)
     const mangaName = path.basename(mangaPath)
-    const projectOutputDir = path.join(outputRoot, mangaName)
+    const outputRoot = path.isAbsolute(outDir) ? outDir : path.join(mangaPath, outDir)
+    const projectOutputDir = path.isAbsolute(outDir) ? path.join(outputRoot, mangaName) : outputRoot
     const audioRoot = path.join(projectOutputDir, 'audio')
     const fadedAudioRoot = `${audioRoot}_faded`
     return { outputRoot, projectOutputDir, audioRoot, fadedAudioRoot }
