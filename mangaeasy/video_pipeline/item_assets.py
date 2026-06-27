@@ -27,11 +27,28 @@ def frame_aligned_duration(audio_duration: float, fps: int) -> tuple[float, int]
 
 
 def load_narration(item_dir: Path) -> list[dict[str, str]]:
+    """Load an item's narration entries, in playback order.
+
+    If `intro.json` exists alongside `narration.json`, its entries are
+    prepended -- a project-agnostic way to give one item (usually the first
+    chapter) a cold-open trailer/hook reel without splicing it into the
+    item's own narration.json. Same `{"image": ..., "narration": ...}` shape,
+    same panels/ folder; every existing caller (audio generation, rendering,
+    validation) sees one combined list and needs no changes.
+    """
     path = item_dir / "narration.json"
     with path.open("r", encoding="utf-8-sig") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise ValueError(f"{path} must contain a JSON array.")
+
+    intro_path = item_dir / "intro.json"
+    if intro_path.exists():
+        with intro_path.open("r", encoding="utf-8-sig") as f:
+            intro_data = json.load(f)
+        if not isinstance(intro_data, list):
+            raise ValueError(f"{intro_path} must contain a JSON array.")
+        data = intro_data + data
     return data
 
 

@@ -13,6 +13,7 @@ from mangaeasy.video_pipeline.common import (
     merge_item_selection,
     project_name,
 )
+from mangaeasy.video_pipeline.item_assets import load_narration
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -33,14 +34,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--long-video", type=Path, default=None, help="Override the long video path to validate.")
     parser.add_argument("--duration-tolerance", type=float, default=3.0)
     return parser.parse_args()
-
-
-def load_narration(path: Path) -> list[dict[str, str]]:
-    with path.open("r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError(f"{path} must contain a JSON array.")
-    return data
 
 
 def files_by_stem(folder: Path, extensions: set[str]) -> dict[str, Path]:
@@ -141,7 +134,7 @@ def check_item(item_dir: Path, args: argparse.Namespace, totals: dict[str, int],
     if not narration_path.exists():
         errors.append(f"[{item_name}] Missing narration.json")
         return 0.0
-    narration = load_narration(narration_path)
+    narration = load_narration(item_dir)
     narration_stems = [Path(item.get("image", "")).stem for item in narration if isinstance(item, dict) and item.get("image")]
     panels = files_by_stem(panels_dir, IMAGE_EXTENSIONS)
     audios = files_by_stem(audio_dir, AUDIO_EXTENSIONS)

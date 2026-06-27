@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 from mangaeasy.video_pipeline.common import (
@@ -11,6 +10,7 @@ from mangaeasy.video_pipeline.common import (
     merge_item_selection,
     project_name,
 )
+from mangaeasy.video_pipeline.item_assets import load_narration
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -47,14 +47,6 @@ def item_audio_dir(args: argparse.Namespace, item_dir: Path) -> Path:
     return args.audio_root.resolve() / project_name(args.project_root, args.project_name) / item_dir.name
 
 
-def load_narration(path: Path) -> list[dict[str, str]]:
-    with path.open("r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError("narration.json must contain a JSON array.")
-    return data
-
-
 def files_by_stem(folder: Path, extensions: set[str]) -> dict[str, Path]:
     if not folder.exists():
         return {}
@@ -83,7 +75,7 @@ def check_item(item_dir: Path, args: argparse.Namespace) -> int:
         warn(f"Missing {narration_path.name}", warnings)
     else:
         try:
-            narration = load_narration(narration_path)
+            narration = load_narration(item_dir)
         except Exception as exc:
             warn(f"Could not read narration.json: {exc}", warnings)
 
