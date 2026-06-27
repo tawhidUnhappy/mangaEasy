@@ -100,3 +100,17 @@ export interface DoctorStatus {
   executables: Record<string, string | null>
   tools: Record<string, DoctorTool>
 }
+
+/** One archived audio run (`mangaeasy/video_pipeline/audio_takes.py`'s `list_runs()`). */
+export interface AudioTakeRun {
+  run: string
+  archived_at: string
+  items: Record<string, number>
+  total_files: number
+}
+
+/** Shape of `mangaeasy audio-takes-list --json`'s output. */
+export interface AudioTakesStatus {
+  active: { items: Record<string, number>; total_files: number }
+  runs: AudioTakeRun[]
+}

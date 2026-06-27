@@ -76,6 +76,24 @@ export function registerIpcHandlers(): void {
     return JSON.parse(stdout)
   })
 
+  ipcMain.handle('list-audio-takes', async (_event, projectRoot: string, audioRoot: string) => {
+    const stdout = await runCapture(
+      buildCli('audio-takes-list', ['--project-root', projectRoot, '--audio-root', audioRoot, '--json']),
+      appRoot()
+    )
+    return JSON.parse(stdout)
+  })
+
+  ipcMain.handle(
+    'restore-audio-take',
+    async (_event, projectRoot: string, audioRoot: string, run: string, items?: string[]) => {
+      const args = ['--project-root', projectRoot, '--audio-root', audioRoot, '--run', run]
+      if (items?.length) args.push('--items', ...items)
+      const stdout = await runCapture(buildCli('audio-takes-restore', args), appRoot())
+      return stdout
+    }
+  )
+
   // ---- Project root + config -------------------------------------------------
 
   ipcMain.handle('get-project-root', () => getProjectRoot())

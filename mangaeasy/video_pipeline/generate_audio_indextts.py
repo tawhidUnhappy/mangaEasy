@@ -36,9 +36,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true",
                         help="Delete the most recently generated audio file plus the previous 5 before "
                              "generating, in case the last run was interrupted mid-write.")
-    parser.add_argument("--archive-audio", action="store_true",
-                        help="Archive any overwritten/resumed audio instead of deleting it, since "
-                             "audio is expensive to regenerate.")
     parser.add_argument("--gpu-workers", type=int, default=1,
                          help="Run this many IndexTTS2 worker processes in parallel, each loading "
                               "its own model copy and handling a separate slice of item folders. "
@@ -87,8 +84,6 @@ def main() -> int:
             cmd.append("--overwrite")
         if args.resume:
             cmd.append("--resume")
-        if args.archive_audio:
-            cmd.append("--archive-audio")
         return cmd
 
     print(f"[tool:index-tts] {tool_dir}", flush=True)

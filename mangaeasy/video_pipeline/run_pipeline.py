@@ -75,10 +75,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-audio", action="store_true",
                         help="Skip narration audio generation entirely and reuse whatever audio "
                              "already exists on disk; just re-render and re-join the video.")
-    parser.add_argument("--archive-audio", action="store_true",
-                        help="Audio is expensive to regenerate, so instead of deleting/overwriting any "
-                             "existing file (via --overwrite-audio or --resume-audio), move it into "
-                             "<audio-root>/<project>/old/run_NNNN/ first.")
     parser.add_argument("--audio-source", choices=("raw", "faded"), default="raw",
                         help="Which audio render/join read. 'raw' is the straight TTS output. "
                              "'faded' adds tiny fade-in/out copies (removes edge clicks/pops) written "
@@ -155,8 +151,6 @@ def main() -> int:
         audio_cmd.append("--overwrite")
     if args.resume_audio:
         audio_cmd.append("--resume")
-    if args.archive_audio:
-        audio_cmd.append("--archive-audio")
     if args.gpu_workers != 1:
         audio_cmd += ["--gpu-workers", str(args.gpu_workers)]
     if selected_items:

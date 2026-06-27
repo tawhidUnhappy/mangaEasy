@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 
-from mangaeasy.utils import archive_into_run
+from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
 
 
 DEFAULT_PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "content"))
@@ -76,9 +76,9 @@ def _sort_key(path: Path) -> tuple[int, int, str]:
 
 
 def prune_recent_audio_for_resume(
-    ordered_paths: list[Path], lookback: int = 5, archive_run_dir: Path | None = None
+    ordered_paths: list[Path], archive_run_dir: LazyArchiveRunDir, lookback: int = 5
 ) -> list[Path]:
-    """Delete (or archive) the in-progress audio file plus the previous N by narration order.
+    """Archive the in-progress audio file plus the previous N by narration order.
 
     ordered_paths is every expected audio file path in narration sequence order
     (across all selected items). "Current" is the first one not on disk yet —
@@ -88,9 +88,11 @@ def prune_recent_audio_for_resume(
     4, 3, 2, 1, 0) forces them to regenerate even though some still exist,
     instead of trusting file mtimes.
 
-    If archive_run_dir is given (audio is expensive to regenerate), files are
-    moved there under a subfolder named after their parent item folder instead
-    of being deleted outright.
+    Audio is expensive to regenerate, so files are always moved into
+    archive_run_dir (under a subfolder named after their parent item folder)
+    rather than deleted outright -- archive_run_dir only allocates its
+    run_NNNN/ folder on first use, so a resume that finds nothing to prune
+    never creates an empty one.
     """
     if not ordered_paths:
         return []
@@ -98,10 +100,7 @@ def prune_recent_audio_for_resume(
     start_idx = max(0, current_idx - lookback)
     removed = [path for path in ordered_paths[start_idx:current_idx + 1] if path.exists()]
     for path in removed:
-        if archive_run_dir is not None:
-            archive_into_run(path, archive_run_dir, subdir=path.parent.name)
-        else:
-            path.unlink(missing_ok=True)
+        archive_into_run(path, archive_run_dir.dir, subdir=path.parent.name)
     return removed
 
 

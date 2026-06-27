@@ -47,6 +47,31 @@ def archive_into_run(path: Path, run_dir: Path, *, subdir: str | None = None) ->
     return destination
 
 
+class LazyArchiveRunDir:
+    """Allocates a single run_NNNN/ folder the first time it's actually needed.
+
+    Audio generation may run for many items without ever overwriting an
+    existing file, so eagerly creating an empty old/run_NNNN/ on every
+    invocation would litter the project with empty runs. This defers
+    `next_archive_run_dir` until the first archive actually happens, then
+    reuses that same folder for the rest of the run.
+    """
+
+    def __init__(self, old_root: Path) -> None:
+        self._old_root = old_root
+        self._dir: Path | None = None
+
+    @property
+    def dir(self) -> Path:
+        if self._dir is None:
+            self._dir = next_archive_run_dir(self._old_root)
+        return self._dir
+
+    @property
+    def allocated(self) -> Path | None:
+        return self._dir
+
+
 def archive_before_overwrite(path: Path) -> Path | None:
     """Move an existing output file into <path's folder>/old/run_NNNN/ before it gets overwritten.
 

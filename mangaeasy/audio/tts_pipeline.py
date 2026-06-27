@@ -31,7 +31,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.append(str(_PROJECT_ROOT))
 
 from mangaeasy.config import HF_CACHE_DIR
-from mangaeasy.utils import archive_into_run, next_archive_run_dir
+from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
 from mangaeasy.video_pipeline.common import (
     item_dirs,
     merge_item_selection,
@@ -126,10 +126,6 @@ def parse_args() -> argparse.Namespace:
                         help="Delete the most recently generated audio file plus the previous 5 before "
                              "generating, in case the last run was interrupted mid-write, then continue "
                              "with anything still missing.")
-    parser.add_argument("--archive-audio", action="store_true",
-                        help="Audio is expensive to regenerate, so instead of deleting/overwriting any "
-                             "existing file (via --overwrite or --resume), move it into "
-                             "<audio-root>/<project>/old/run_NNNN/ first.")
     return parser.parse_args()
 
 
@@ -178,19 +174,13 @@ def main() -> int:
     total_chapters = len(selected)
     print(f"MANGAEASY_PROGRESS 0/{total_chapters} Generating audio", flush=True)
 
-    archive_run_dir = None
-    if args.archive_audio:
-        archive_run_dir = next_archive_run_dir(audio_root / name / "old")
-        print(f"Archiving any overwritten/resumed audio to: {archive_run_dir}", flush=True)
+    archive_run_dir = LazyArchiveRunDir(audio_root / name / "old")
 
     if args.resume:
-        removed = prune_recent_audio_for_resume(
-            ordered_audio_paths(audio_root, name, selected), archive_run_dir=archive_run_dir
-        )
+        removed = prune_recent_audio_for_resume(ordered_audio_paths(audio_root, name, selected), archive_run_dir)
         if removed:
-            verb = "archived" if archive_run_dir else "deleted"
             print(
-                f"Resume: {verb} {len(removed)} most recent audio file(s) to re-verify: "
+                f"Resume: archived {len(removed)} most recent audio file(s) to re-verify: "
                 + ", ".join(p.name for p in removed),
                 flush=True,
             )
@@ -211,10 +201,12 @@ def main() -> int:
             if dst.exists():
                 if not args.overwrite:
                     continue
-                if archive_run_dir is not None:
-                    archive_into_run(dst, archive_run_dir, subdir=item_dir.name)
+                archive_into_run(dst, archive_run_dir.dir, subdir=item_dir.name)
             jobs_for_item.append((text, dst))
         per_chapter.append(jobs_for_item)
+
+    if archive_run_dir.allocated is not None:
+        print(f"Archived previously-generated audio that was overwritten to: {archive_run_dir.allocated}", flush=True)
 
     to_generate = [job for jobs_for_item in per_chapter for job in jobs_for_item]
     if not to_generate:

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useJob } from '../job-context'
-import type { LibraryEntry } from '../../../shared/types'
+import type { AudioTakesStatus, LibraryEntry } from '../../../shared/types'
 
 const STEPS: Record<string, string> = {
   video: 'Everything (IndexTTS + blur + long video)',
@@ -12,7 +12,7 @@ const STEPS: Record<string, string> = {
   'video-render': 'Render videos only',
   'video-join': 'Join into one long video',
   'video-normalize-audio': 'Loudness-normalize joined audio',
-  'video-clean-audio': 'Delete generated audio',
+  'video-clean-audio': 'Clear generated audio (kept, restorable later)',
   'video-clean-video': 'Delete rendered videos',
   'video-validate': 'Validate generated output'
 }
@@ -38,8 +38,9 @@ export function Batch(): React.JSX.Element {
   const [normalize, setNormalize] = useState(true)
   const [bgm, setBgm] = useState(true)
   const [resume, setResume] = useState(false)
-  const [archiveAudio, setArchiveAudio] = useState(false)
   const [skipAudio, setSkipAudio] = useState(false)
+  const [takes, setTakes] = useState<AudioTakesStatus | null>(null)
+  const [takesLoading, setTakesLoading] = useState(false)
   const [ocrForce, setOcrForce] = useState(false)
   const [renderWorkers, setRenderWorkers] = useState(3)
   const [gpuWorkers, setGpuWorkers] = useState(1)
@@ -70,6 +71,26 @@ export function Batch(): React.JSX.Element {
     if (!mangaPath) return
     window.api.resolveBatchPaths(outDir, mangaPath).then(setPaths)
   }, [outDir, mangaPath])
+
+  useEffect(() => {
+    setTakes(null)
+  }, [mangaPath])
+
+  const refreshTakes = useCallback(async (): Promise<void> => {
+    if (!mangaPath || !paths.audioRoot) return
+    setTakesLoading(true)
+    try {
+      setTakes(await window.api.listAudioTakes(mangaPath, paths.audioRoot))
+    } finally {
+      setTakesLoading(false)
+    }
+  }, [mangaPath, paths.audioRoot])
+
+  const restoreTake = async (run: string): Promise<void> => {
+    if (!mangaPath || !paths.audioRoot) return
+    await window.api.restoreAudioTake(mangaPath, paths.audioRoot, run)
+    await refreshTakes()
+  }
 
   const rangeArg = (): string | null => {
     if (!useRange) return null
@@ -114,7 +135,6 @@ export function Batch(): React.JSX.Element {
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       if (audioSource === 'faded') args.push('--audio-source', 'faded')
       if (resume) args.push('--resume-audio')
-      if (archiveAudio) args.push('--archive-audio')
       if (skipAudio) args.push('--skip-audio')
       if (longVideo) {
         args.push('--build-long-video')
@@ -159,7 +179,6 @@ export function Batch(): React.JSX.Element {
       appendAudioRoot(args)
       args.push('--device', 'auto')
       if (resume) args.push('--resume')
-      if (archiveAudio) args.push('--archive-audio')
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       await run(step, args)
       return
@@ -170,7 +189,6 @@ export function Batch(): React.JSX.Element {
       if (!args) return
       appendAudioRoot(args)
       if (resume) args.push('--resume')
-      if (archiveAudio) args.push('--archive-audio')
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       await run(step, args)
       return
@@ -194,7 +212,7 @@ export function Batch(): React.JSX.Element {
   }
 
   const showAudioSource = ['video', 'video-render', 'video-join', 'video-check', 'video-validate', 'video-clean-audio'].includes(step)
-  const showResumeArchive = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
+  const showResume = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
   const showSkipAudio = step === 'video'
   const showOcrForce = step === 'got-ocr2'
   const showRenderWorkers = ['video', 'video-render'].includes(step)
@@ -274,16 +292,10 @@ export function Batch(): React.JSX.Element {
           <label>
             <input type="checkbox" checked={bgm} onChange={(e) => setBgm(e.target.checked)} /> Background music
           </label>
-          {showResumeArchive && (
-            <>
-              <label title="If a previous audio run was interrupted, delete the most recent audio file plus the previous 5 and regenerate them.">
-                <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
-              </label>
-              <label title="Audio is expensive to regenerate. Moves any overwritten/resumed audio into old/run_NNNN/ instead of losing it.">
-                <input type="checkbox" checked={archiveAudio} onChange={(e) => setArchiveAudio(e.target.checked)} /> Archive overwritten
-                audio
-              </label>
-            </>
+          {showResume && (
+            <label title="If a previous audio run was interrupted, re-verify the most recent audio file plus the previous 5 (archived first, then regenerated).">
+              <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
+            </label>
           )}
           {showSkipAudio && (
             <label title="Skip narration audio generation entirely and just re-render + re-join using whatever audio already exists.">
@@ -341,6 +353,57 @@ export function Batch(): React.JSX.Element {
         <p className="hint">
           Reusable files: {paths.projectOutputDir || `${outDir}/<manga name>`} (audio cache under {paths.audioRoot || '…'})
         </p>
+      </div>
+
+      <div className="section">
+        <h3>Previous audio takes</h3>
+        <p className="hint">
+          Audio is never overwritten silently — regenerating or clearing it archives the previous take first, so you
+          can pick an older one back up instead of generating a new one.
+        </p>
+        <div className="row">
+          <button onClick={refreshTakes} disabled={!mangaPath || takesLoading}>
+            {takesLoading ? 'Loading…' : 'Refresh takes'}
+          </button>
+          {takes && (
+            <span className="hint">
+              Active: {takes.active.total_files} file(s)
+              {Object.keys(takes.active.items).length > 0 &&
+                ` (${Object.entries(takes.active.items).map(([item, n]) => `${item}: ${n}`).join(', ')})`}
+            </span>
+          )}
+        </div>
+        {takes && takes.runs.length === 0 && <p className="hint">No archived takes yet.</p>}
+        {takes && takes.runs.length > 0 && (
+          <table className="mono" style={{ width: '100%', marginTop: 8 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left' }}>Take</th>
+                <th style={{ textAlign: 'left' }}>Archived</th>
+                <th style={{ textAlign: 'left' }}>Files</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...takes.runs].reverse().map((run) => (
+                <tr key={run.run}>
+                  <td>{run.run}</td>
+                  <td>{new Date(run.archived_at).toLocaleString()}</td>
+                  <td>
+                    {Object.entries(run.items)
+                      .map(([item, n]) => `${item}: ${n}`)
+                      .join(', ')}
+                  </td>
+                  <td>
+                    <button onClick={() => restoreTake(run.run)} disabled={running}>
+                      Restore
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="row">

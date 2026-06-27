@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
   AppConfig,
+  AudioTakesStatus,
   ChapterStatus,
   CliCommand,
   ConfigPair,
@@ -33,6 +34,11 @@ const api = {
 
   getDoctorStatus: (checkUpdates = false): Promise<DoctorStatus> =>
     ipcRenderer.invoke('get-doctor-status', checkUpdates),
+
+  listAudioTakes: (projectRoot: string, audioRoot: string): Promise<AudioTakesStatus> =>
+    ipcRenderer.invoke('list-audio-takes', projectRoot, audioRoot),
+  restoreAudioTake: (projectRoot: string, audioRoot: string, run: string, items?: string[]): Promise<string> =>
+    ipcRenderer.invoke('restore-audio-take', projectRoot, audioRoot, run, items),
 
   // Project root + config
   getProjectRoot: (): Promise<string> => ipcRenderer.invoke('get-project-root'),
