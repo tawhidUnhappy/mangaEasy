@@ -14,11 +14,46 @@ const STEPS: Record<string, string> = {
   'video-normalize-audio': 'Loudness-normalize joined audio',
   'video-clean-audio': 'Clear generated audio (kept, restorable later)',
   'video-clean-video': 'Delete rendered videos',
-  'video-validate': 'Validate generated output'
+  'video-validate': 'Validate generated output',
+  'video-clean-all': 'DELETE ALL generated output (start fresh)'
 }
 
 const AUDIO_STEPS = new Set(['video-check', 'video-validate', 'video-clean-audio'])
 const OUTPUT_STEPS = new Set(['video-validate', 'video-clean-video'])
+
+// Persist the user's choices across app reloads/restarts -- this is pure UI
+// convenience (which manga/step/options were last selected), not config the
+// CLI itself reads, so plain localStorage is enough; no IPC round trip needed.
+const PREFS_KEY = 'mangaeasy.batch.prefs.v1'
+
+interface BatchPrefs {
+  mangaPath: string
+  useRange: boolean
+  rangeFrom: number
+  rangeTo: number
+  step: string
+  tts: 'auto' | 'indextts' | 'kokoro'
+  audioSource: 'raw' | 'faded'
+  longVideo: boolean
+  normalize: boolean
+  bgm: boolean
+  resume: boolean
+  overwriteAudio: boolean
+  skipAudio: boolean
+  ocrForce: boolean
+  renderWorkers: number
+  gpuWorkers: number
+  outDir: string
+}
+
+function loadPrefs(): Partial<BatchPrefs> {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
 
 /** Batch videos tab — the multi-chapter ("item"-based) pipeline. Ports
  * nicegui_app.py's Batch tab's argument-building functions
@@ -26,28 +61,40 @@ const OUTPUT_STEPS = new Set(['video-validate', 'video-clean-video'])
  * contract stays identical. */
 export function Batch(): React.JSX.Element {
   const { run, running } = useJob()
+  const initialPrefs = useState(loadPrefs)[0]
   const [entries, setEntries] = useState<LibraryEntry[]>([])
-  const [mangaPath, setMangaPath] = useState('')
-  const [useRange, setUseRange] = useState(true)
-  const [rangeFrom, setRangeFrom] = useState(1)
-  const [rangeTo, setRangeTo] = useState(24)
-  const [step, setStep] = useState('video')
-  const [tts, setTts] = useState<'auto' | 'indextts' | 'kokoro'>('indextts')
-  const [audioSource, setAudioSource] = useState<'raw' | 'faded'>('raw')
-  const [longVideo, setLongVideo] = useState(true)
-  const [normalize, setNormalize] = useState(true)
-  const [bgm, setBgm] = useState(true)
-  const [resume, setResume] = useState(false)
-  const [overwriteAudio, setOverwriteAudio] = useState(false)
-  const [skipAudio, setSkipAudio] = useState(false)
+  const [mangaPath, setMangaPath] = useState(initialPrefs.mangaPath ?? '')
+  const [useRange, setUseRange] = useState(initialPrefs.useRange ?? true)
+  const [rangeFrom, setRangeFrom] = useState(initialPrefs.rangeFrom ?? 1)
+  const [rangeTo, setRangeTo] = useState(initialPrefs.rangeTo ?? 24)
+  const [step, setStep] = useState(initialPrefs.step ?? 'video')
+  const [tts, setTts] = useState<'auto' | 'indextts' | 'kokoro'>(initialPrefs.tts ?? 'indextts')
+  const [audioSource, setAudioSource] = useState<'raw' | 'faded'>(initialPrefs.audioSource ?? 'raw')
+  const [longVideo, setLongVideo] = useState(initialPrefs.longVideo ?? true)
+  const [normalize, setNormalize] = useState(initialPrefs.normalize ?? true)
+  const [bgm, setBgm] = useState(initialPrefs.bgm ?? true)
+  const [resume, setResume] = useState(initialPrefs.resume ?? false)
+  const [overwriteAudio, setOverwriteAudio] = useState(initialPrefs.overwriteAudio ?? false)
+  const [skipAudio, setSkipAudio] = useState(initialPrefs.skipAudio ?? false)
   const [takes, setTakes] = useState<AudioTakesStatus | null>(null)
   const [takesLoading, setTakesLoading] = useState(false)
-  const [ocrForce, setOcrForce] = useState(false)
-  const [renderWorkers, setRenderWorkers] = useState(3)
-  const [gpuWorkers, setGpuWorkers] = useState(1)
-  const [outDir, setOutDir] = useState('output')
+  const [ocrForce, setOcrForce] = useState(initialPrefs.ocrForce ?? false)
+  const [renderWorkers, setRenderWorkers] = useState(initialPrefs.renderWorkers ?? 3)
+  const [gpuWorkers, setGpuWorkers] = useState(initialPrefs.gpuWorkers ?? 1)
+  const [outDir, setOutDir] = useState(initialPrefs.outDir ?? 'output')
   const [bgmFile, setBgmFile] = useState('')
   const [paths, setPaths] = useState({ outputRoot: '', projectOutputDir: '', audioRoot: '', fadedAudioRoot: '' })
+
+  useEffect(() => {
+    const prefs: BatchPrefs = {
+      mangaPath, useRange, rangeFrom, rangeTo, step, tts, audioSource, longVideo,
+      normalize, bgm, resume, overwriteAudio, skipAudio, ocrForce, renderWorkers, gpuWorkers, outDir
+    }
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  }, [
+    mangaPath, useRange, rangeFrom, rangeTo, step, tts, audioSource, longVideo,
+    normalize, bgm, resume, overwriteAudio, skipAudio, ocrForce, renderWorkers, gpuWorkers, outDir
+  ])
 
   const refreshMangas = useCallback(async () => {
     const { entries: found } = await window.api.listLibrary()
@@ -200,6 +247,20 @@ export function Batch(): React.JSX.Element {
       if (resume) args.push('--resume')
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       await run(step, args)
+      return
+    }
+
+    if (step === 'video-clean-all') {
+      if (!mangaPath || !paths.projectOutputDir) return
+      const mangaLabel = entries.find((e) => e.path === mangaPath)?.label ?? mangaPath
+      const confirmed = window.confirm(
+        `Delete ALL generated output for "${mangaLabel}"?\n\n${paths.projectOutputDir}\n\n` +
+          'This removes every narration audio take (including archived ones), rendered chapter videos, ' +
+          'and the joined long video. Chapters, panels, downloads, and narration are NOT touched. ' +
+          'This cannot be undone.'
+      )
+      if (!confirmed) return
+      await run(step, ['--project-root', mangaPath, '--dir', paths.projectOutputDir, '--yes'])
       return
     }
 

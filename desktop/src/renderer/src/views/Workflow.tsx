@@ -24,22 +24,50 @@ function configuredBgmFile(audioBgm: string | undefined, sysBgmFile: string | un
   return (sysBgmFile || audioBgm || '').trim()
 }
 
+// dlMode/dlFrom/dlTo/dlFresh/normalize are pure UI convenience (not saved to
+// config.json like chapter/lang/audioSource below), so plain localStorage is
+// enough to survive a reload.
+const WF_PREFS_KEY = 'mangaeasy.workflow.prefs.v1'
+
+interface WorkflowPrefs {
+  dlMode: 'single' | 'range'
+  dlFrom: number
+  dlTo: number
+  dlFresh: boolean
+  normalize: boolean
+}
+
+function loadWfPrefs(): Partial<WorkflowPrefs> {
+  try {
+    const raw = localStorage.getItem(WF_PREFS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
 /** "Make a video" tab — single-chapter pipeline, ports nicegui_app.py's
  * Workflow tab (download -> crop -> narrate -> generate audio+video). */
 export function Workflow(): React.JSX.Element {
   const { run, runChain, running } = useJob()
   const { launch: launchEditor } = useEditor()
+  const initialWfPrefs = useState(loadWfPrefs)[0]
   const [chapter, setChapter] = useState(1)
   const [lang, setLang] = useState('en')
-  const [dlMode, setDlMode] = useState<'single' | 'range'>('single')
-  const [dlFrom, setDlFrom] = useState(1)
-  const [dlTo, setDlTo] = useState(5)
-  const [dlFresh, setDlFresh] = useState(false)
-  const [normalize, setNormalize] = useState(false)
+  const [dlMode, setDlMode] = useState<'single' | 'range'>(initialWfPrefs.dlMode ?? 'single')
+  const [dlFrom, setDlFrom] = useState(initialWfPrefs.dlFrom ?? 1)
+  const [dlTo, setDlTo] = useState(initialWfPrefs.dlTo ?? 5)
+  const [dlFresh, setDlFresh] = useState(initialWfPrefs.dlFresh ?? false)
+  const [normalize, setNormalize] = useState(initialWfPrefs.normalize ?? false)
   const [audioSource, setAudioSource] = useState<'raw' | 'faded'>('raw')
   const [mangaName, setMangaName] = useState('')
   const [bgmFile, setBgmFile] = useState('')
   const [status, setStatus] = useState<ChapterStatus | null>(null)
+
+  useEffect(() => {
+    const prefs: WorkflowPrefs = { dlMode, dlFrom, dlTo, dlFresh, normalize }
+    localStorage.setItem(WF_PREFS_KEY, JSON.stringify(prefs))
+  }, [dlMode, dlFrom, dlTo, dlFresh, normalize])
 
   const refreshStatus = useCallback(async () => {
     if (!mangaName) return
