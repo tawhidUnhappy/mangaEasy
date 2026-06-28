@@ -188,7 +188,7 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], st
             problems.append(f"{label}: missing narration.json")
             continue
         try:
-            narration = load_narration(narration_path)
+            narration = load_narration(item_dir)
         except Exception as exc:
             problems.append(f"{label}: could not read narration.json: {exc}")
             continue
