@@ -22,6 +22,27 @@ const STEPS: Record<string, string> = {
 const AUDIO_STEPS = new Set(['video-check', 'video-validate', 'video-clean-audio'])
 const OUTPUT_STEPS = new Set(['video-validate', 'video-clean-video'])
 
+// One plain-language line per step, shown directly under the step picker so
+// it's never ambiguous what clicking Start will actually do.
+const STEP_DESCRIPTIONS: Record<string, string> = {
+  video: 'Runs the full pipeline end to end: narration audio, rendered chapter videos, and (optionally) the joined long video with background music.',
+  'video-check': 'Checks that panels, narration.json, and audio line up for each selected chapter. Nothing is generated.',
+  'got-ocr2': 'Fills in missing narration text fields using OCR on the panel images.',
+  'video-audio': 'Generates per-chapter narration audio with Kokoro TTS.',
+  'video-audio-indextts': 'Generates per-chapter narration audio with IndexTTS.',
+  'video-fade-audio': 'Copies narration audio with a tiny fade in/out to remove clicks. The raw audio is never deleted.',
+  'video-render': 'Renders one video per chapter from panels + audio. Missing audio is generated first automatically.',
+  'video-join': "Joins the rendered chapter videos into one long video. No background music here -- use 'Add background music' afterward.",
+  'video-add-bgm': 'Mixes background music directly into the already-joined long video, without re-joining from chapter clips.',
+  'video-normalize-audio': "Loudness-normalizes the joined long video's audio to YouTube's target level.",
+  'video-clean-audio': 'Archives generated narration audio so it can be regenerated. Previous takes stay recoverable below.',
+  'video-clean-video': 'Deletes rendered chapter videos.',
+  'video-validate': 'Checks generated audio/video against the expected inputs and reports any mismatches.',
+  'video-clean-all': 'Deletes ALL generated output for this manga (audio, videos, long video). Chapters/panels/narration are untouched.'
+}
+
+const DISABLED_STYLE: React.CSSProperties = { opacity: 0.45 }
+
 // Persist the user's choices across app reloads/restarts -- this is pure UI
 // convenience (which manga/step/options were last selected), not config the
 // CLI itself reads, so plain localStorage is enough; no IPC round trip needed.
@@ -342,12 +363,22 @@ export function Batch(): React.JSX.Element {
     await run(step, args)
   }
 
-  const showAudioSource = ['video', 'video-render', 'video-join', 'video-check', 'video-validate', 'video-clean-audio'].includes(step)
-  const showResume = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
-  const showSkipAudio = step === 'video'
-  const showOcrForce = step === 'got-ocr2'
-  const showRenderWorkers = ['video', 'video-render'].includes(step)
-  const showGpuWorkers = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
+  // Whether each control actually does anything for the currently selected
+  // step -- used to gray controls out (not hide them) so the panel doesn't
+  // jump around as you switch steps, but it's still obvious at a glance
+  // which settings this particular run will actually use.
+  const usesTts = step === 'video'
+  const usesAudioSource = ['video', 'video-render', 'video-join', 'video-check', 'video-validate', 'video-clean-audio'].includes(step)
+  const usesItemRange = !['video-add-bgm', 'video-normalize-audio', 'video-clean-all'].includes(step)
+  const usesLongVideoToggle = step === 'video'
+  const usesNormalizeToggle = step === 'video'
+  const usesBgmToggle = step === 'video'
+  const usesBgmFields = (step === 'video' && bgm) || step === 'video-add-bgm'
+  const usesResume = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
+  const usesSkipAudio = step === 'video'
+  const usesOcrForce = step === 'got-ocr2'
+  const usesRenderWorkers = ['video', 'video-render'].includes(step)
+  const usesGpuWorkers = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
 
   return (
     <div className="tab-panel">
@@ -367,17 +398,35 @@ export function Batch(): React.JSX.Element {
           <button onClick={() => mangaPath && window.api.openFolder(mangaPath)}>Open</button>
         </div>
         <p className="hint">{entries.length} manga folder(s) found</p>
-        <div className="row">
-          <label>
-            <input type="checkbox" checked={useRange} onChange={(e) => setUseRange(e.target.checked)} /> Use chapter range
+        <div className="row" style={!usesItemRange ? DISABLED_STYLE : undefined}>
+          <label title={!usesItemRange ? 'This step always works on the whole project, not a chapter range.' : undefined}>
+            <input
+              type="checkbox"
+              checked={useRange}
+              disabled={!usesItemRange}
+              onChange={(e) => setUseRange(e.target.checked)}
+            />{' '}
+            Use chapter range
           </label>
           <label>
             From
-            <input type="number" style={{ width: 60 }} value={rangeFrom} onChange={(e) => setRangeFrom(Number(e.target.value))} />
+            <input
+              type="number"
+              style={{ width: 60 }}
+              disabled={!usesItemRange}
+              value={rangeFrom}
+              onChange={(e) => setRangeFrom(Number(e.target.value))}
+            />
           </label>
           <label>
             To
-            <input type="number" style={{ width: 60 }} value={rangeTo} onChange={(e) => setRangeTo(Number(e.target.value))} />
+            <input
+              type="number"
+              style={{ width: 60 }}
+              disabled={!usesItemRange}
+              value={rangeTo}
+              onChange={(e) => setRangeTo(Number(e.target.value))}
+            />
           </label>
         </div>
       </div>
@@ -395,97 +444,114 @@ export function Batch(): React.JSX.Element {
               ))}
             </select>
           </label>
-          <label>
+          <label style={!usesTts ? DISABLED_STYLE : undefined} title={!usesTts ? 'Only used by the Everything step -- other steps use a fixed engine implied by their name.' : undefined}>
             Voice engine
-            <select value={tts} onChange={(e) => setTts(e.target.value as typeof tts)}>
+            <select value={tts} disabled={!usesTts} onChange={(e) => setTts(e.target.value as typeof tts)}>
               <option value="auto">Auto</option>
               <option value="indextts">IndexTTS</option>
               <option value="kokoro">Kokoro</option>
             </select>
           </label>
-          {showAudioSource && (
-            <label title="Faded copies have tiny fade-in/out to remove clicks/pops. The raw audio is never deleted.">
-              Audio source
-              <select value={audioSource} onChange={(e) => setAudioSource(e.target.value as typeof audioSource)}>
-                <option value="raw">Raw audio</option>
-                <option value="faded">Faded audio (de-click)</option>
-              </select>
-            </label>
-          )}
+          <label
+            style={!usesAudioSource ? DISABLED_STYLE : undefined}
+            title={
+              usesAudioSource
+                ? 'Faded copies have tiny fade-in/out to remove clicks/pops. The raw audio is never deleted.'
+                : "This step doesn't read narration audio."
+            }
+          >
+            Audio source
+            <select disabled={!usesAudioSource} value={audioSource} onChange={(e) => setAudioSource(e.target.value as typeof audioSource)}>
+              <option value="raw">Raw audio</option>
+              <option value="faded">Faded audio (de-click)</option>
+            </select>
+          </label>
         </div>
+        <p className="hint" style={{ marginTop: 4 }}>{STEP_DESCRIPTIONS[step]}</p>
         <div className="row" style={{ marginTop: 8 }}>
-          <label>
-            <input type="checkbox" checked={longVideo} onChange={(e) => setLongVideo(e.target.checked)} /> Generate one long video
+          <label style={!usesLongVideoToggle ? DISABLED_STYLE : undefined} title={!usesLongVideoToggle ? "Only used by the Everything step. Use 'Join into one long video' to do this on its own." : undefined}>
+            <input type="checkbox" disabled={!usesLongVideoToggle} checked={longVideo} onChange={(e) => setLongVideo(e.target.checked)} /> Generate one long video
           </label>
-          <label>
-            <input type="checkbox" checked={normalize} onChange={(e) => setNormalize(e.target.checked)} /> YouTube loudness
+          <label style={!usesNormalizeToggle ? DISABLED_STYLE : undefined} title={!usesNormalizeToggle ? "Only used by the Everything step. Use 'Loudness-normalize joined audio' to do this on its own." : undefined}>
+            <input type="checkbox" disabled={!usesNormalizeToggle} checked={normalize} onChange={(e) => setNormalize(e.target.checked)} /> YouTube loudness
           </label>
-          <label>
-            <input type="checkbox" checked={bgm} onChange={(e) => setBgm(e.target.checked)} /> Background music
+          <label style={!usesBgmToggle ? DISABLED_STYLE : undefined} title={!usesBgmToggle ? "Only used by the Everything step. Use 'Add background music to long video' to do this on its own, on an existing long video, without re-joining." : undefined}>
+            <input type="checkbox" disabled={!usesBgmToggle} checked={bgm} onChange={(e) => setBgm(e.target.checked)} /> Background music
           </label>
-          {showResume && (
-            <>
-              <label title="Force narration audio to regenerate even if a file already exists for it (e.g. after fixing a narration line). The previous take is archived first, never lost -- see 'Previous audio takes' below.">
-                <input type="checkbox" checked={overwriteAudio} onChange={(e) => setOverwriteAudio(e.target.checked)} /> Regenerate audio
-              </label>
-              <label title="If a previous audio run was interrupted, re-verify the most recent audio file plus the previous 5 (archived first, then regenerated).">
-                <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
-              </label>
-            </>
-          )}
-          {showSkipAudio && (
-            <label title="Skip narration audio generation entirely and just re-render + re-join using whatever audio already exists.">
-              <input type="checkbox" checked={skipAudio} onChange={(e) => setSkipAudio(e.target.checked)} /> Regenerate video only
-            </label>
-          )}
-          {showOcrForce && (
-            <label>
-              <input type="checkbox" checked={ocrForce} onChange={(e) => setOcrForce(e.target.checked)} /> Redo all OCR
-            </label>
-          )}
-          {showRenderWorkers && (
-            <label title="Render this many item folders in parallel. Consumer NVIDIA GPUs typically cap at ~3 concurrent NVENC encode sessions, so going much higher won't add throughput.">
-              Parallel render workers
-              <input
-                type="number"
-                min={1}
-                max={8}
-                style={{ width: 50 }}
-                value={renderWorkers}
-                onChange={(e) => setRenderWorkers(Math.max(1, Number(e.target.value)))}
-              />
-            </label>
-          )}
-          {showGpuWorkers && (
-            <label title="Run this many TTS worker processes in parallel, each loading its own model copy. Multiplies VRAM use by this count — only raise it on a GPU with headroom (e.g. 24GB+).">
-              GPU audio workers
-              <input
-                type="number"
-                min={1}
-                max={8}
-                style={{ width: 50 }}
-                value={gpuWorkers}
-                onChange={(e) => setGpuWorkers(Math.max(1, Number(e.target.value)))}
-              />
-            </label>
-          )}
+          <label style={!usesResume ? DISABLED_STYLE : undefined} title={
+            usesResume
+              ? "Force narration audio to regenerate even if a file already exists for it (e.g. after fixing a narration line). The previous take is archived first, never lost -- see 'Previous audio takes' below."
+              : "This step doesn't generate narration audio."
+          }>
+            <input type="checkbox" disabled={!usesResume} checked={overwriteAudio} onChange={(e) => setOverwriteAudio(e.target.checked)} /> Regenerate audio
+          </label>
+          <label style={!usesResume ? DISABLED_STYLE : undefined} title={
+            usesResume
+              ? "If a previous audio run was interrupted, re-verify the most recent audio file plus the previous 5 (archived first, then regenerated)."
+              : "This step doesn't generate narration audio."
+          }>
+            <input type="checkbox" disabled={!usesResume} checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
+          </label>
+          <label style={!usesSkipAudio ? DISABLED_STYLE : undefined} title={!usesSkipAudio ? 'Only used by the Everything step.' : 'Skip narration audio generation entirely and just re-render + re-join using whatever audio already exists.'}>
+            <input type="checkbox" disabled={!usesSkipAudio} checked={skipAudio} onChange={(e) => setSkipAudio(e.target.checked)} /> Regenerate video only
+          </label>
+          <label style={!usesOcrForce ? DISABLED_STYLE : undefined} title={!usesOcrForce ? 'Only used by the OCR step.' : undefined}>
+            <input type="checkbox" disabled={!usesOcrForce} checked={ocrForce} onChange={(e) => setOcrForce(e.target.checked)} /> Redo all OCR
+          </label>
+          <label style={!usesRenderWorkers ? DISABLED_STYLE : undefined} title={
+            usesRenderWorkers
+              ? 'Render this many item folders in parallel. Consumer NVIDIA GPUs typically cap at ~3 concurrent NVENC encode sessions, so going much higher won\'t add throughput.'
+              : "This step doesn't render video."
+          }>
+            Parallel render workers
+            <input
+              type="number"
+              min={1}
+              max={8}
+              style={{ width: 50 }}
+              disabled={!usesRenderWorkers}
+              value={renderWorkers}
+              onChange={(e) => setRenderWorkers(Math.max(1, Number(e.target.value)))}
+            />
+          </label>
+          <label style={!usesGpuWorkers ? DISABLED_STYLE : undefined} title={
+            usesGpuWorkers
+              ? 'Run this many TTS worker processes in parallel, each loading its own model copy. Multiplies VRAM use by this count — only raise it on a GPU with headroom (e.g. 24GB+).'
+              : "This step doesn't generate narration audio."
+          }>
+            GPU audio workers
+            <input
+              type="number"
+              min={1}
+              max={8}
+              style={{ width: 50 }}
+              disabled={!usesGpuWorkers}
+              value={gpuWorkers}
+              onChange={(e) => setGpuWorkers(Math.max(1, Number(e.target.value)))}
+            />
+          </label>
         </div>
-        {(bgm || step === 'video-add-bgm') && (
-          <div className="row" style={{ marginTop: 4, alignItems: 'center' }}>
-            <p className="hint mono" style={{ flex: 1, margin: 0 }}>
-              {bgmFile || 'No background music file selected'}
-            </p>
-            <button onClick={browseBgm}>Browse…</button>
-            <label title="Background music loudness in dB. More negative = quieter.">
-              Volume (dB)
-              <input
-                type="number"
-                style={{ width: 70 }}
-                value={bgmVolumeDb ?? -25}
-                onChange={(e) => setBgmVolume(Number(e.target.value))}
-              />
-            </label>
-          </div>
+        <div className="row" style={{ marginTop: 4, alignItems: 'center', ...(!usesBgmFields ? DISABLED_STYLE : {}) }}>
+          <p className="hint mono" style={{ flex: 1, margin: 0 }}>
+            {bgmFile || 'No background music file selected'}
+          </p>
+          <button disabled={!usesBgmFields} onClick={browseBgm}>Browse…</button>
+          <label title="Background music loudness in dB. More negative = quieter.">
+            Volume (dB)
+            <input
+              type="number"
+              style={{ width: 70 }}
+              disabled={!usesBgmFields}
+              value={bgmVolumeDb ?? -25}
+              onChange={(e) => setBgmVolume(Number(e.target.value))}
+            />
+          </label>
+        </div>
+        {step === 'video-add-bgm' && (
+          <p className="hint">
+            Re-applies music to the existing long video directly — much faster than re-running the join when you
+            just want to try a different track or volume.
+          </p>
         )}
       </div>
 
