@@ -41,7 +41,7 @@ class LongVideoConfig:
     audio_root: Path | None = None
     narration_dir: Path | None = None
     background_music: Path | None = None
-    music_volume: float = 0.035
+    music_volume_db: float = -25.0
     narration_volume: float = 1.0
 
 
@@ -131,11 +131,13 @@ def video_only_chapter_files(paths: list[Path], work_dir: Path) -> list[Path]:
     return clean_paths
 
 
-def mixed_audio_filter(narration_volume: float, music_volume: float, narration_input: int, music_input: int) -> str:
+def mixed_audio_filter(
+    narration_volume: float, music_volume_db: float, narration_input: int, music_input: int
+) -> str:
     return (
         f"[{narration_input}:a]volume={narration_volume},"
         "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narr];"
-        f"[{music_input}:a]volume={music_volume},"
+        f"[{music_input}:a]volume={music_volume_db}dB,"
         "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[music];"
         "[narr][music]amix=inputs=2:duration=first:dropout_transition=3,"
         "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
@@ -159,8 +161,8 @@ def video_codec_args(config: LongVideoConfig) -> list[str]:
 def validate_config(config: LongVideoConfig) -> None:
     if config.background_music is not None and not config.background_music.exists():
         raise FileNotFoundError(f"Background music does not exist: {config.background_music}")
-    if config.music_volume < 0 or config.narration_volume < 0:
-        raise ValueError("Audio volumes must be non-negative.")
+    if config.narration_volume < 0:
+        raise ValueError("Narration volume must be non-negative.")
 
 
 def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], start: int, end: int) -> None:
@@ -270,7 +272,7 @@ def build_long_video(config: LongVideoConfig) -> Path:
     if config.background_music is not None and full_narration is not None:
         music_input = ["-guess_layout_max", "0", "-stream_loop", "-1", "-i", str(config.background_music.resolve())]
         output_args = [
-            "-filter_complex", mixed_audio_filter(config.narration_volume, config.music_volume, 1, 2),
+            "-filter_complex", mixed_audio_filter(config.narration_volume, config.music_volume_db, 1, 2),
             "-map", "0:v:0", "-map", "[a]", *video_codec_args(config),
             "-c:a", "aac", "-b:a", config.audio_bitrate,
             "-movflags", "+faststart", str(out_path),
@@ -285,7 +287,7 @@ def build_long_video(config: LongVideoConfig) -> Path:
     elif config.background_music is not None:
         music_input = ["-guess_layout_max", "0", "-stream_loop", "-1", "-i", str(config.background_music.resolve())]
         output_args = [
-            "-filter_complex", mixed_audio_filter(config.narration_volume, config.music_volume, 0, 1),
+            "-filter_complex", mixed_audio_filter(config.narration_volume, config.music_volume_db, 0, 1),
             "-map", "0:v:0", "-map", "[a]", *video_codec_args(config),
             "-c:a", "aac", "-b:a", config.audio_bitrate,
             "-movflags", "+faststart", str(out_path),

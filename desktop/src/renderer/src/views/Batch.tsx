@@ -165,15 +165,25 @@ export function Batch(): React.JSX.Element {
   const appendBgm = (args: string[]): void => {
     if (!bgm || !bgmFile) return
     args.push('--background-music', bgmFile)
-    // Project tab exposes this as dB (matches how everyone thinks about
-    // music volume), but --music-volume is a linear gain factor applied
-    // directly in ffmpeg's volume= filter -- convert here so the dB value
-    // actually reaches the mix instead of silently falling back to the
-    // CLI's own default every time.
-    if (bgmVolumeDb !== null) {
-      const linearGain = 10 ** (bgmVolumeDb / 20)
-      args.push('--music-volume', linearGain.toFixed(6))
-    }
+    if (bgmVolumeDb !== null) args.push('--music-volume-db', String(bgmVolumeDb))
+  }
+
+  // setConfig overwrites config.system.json wholesale, so any save here must
+  // start from the full current file (not just the bgm fields) or it would
+  // silently wipe out unrelated settings like the voice reference WAV.
+  const browseBgm = async (): Promise<void> => {
+    const picked = await window.api.pickAudioFile()
+    if (!picked) return
+    const { systemConfig } = await window.api.getConfig()
+    const updated = { ...systemConfig, bgm: { ...systemConfig.bgm, file: picked } }
+    await window.api.setConfig(undefined, updated)
+    setBgmFile(picked)
+  }
+
+  const setBgmVolume = async (db: number): Promise<void> => {
+    setBgmVolumeDb(db)
+    const { systemConfig } = await window.api.getConfig()
+    await window.api.setConfig(undefined, { ...systemConfig, bgm: { ...systemConfig.bgm, volume_db: db } })
   }
 
   const start = async (): Promise<void> => {
@@ -442,7 +452,23 @@ export function Batch(): React.JSX.Element {
             </label>
           )}
         </div>
-        <p className="hint">{bgmFile ? `BGM: ${bgmFile}` : 'BGM: not set in Project tab'}</p>
+        {bgm && (
+          <div className="row" style={{ marginTop: 4, alignItems: 'center' }}>
+            <p className="hint mono" style={{ flex: 1, margin: 0 }}>
+              {bgmFile || 'No background music file selected'}
+            </p>
+            <button onClick={browseBgm}>Browse…</button>
+            <label title="Background music loudness in dB. More negative = quieter.">
+              Volume (dB)
+              <input
+                type="number"
+                style={{ width: 70 }}
+                value={bgmVolumeDb ?? -25}
+                onChange={(e) => setBgmVolume(Number(e.target.value))}
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="section">

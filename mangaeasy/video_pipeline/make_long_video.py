@@ -30,7 +30,8 @@ def parse_args() -> argparse.Namespace:
                         help="Used to strictly check every item has a matching audio file before joining.")
     parser.add_argument("--narration-dir", type=Path, default=None)
     parser.add_argument("--background-music", type=Path, default=None)
-    parser.add_argument("--music-volume", type=float, default=0.035)
+    parser.add_argument("--music-volume-db", type=float, default=-25.0,
+                        help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
     return parser.parse_args()
 
@@ -59,7 +60,7 @@ def main() -> int:
             audio_root=args.audio_root,
             narration_dir=args.narration_dir,
             background_music=args.background_music,
-            music_volume=args.music_volume,
+            music_volume_db=args.music_volume_db,
             narration_volume=args.narration_volume,
         )
     )

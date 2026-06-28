@@ -95,7 +95,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
     parser.add_argument("--background-music", type=Path, default=None)
-    parser.add_argument("--music-volume", type=float, default=0.035)
+    parser.add_argument("--music-volume-db", type=float, default=-25.0,
+                        help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
     parser.add_argument("--audio-bitrate", default="128k")
     parser.add_argument("--render-mode", choices=("segments", "concat-images"), default="segments")
@@ -225,7 +226,7 @@ def main() -> int:
         if args.background_music is not None:
             long_cmd += [
                 "--background-music", str(args.background_music),
-                "--music-volume", str(args.music_volume),
+                "--music-volume-db", str(args.music_volume_db),
                 "--narration-volume", str(args.narration_volume),
             ]
         if selected_items:
