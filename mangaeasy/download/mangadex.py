@@ -264,7 +264,7 @@ def download_images(
     pad       = max(2, len(str(total)))
     skipped   = 0
 
-    for idx, (url, fname) in enumerate(zip(urls, filenames), start=1):
+    for idx, (url, fname) in enumerate(zip(urls, filenames, strict=False), start=1):
         ext      = os.path.splitext(fname)[1] or ".jpg"
         dest     = output_dir / f"{chapter_str}_{idx:0{pad}d}{ext}"
 

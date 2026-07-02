@@ -24,7 +24,7 @@ import numpy as np
 from PIL import Image
 
 # Import config first — this sets HF_HOME before any HF library is imported.
-from mangaeasy.config import HF_CACHE_DIR, PROJECT_ROOT
+from mangaeasy.config import PROJECT_ROOT
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 
 try:

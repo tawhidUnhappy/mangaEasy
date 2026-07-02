@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from flask import Response, jsonify, render_template, request, send_from_directory

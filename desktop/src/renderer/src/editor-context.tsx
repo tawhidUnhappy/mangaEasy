@@ -31,18 +31,21 @@ export function EditorProvider({ children }: { children: React.ReactNode }): Rea
   const [reloadToken, setReloadToken] = useState(0)
   const [launching, setLaunching] = useState<string | null>(null)
 
-  const launch = useCallback(async (editorName: string) => {
-    setLaunching(editorName)
-    try {
-      const alreadyRunning = await window.api.isEditorRunning(editorName)
-      const editorUrl = alreadyRunning ? url : await window.api.launchEditor(editorName)
-      setName(editorName)
-      setUrl(editorUrl)
-      setReloadToken((t) => t + 1)
-    } finally {
-      setLaunching(null)
-    }
-  }, [url])
+  const launch = useCallback(
+    async (editorName: string) => {
+      setLaunching(editorName)
+      try {
+        const alreadyRunning = await window.api.isEditorRunning(editorName)
+        const editorUrl = alreadyRunning ? url : await window.api.launchEditor(editorName)
+        setName(editorName)
+        setUrl(editorUrl)
+        setReloadToken((t) => t + 1)
+      } finally {
+        setLaunching(null)
+      }
+    },
+    [url]
+  )
 
   const reload = useCallback(() => setReloadToken((t) => t + 1), [])
   const close = useCallback(() => {

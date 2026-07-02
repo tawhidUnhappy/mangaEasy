@@ -16,6 +16,9 @@ jobs:
   build:
     name: Build - ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    # The Intel-mac build is best-effort: if GitHub retires the runner label
+    # or the build breaks, the release still ships for the other platforms.
+    continue-on-error: ${{ matrix.optional == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -26,9 +29,13 @@ jobs:
           - platform: linux
             os: ubuntu-22.04
             electron-builder-flag: --linux
-          - platform: macos
+          - platform: macos-arm64
             os: macos-latest
             electron-builder-flag: --mac
+          - platform: macos-intel
+            os: macos-15-intel
+            electron-builder-flag: --mac
+            optional: true
 
     steps:
       - name: Checkout
@@ -52,19 +59,40 @@ jobs:
         run: |
           echo "MANGAEASY_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
+      # The tag is the single source of truth for a release's version —
+      # refuse to build if the sources disagree with it.
+      - name: Check versions are in sync with the tag
+        shell: bash
+        run: |
+          set -e
+          tag="${GITHUB_REF_NAME#v}"
+          py=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          init=$(python -c "import re;print(re.search(r'__version__ = \"(.+?)\"', open('mangaeasy/__init__.py').read()).group(1))")
+          echo "tag=$tag pyproject=$py __init__=$init"
+          if [ "$tag" != "$py" ] || [ "$tag" != "$init" ]; then
+            echo "::error::Version mismatch: tag v$tag vs pyproject $py vs __init__ $init. Run scripts/release.py first."
+            exit 1
+          fi
+
+      # Stamp the tag version into desktop/package.json so electron-builder
+      # names artifacts and the in-app version after the real release —
+      # historically this stayed at its initial value and every release's
+      # assets were mislabeled.
+      - name: Sync desktop app version
+        working-directory: desktop
+        run: npm version ${{ env.MANGAEASY_VERSION }} --no-git-tag-version --allow-same-version
+
       - name: Sync Python dependencies
         run: uv sync --group dev
 
-      - name: Sanity check package
+      - name: Lint + tests
         run: |
+          uv run ruff check .
           uv run python -m compileall -q mangaeasy
-          uv run mangaeasy --version
+          uv run pytest
 
-      # Vendors ffmpeg/uv/git-lfs into mangaeasy's own .mangaeasy/tools dir
-      # (see mangaeasy/tools/vendored.py) so the shipped app never needs to
-      # download them on a fresh install.
-      - name: Vendor core binaries (ffmpeg/uv/git-lfs)
-        run: uv run mangaeasy bootstrap-tools
+      - name: Sanity check package
+        run: uv run mangaeasy --version
 
       - name: Install desktop dependencies
         working-directory: desktop
@@ -72,13 +100,29 @@ jobs:
 
       # Builds the PyInstaller backend (packaging/mangaeasy.spec, excludes
       # torch/transformers — those stay in isolated install-tool envs) and
-      # copies it into desktop/resources/backend/, then runs electron-builder
-      # for this platform. electron-builder.yml's extraResources bundles that
-      # backend folder straight into the installer/portable output, so the
-      # shipped app needs no system Python or uv at all.
+      # copies it into desktop/resources/backend/, then electron-builder
+      # bundles that folder into the installer/portable output via
+      # extraResources — the shipped app needs no system Python or uv.
+      # ffmpeg/uv/git-lfs are NOT bundled: the app downloads them once on
+      # first launch (Setup tab → Download core tools) to keep installers small.
       - name: Bundle Python backend into desktop/resources/backend
         working-directory: desktop
         run: npm run bundle:backend
+
+      # The frozen backend must at least answer --version and doctor --json,
+      # or the shipped app would be dead on arrival.
+      - name: Smoke-test frozen backend
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            backend="desktop/resources/backend/mangaeasy"
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            backend="desktop/resources/backend/mangaeasy.exe"
+          else
+            backend="desktop/resources/backend/mangaeasy"
+          fi
+          "$backend" --version
+          "$backend" doctor --json | python -c "import json,sys; json.loads(sys.stdin.read().strip().splitlines()[-1]); print('doctor JSON ok')"
 
       - name: Build Electron app
         working-directory: desktop
@@ -99,12 +143,15 @@ jobs:
         with:
           name: mangaeasy-${{ matrix.platform }}
           path: release-assets/*
-          if-no-files-found: error
+          if-no-files-found: ${{ matrix.optional == true && 'warn' || 'error' }}
 
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     needs: build
+    # Publish as long as the required platforms built (the optional
+    # Intel-mac job may be missing).
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     steps:
       - name: Download build assets
         uses: actions/download-artifact@v4
@@ -121,27 +168,38 @@ jobs:
           body: |
             ## mangaEasy ${{ github.ref_name }}
 
-            Self-contained Electron desktop app — no system Python, uv, or
-            ffmpeg required. Everything lives under the install folder's own
-            `.mangaeasy/` directory; delete that folder (or uninstall) and
-            nothing is left behind anywhere else on the machine.
+            Self-contained desktop app — no Python, Node, or ffmpeg install
+            needed. On first launch the Setup tab offers a one-time ~100 MB
+            download of core tools (ffmpeg and friends) into the app's own
+            data folder; nothing is installed system-wide.
 
-            GPU acceleration (NVIDIA CUDA, Apple Silicon MPS) is detected and
-            configured automatically on first run — no manual setup needed.
-            Everything else falls back to CPU.
+            GPU acceleration (NVIDIA CUDA, Apple Silicon) is detected
+            automatically; everything falls back to CPU.
+
+            See [CHANGELOG.md](https://github.com/tawhidUnhappy/mangaEasy/blob/main/CHANGELOG.md)
+            for what changed.
 
             ### Downloads
 
             #### Windows
-            - `*-portable.exe` — no install, just run it. Delete the folder and nothing is left on the machine.
+            - `*-portable.exe` — no install, just run it.
+            - Windows SmartScreen may warn because the app is unsigned
+              (it's free software without a paid certificate). Click
+              **More info → Run anyway**.
+            - App data lives next to the `.exe` — delete that folder and
+              everything is gone.
 
             #### macOS
-            - `*.dmg` — installer
-            - `*-mac.zip` — portable
+            - `*.dmg` — installer (Apple Silicon; Intel build included when
+              available). `*-mac.zip` — portable.
+            - The app is unsigned, so the first launch needs:
+              **right-click the app → Open → Open**, or run
+              `xattr -cr /Applications/mangaEasy.app` once in Terminal.
+            - App data lives in `~/Library/Application Support/mangaEasy`.
 
             #### Linux
-            - `*.AppImage` — portable, no install
-            - `*.deb` — installer (Debian/Ubuntu)
-            - `*.tar.gz` — portable archive
+            - `*.AppImage` — portable (`chmod +x`, run). `*.deb` — Debian/
+              Ubuntu installer. `*.tar.gz` — any distro.
+            - App data lives in `~/.local/share/mangaEasy`.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -18,6 +18,8 @@ config.system.json
 # Caches
 /.cache/
 /.hf_cache/
+.pytest_cache/
+.ruff_cache/
 
 # This install's self-contained data: AI tool envs, app state, HF/torch/uv caches
 /.mangaeasy/
@@ -70,3 +72,6 @@ desktop/dist/
 .claude/
 .idea/
 .vscode/
+
+# eslint cache
+desktop/.eslintcache

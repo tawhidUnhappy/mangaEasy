@@ -22,7 +22,6 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable
-import traceback
 
 from PIL import Image, ImageOps
 
@@ -295,7 +294,7 @@ def write_slideshow_concat(frames: list[Path], durations: list[float], out_path:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     min_dur = 1.0 / fps
     with out_path.open("w", encoding="utf-8") as f:
-        for frame, duration in zip(frames, durations):
+        for frame, duration in zip(frames, durations, strict=False):
             f.write(f"file '{frame.resolve().as_posix()}'\n")
             f.write(f"duration {max(duration, min_dur):.6f}\n")
         f.write(f"file '{frames[-1].resolve().as_posix()}'\n")
@@ -305,7 +304,6 @@ def build_video_only(frames: list[Path], durations: list[float], concat_list: Pa
                      output_path: Path, total_duration: float, fps: int, enc: dict) -> None:
     write_slideshow_concat(frames, durations, concat_list, fps)
     use_nvenc = nvenc_available()
-    video_codec = "h264_nvenc" if use_nvenc else "libx264"
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
            "-vsync", "cfr", "-r", str(fps), "-t", f"{total_duration + 0.5:.6f}",
            "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart",

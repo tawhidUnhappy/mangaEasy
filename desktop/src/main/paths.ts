@@ -1,10 +1,8 @@
 /**
  * Path/command resolution for the mangaEasy Python backend.
  *
- * `desktop/` sits as a sibling of the `mangaeasy/` package at the repo root
- * (matches the sibling-project convention already used by AiSongTool's own
- * Electron rewrite at D:\AiSongTool\desktop). Three resolution modes, tried
- * in order:
+ * `desktop/` sits as a sibling of the `mangaeasy/` package at the repo root.
+ * Three resolution modes, tried in order:
  *   - Packaged: the PyInstaller-built backend bundled at build time under
  *     `resources/backend/` (see packaging/mangaeasy.spec + electron-builder.yml's
  *     extraResources) — no system Python/uv needed at all.
@@ -13,6 +11,7 @@
  */
 import { app } from 'electron'
 import { existsSync } from 'fs'
+import os from 'os'
 import path from 'path'
 
 /** Repo root (`D:\mangaEasy`), one level up from `desktop/out/main` at runtime. */
@@ -21,17 +20,41 @@ export function repoRoot(): string {
 }
 
 /**
- * This install's own root folder — mirrors `mangaeasy.tools.external.app_root()`.
- * Dev: the repo root (this file lives at `<repo>/desktop/src/main/paths.ts`,
- * built to `<repo>/desktop/out/main/`). Packaged: the folder containing the
- * installed/portable app, i.e. the parent of Electron's resources dir — so
- * deleting that one folder removes the app and everything it ever wrote.
+ * This install's own root folder — where the app's data (`.mangaeasy/`,
+ * default projects) lives. Mirrors `mangaeasy.tools.external.app_root()`.
+ *
+ * Packaged builds must NOT use the app's own install location: the Windows
+ * portable exe self-extracts to a random %TEMP% dir every launch, the macOS
+ * .app bundle is read-only (and translocated when quarantined), a Linux
+ * AppImage runs from a read-only squashfs mount, and a .deb install lives in
+ * root-owned /opt. So:
+ *   - Windows portable: the folder containing the .exe the user ran
+ *     (PORTABLE_EXECUTABLE_DIR) — data next to the app, delete-folder-and-
+ *     it's-gone stays literally true.
+ *   - macOS: ~/Library/Application Support/mangaEasy
+ *   - Linux: $XDG_DATA_HOME/mangaEasy (default ~/.local/share/mangaEasy)
+ * MANGAEASY_ROOT overrides everything (power users / tests).
  */
 export function appRoot(): string {
   const configured = process.env.MANGAEASY_ROOT
   if (configured) return path.resolve(configured)
-  if (app.isPackaged) return path.dirname(process.resourcesPath)
-  return repoRoot()
+  if (!app.isPackaged) return repoRoot()
+
+  if (process.platform === 'win32') {
+    // Set by electron-builder's portable target: the directory holding the
+    // .exe the user actually ran (resourcesPath points into the temp
+    // self-extraction dir and must never be used for data).
+    const portableDir = process.env.PORTABLE_EXECUTABLE_DIR
+    if (portableDir) return path.resolve(portableDir)
+    // Unpacked/zip layout: data next to the executable.
+    return path.dirname(app.getPath('exe'))
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'mangaEasy')
+  }
+  const xdg = process.env.XDG_DATA_HOME
+  const base = xdg && xdg.trim() ? xdg : path.join(os.homedir(), '.local', 'share')
+  return path.join(base, 'mangaEasy')
 }
 
 /** This install's own data dir — matches `mangaeasy.tools.external.mangaeasy_home()`. */
@@ -72,15 +95,21 @@ export function mangaeasyCommand(): string[] {
   const bundled = bundledBackend()
   if (bundled) return [bundled]
 
-  const devPython = path.join(repoRoot(), '.venv', 'Scripts', 'python.exe')
-  if (existsSync(devPython)) return [devPython, '-m', 'mangaeasy.cli']
+  // Dev checkout: the repo's own venv (Windows and POSIX layouts differ).
+  for (const rel of [
+    ['Scripts', 'python.exe'],
+    ['bin', 'python']
+  ]) {
+    const devPython = path.join(repoRoot(), '.venv', ...rel)
+    if (existsSync(devPython)) return [devPython, '-m', 'mangaeasy.cli']
+  }
 
   const shim = whichSync('mangaeasy')
   if (shim) return [shim]
 
   // Last resort: hope `mangaeasy` resolves some other way the shell knows
-  // about (e.g. a non-Windows venv layout) — surfaces a clear ENOENT in the
-  // terminal pane rather than silently doing nothing.
+  // about — surfaces a clear ENOENT in the terminal pane rather than
+  // silently doing nothing.
   return ['mangaeasy']
 }
 

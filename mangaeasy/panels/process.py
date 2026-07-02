@@ -29,18 +29,16 @@ Usage:
 
 from __future__ import annotations
 
-import os
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 import torch
 from PIL import Image
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
-from mangaeasy.images.watermark_util import apply_watermark
 from mangaeasy.panels.ai import _clamp_box, _run_magi
 from mangaeasy.paths import panels_dir, processed_panels_dir
 
@@ -201,7 +199,6 @@ def process_panel(
     hide_bubbles: bool = True,
     inpaint_radius: int = 5,
 ) -> None:
-    import cv2  # type: ignore (optional; guarded inside _hide_bubbles)
 
     img = Image.open(src).convert("RGB")
     W, H = img.size
@@ -295,7 +292,9 @@ def main() -> None:
             print("OK")
         except Exception as exc:
             print(f"FAILED — {exc}")
-            import traceback; traceback.print_exc()
+            import traceback
+
+            traceback.print_exc()
 
     print(f"\n[DONE] {len(srcs)} panels → {dst_dir}")
     print("       Run `mangaeasy render-video` to use the processed panels.")

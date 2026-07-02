@@ -6,9 +6,25 @@
  * `mangaeasy/web/app/api_workflow.py`'s `_library_dir`. Reading these
  * directly in Node avoids a Python round-trip for simple filesystem checks.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync
+} from 'fs'
 import path from 'path'
-import type { AppConfig, ChapterStatus, DeleteWhat, LibraryEntry, PurgeKind, SystemConfig } from '../shared/types'
+import type {
+  AppConfig,
+  ChapterStatus,
+  DeleteWhat,
+  LibraryEntry,
+  PurgeKind,
+  SystemConfig
+} from '../shared/types'
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif'])
 const AUDIO_EXTS = new Set(['.wav', '.mp3', '.m4a'])
@@ -29,9 +45,17 @@ export function readConfig(projectRoot: string): { config: AppConfig; systemConf
   }
 }
 
-export function writeConfig(projectRoot: string, config?: AppConfig, systemConfig?: SystemConfig): void {
+export function writeConfig(
+  projectRoot: string,
+  config?: AppConfig,
+  systemConfig?: SystemConfig
+): void {
   if (config) {
-    writeFileSync(path.join(projectRoot, 'config.json'), JSON.stringify(config, null, 2) + '\n', 'utf-8')
+    writeFileSync(
+      path.join(projectRoot, 'config.json'),
+      JSON.stringify(config, null, 2) + '\n',
+      'utf-8'
+    )
   }
   if (systemConfig) {
     writeFileSync(
@@ -86,7 +110,10 @@ export function chapterStatus(projectRoot: string, name: string, chapter: number
   }
 }
 
-export function libraryMangaEntries(projectRoot: string): { library: string; entries: LibraryEntry[] } {
+export function libraryMangaEntries(projectRoot: string): {
+  library: string
+  entries: LibraryEntry[]
+} {
   const { config, systemConfig } = readConfig(projectRoot)
   const currentName = String(config.download?.name ?? '')
   const library = libraryDir(projectRoot, systemConfig)
@@ -166,7 +193,9 @@ export function purge(projectRoot: string, kind: PurgeKind): number {
         removed++
       }
     } else if (kind === 'narration') {
-      for (const f of readdirSync(chDir).filter((f) => f.startsWith('narration_') && f.endsWith('.json'))) {
+      for (const f of readdirSync(chDir).filter(
+        (f) => f.startsWith('narration_') && f.endsWith('.json')
+      )) {
         unlinkSync(path.join(chDir, f))
         removed++
       }

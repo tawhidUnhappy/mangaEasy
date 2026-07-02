@@ -25,7 +25,14 @@ export default defineConfig(
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules
+      ...eslintPluginReactRefresh.configs.vite.rules,
+      // Advisory (react-compiler-era) rules: real signals, but the existing
+      // load-on-mount / ETA-tick patterns they flag work correctly — keep
+      // them visible as warnings, not build-breakers.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+      // Context modules deliberately export a provider + its hook together.
+      'react-refresh/only-export-components': 'off'
     }
   },
   eslintConfigPrettier

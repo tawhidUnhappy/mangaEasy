@@ -81,7 +81,21 @@ def _download(url: str, dest: Path, log: LogFn) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     log(f"Downloading {url}")
     with urllib.request.urlopen(url) as response, dest.open("wb") as f:
-        shutil.copyfileobj(response, f)
+        total = int(response.headers.get("Content-Length") or 0)
+        done = 0
+        next_report = 0.10
+        while True:
+            chunk = response.read(1024 * 256)
+            if not chunk:
+                break
+            f.write(chunk)
+            done += len(chunk)
+            if total and done / total >= next_report:
+                log(f"  ... {done / total:4.0%} ({done // (1024 * 1024)} / {total // (1024 * 1024)} MB)")
+                next_report += 0.10
+            elif not total and done % (32 * 1024 * 1024) < 1024 * 256:
+                log(f"  ... {done // (1024 * 1024)} MB")
+    log(f"  done ({done // (1024 * 1024)} MB)")
     return dest
 
 
@@ -146,18 +160,38 @@ def _platform_arch() -> tuple[str, str]:
     return system, arch
 
 
+def _fetch_ffmpeg_macos(arch: str, log: LogFn) -> bool:
+    """macOS static builds from ffmpeg.martin-riedl.de — one zip per binary
+    (top-level `ffmpeg` / `ffprobe` member), published for both arm64 and
+    x86_64 with a stable `latest` redirect URL."""
+    riedl_arch = "arm64" if arch == "arm64" else "amd64"
+    bin_dir = _bin_dir("ffmpeg")
+    ok = True
+    for name in ("ffmpeg", "ffprobe"):
+        url = f"https://ffmpeg.martin-riedl.de/redirect/latest/macos/{riedl_arch}/release/{name}.zip"
+        archive = _download(url, _vendored_root("ffmpeg") / "_dl" / f"{name}.zip", log)
+        extracted = _extract_member(archive, name, bin_dir / name, log)
+        if extracted:
+            _make_executable(bin_dir / name)
+        ok = ok and extracted
+    shutil.rmtree(_vendored_root("ffmpeg") / "_dl", ignore_errors=True)
+    return ok
+
+
 def fetch_ffmpeg(log: LogFn) -> bool:
     """Vendor a static ffmpeg+ffprobe build.
 
     Windows/Linux use BtbN/FFmpeg-Builds' GPL static releases (well-known,
-    stable URLs). macOS doesn't have an equivalent official static build
-    here, so on macOS this currently falls through to documenting `brew
-    install ffmpeg` instead of vendoring — flagged explicitly rather than
-    shipping an unverified download path no one's run on real hardware.
+    stable URLs); macOS uses ffmpeg.martin-riedl.de's static builds (both
+    Apple Silicon and Intel). Runs on demand on first launch — nothing is
+    bundled into the installer, so the download (~50-120 MB) happens once
+    per install, with progress logged to the terminal pane.
     """
     if _is_vendored("ffmpeg"):
         return True
     system, arch = _platform_arch()
+    if system == "darwin":
+        return _fetch_ffmpeg_macos(arch, log)
     ext = "exe" if system == "windows" else ""
     if system == "windows" and arch == "x64":
         url = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
@@ -167,7 +201,7 @@ def fetch_ffmpeg(log: LogFn) -> bool:
         url = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linuxarm64-gpl.tar.xz"
     else:
         log(f"[warn] no vendored ffmpeg build for {system}/{arch} -- install it yourself "
-            f"(macOS: `brew install ffmpeg`) and it'll be picked up from PATH.")
+            f"and it'll be picked up from PATH.")
         return False
 
     archive = _download(url, _vendored_root("ffmpeg") / "_dl" / Path(url).name, log)
@@ -293,25 +327,17 @@ def fetch_node(log: LogFn) -> bool:
 
 def bootstrap_main() -> int:
     """`mangaeasy bootstrap-tools` — fetch ffmpeg/uv/git-lfs into this
-    install's own tools dir. CI runs this once per platform at build time
-    so the shipped installer never needs to download them; anyone else can
-    run it by hand for the same effect on a dev checkout."""
+    install's own tools dir. The desktop app runs this on first launch (the
+    installers deliberately don't bundle these binaries to keep downloads
+    small); anyone can also run it by hand on a dev checkout."""
     results = ensure_core_tools(print)
-    # ffmpeg has no vendored macOS build (see fetch_ffmpeg's docstring) --
-    # that's an accepted, documented gap, not a build failure. macOS users
-    # get a clear `brew install ffmpeg` message instead. uv/git-lfs are
-    # vendorable on every platform and must still succeed everywhere.
-    on_macos_ffmpeg_gap = platform.system().lower() == "darwin" and not results.get("ffmpeg", True)
-    required = {
-        name: success for name, success in results.items()
-        if not (name == "ffmpeg" and on_macos_ffmpeg_gap)
-    }
-    ok = all(required.values())
+    ok = all(results.values())
     for name, success in results.items():
         status = "ok" if success else "FAILED (see warning above)"
-        if name == "ffmpeg" and on_macos_ffmpeg_gap:
-            status = "not vendored (macOS) -- end users need `brew install ffmpeg`"
         print(f"  {name:10s} {status}")
+    if not ok:
+        print("\nERROR: some core tools could not be downloaded. Check your "
+              "internet connection and re-run Setup -> Download core tools.")
     return 0 if ok else 1
 
 

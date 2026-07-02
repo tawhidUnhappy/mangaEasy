@@ -330,7 +330,7 @@ def process_narration(
             traceback.print_exc()
             errors += len(batch)
             continue
-        for (index, image_path), text in zip(batch, texts):
+        for (index, image_path), text in zip(batch, texts, strict=False):
             entries[index]["ocr"] = text
             written += 1
             print(f"  [{written}/{len(pending)}] {image_path.name}: {text[:80]!r}", flush=True)

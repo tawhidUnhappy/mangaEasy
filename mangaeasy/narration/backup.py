@@ -4,8 +4,7 @@
 import sys
 from pathlib import Path
 
-from mangaeasy.config import load_download_config
-from mangaeasy.paths import narration_json, chapter_dir
+from mangaeasy.paths import narration_json
 
 
 def get_safe_backup_name(folder: Path) -> Path:

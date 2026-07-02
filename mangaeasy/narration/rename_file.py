@@ -3,7 +3,6 @@
 
 import argparse
 import sys
-from pathlib import Path
 
 # Importing chapter_dir from your existing paths module
 from mangaeasy.paths import chapter_dir

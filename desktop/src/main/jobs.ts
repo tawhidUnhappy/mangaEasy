@@ -26,9 +26,7 @@ export type OnData = (chunk: string) => void
  * line args entirely (rather than trying to reformat them) is both simpler
  * and avoids dumping a whole song's lyrics into the terminal pane. */
 function formatCmdForDisplay(cmd: string[]): string {
-  return cmd
-    .map((arg) => (arg.includes('\n') ? `<text, ${arg.length} chars>` : arg))
-    .join(' ')
+  return cmd.map((arg) => (arg.includes('\n') ? `<text, ${arg.length} chars>` : arg)).join(' ')
 }
 
 interface CurrentJob {

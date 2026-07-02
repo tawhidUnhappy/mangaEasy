@@ -290,10 +290,43 @@ the install mechanics; this file just covers what calls what.
 
 `packaging/mangaeasy.spec` + `launcher.py` build a self-contained
 distributable via PyInstaller; `make_icon.py`/`icon.ico`/`icon.png` are
-packaging assets. See `docs/publishing.md` for the release process. Data for
-an *installed* app lives under `<install root>/.mangaeasy/`, not
-`~/.mangaeasy` — don't assume a home-directory config path when touching
-install-time path resolution.
+packaging assets. See `docs/publishing.md` for the release process
+(`scripts/release.py` bumps all three version fields in lockstep; the
+release workflow refuses to build if they disagree with the tag).
+
+**Data root for an installed app is per-platform** (fixed in v1.0.0 — the
+old "parent of resourcesPath" resolution wrote into %TEMP% on Windows
+portable and into read-only mounts on macOS/Linux):
+
+- Windows portable: next to the exe (`PORTABLE_EXECUTABLE_DIR`).
+- macOS: `~/Library/Application Support/mangaEasy`.
+- Linux: `$XDG_DATA_HOME/mangaEasy` (default `~/.local/share/mangaEasy`).
+- Dev checkout: the repo root. `MANGAEASY_ROOT` env var overrides everywhere.
+
+The logic lives twice and must stay in sync: `appRoot()` in
+`desktop/src/main/paths.ts` (authoritative — Electron exports
+`MANGAEASY_ROOT`/`MANGAEASY_HOME` to every child) and
+`_default_frozen_root()` in `mangaeasy/tools/external.py` (fallback for
+standalone frozen-CLI use). Electron's own userData is also pointed inside
+`<data root>/.mangaeasy/electron` when packaged so Chromium caches don't
+leak into the OS profile. Never assume `~/.mangaeasy`.
+
+Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not bundled** into the
+installers — `mangaeasy bootstrap-tools` downloads them on demand (the
+Setup tab offers this on first run when doctor reports them missing).
+
+## Tests, lint, CI
+
+- `tests/` is a pytest suite for the pipeline's pure logic (item selection,
+  narration loading, archive-before-overwrite, shard-aware resume pruning,
+  CLI dispatch). Run `uv run pytest` before committing; add a test when
+  fixing logic bugs in those areas.
+- `uv run ruff check .` must stay clean (config in pyproject.toml —
+  correctness rules only, style checks deliberately off).
+- `.github/workflows/ci.yml` runs ruff/pytest/compileall + desktop
+  lint/typecheck/build on every push/PR across all three OSes;
+  `release.yml` additionally smoke-tests the frozen backend
+  (`--version`, `doctor --json`) before packaging.
 
 ## Conventions worth preserving
 

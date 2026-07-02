@@ -3,14 +3,13 @@
 
 import subprocess
 import sys
-from pathlib import Path
 
 from mangaeasy.config import load_download_config
 from mangaeasy.paths import download_dir
 
 
 def main() -> None:
-    dl  = load_download_config()
+    load_download_config()  # validates config presence; result unused here
     dl_dir = download_dir()
 
     if not dl_dir.exists():

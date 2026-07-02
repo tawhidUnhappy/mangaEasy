@@ -5,7 +5,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from mangaeasy.config import load_download_config
 from mangaeasy.paths import panels_dir
 
 
@@ -29,7 +28,6 @@ def add_watermark(input_folder: Path) -> None:
             draw = ImageDraw.Draw(im)
             text = img_file.name
             bbox = draw.textbbox((0, 0), text, font=font)
-            text_w = bbox[2] - bbox[0]
             text_h = bbox[3] - bbox[1]
             padding = 10
             new_h = im.height + text_h + 2 * padding

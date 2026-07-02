@@ -7,6 +7,7 @@
  */
 import type { JobProgress } from '../shared/types'
 
+// eslint-disable-next-line no-control-regex -- stripping ANSI escapes requires matching \x1b
 const ANSI_RE = /\x1b\[[0-?]*[ -/]*[@-~]/g
 const COUNT_RE = /(?<!\d)(\d{1,6})\s*\/\s*(\d{1,6})(?!\d)/
 const PENDING_RE =
@@ -19,7 +20,8 @@ function progressLabel(line: string, fallback: string): string {
   if (lower.includes('[frame]') || lower.includes('render')) return 'Rendering frames'
   if (lower.includes('[pcm]') || lower.includes('fade')) return 'Preparing audio'
   if (lower.includes('download') || lower.includes('skip (exists)')) return 'Downloading pages'
-  if (lower.includes('kokoro') || lower.includes('tts') || lower.includes('audio')) return 'Generating audio'
+  if (lower.includes('kokoro') || lower.includes('tts') || lower.includes('audio'))
+    return 'Generating audio'
   if (lower.includes('panel')) return 'Processing panels'
   return fallback
 }
@@ -75,6 +77,10 @@ export class ProgressParser {
     const value = parseInt(match[1], 10)
     const total = parseInt(match[2], 10)
     if (total <= 0) return null
-    return { value: Math.max(0, Math.min(value, total)), total, label: progressLabel(text, 'Working') }
+    return {
+      value: Math.max(0, Math.min(value, total)),
+      total,
+      label: progressLabel(text, 'Working')
+    }
   }
 }

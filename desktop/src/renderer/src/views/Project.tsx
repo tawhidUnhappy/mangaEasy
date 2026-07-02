@@ -130,7 +130,9 @@ export function Project(): React.JSX.Element {
             className="flex-1 mono"
             type="text"
             value={systemConfig.bgm?.file ?? ''}
-            onChange={(e) => updateSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, file: e.target.value } }))}
+            onChange={(e) =>
+              updateSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, file: e.target.value } }))
+            }
           />
           <button onClick={browseBgm}>Browse…</button>
           <label>
@@ -140,7 +142,10 @@ export function Project(): React.JSX.Element {
               style={{ width: 70 }}
               value={systemConfig.bgm?.volume_db ?? -25}
               onChange={(e) =>
-                updateSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, volume_db: Number(e.target.value) } }))
+                updateSystemConfig((sc) => ({
+                  ...sc,
+                  bgm: { ...sc.bgm, volume_db: Number(e.target.value) }
+                }))
               }
             />
           </label>
@@ -154,14 +159,21 @@ export function Project(): React.JSX.Element {
             className="flex-1 mono"
             type="text"
             value={systemConfig.tts?.speaker_wav ?? ''}
-            onChange={(e) => updateSystemConfig((sc) => ({ ...sc, tts: { ...sc.tts, speaker_wav: e.target.value } }))}
+            onChange={(e) =>
+              updateSystemConfig((sc) => ({
+                ...sc,
+                tts: { ...sc.tts, speaker_wav: e.target.value }
+              }))
+            }
           />
           <button onClick={browseVoice}>Browse…</button>
         </div>
       </div>
 
       <details className="section">
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Advanced: raw config.system.json</summary>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+          Advanced: raw config.system.json
+        </summary>
         <div style={{ height: 320, marginTop: 8, border: '1px solid #3a3a3e' }}>
           <Editor
             language="json"

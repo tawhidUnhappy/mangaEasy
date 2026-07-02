@@ -105,6 +105,24 @@ export interface DoctorStatus {
   tools: Record<string, DoctorTool>
 }
 
+/** Shape of the `app:get-info` IPC reply — version + where this install keeps its data. */
+export interface AppInfo {
+  version: string
+  dataRoot: string
+  home: string
+  logsDir: string
+  platform: string
+  packaged: boolean
+}
+
+/** Shape of the `app:check-updates` IPC reply. */
+export interface UpdateCheck {
+  current: string
+  latest: string | null
+  updateAvailable: boolean
+  url: string
+}
+
 /** One archived audio run (`mangaeasy/video_pipeline/audio_takes.py`'s `list_runs()`). */
 export interface AudioTakeRun {
   run: string

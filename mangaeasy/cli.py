@@ -33,7 +33,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "app":                  ("mangaeasy.web.app",                              "main",        "Setup & app",      "Open the mangaEasy control center (desktop app)."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, got-ocr2, ...) from GitHub/Hugging Face."),
-    "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Vendor ffmpeg/uv/git-lfs into this install's own tools dir (CI runs this at build time)."),
+    "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Download ffmpeg/uv/git-lfs into this install's own tools dir (the desktop app runs this on first launch)."),
     "ensure-node":          ("mangaeasy.tools.vendored",                       "ensure_node_main", "Setup & app", "Vendor a portable Node.js/npm on demand (run.sh/run.bat use this to build the desktop app from source)."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
@@ -109,8 +109,10 @@ def _group_order() -> list[str]:
     return order
 
 
-def _print_help(stream=sys.stdout) -> None:
-    write = stream.write
+def _print_help(stream=None) -> None:
+    # Resolve sys.stdout at call time, not def time — a default bound at
+    # import would ignore any redirection set up after this module loads.
+    write = (stream or sys.stdout).write
     write(f"mangaeasy {__version__} - manga & image-to-video automation\n\n")
     write("Usage:\n")
     write("  mangaeasy <command> [args...]\n")

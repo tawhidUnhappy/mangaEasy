@@ -1,6 +1,6 @@
 [project]
 name = "mangaeasy"
-version = "0.9.30"
+version = "1.0.0"
 description = "General manga and image-to-video automation with isolated external AI tool envs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -95,6 +95,28 @@ include = [
 [dependency-groups]
 dev = [
     "pyinstaller>=6.20.0",
+    "pytest>=8.0.0",
+    "ruff>=0.9.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["packaging"]
+
+[tool.ruff.lint]
+# Correctness-focused: pyflakes (F), a subset of pycodestyle errors (E),
+# and bugbear (B). Style-only churn is deliberately left out — this codebase
+# predates the linter.
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = [
+    "E402",  # lazy imports after module docstring/setup are a project convention
+    "E731",  # lambda assignments are used deliberately in a few pipelines
+    "B008",  # argparse default-factory pattern
 ]
 
 [project.scripts]

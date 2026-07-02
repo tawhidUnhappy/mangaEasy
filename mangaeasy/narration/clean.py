@@ -6,9 +6,7 @@ import shutil
 import sys
 import traceback
 import unicodedata
-from pathlib import Path
 
-from mangaeasy.config import load_download_config
 from mangaeasy.narration import load_narration, save_narration
 from mangaeasy.paths import narration_json
 

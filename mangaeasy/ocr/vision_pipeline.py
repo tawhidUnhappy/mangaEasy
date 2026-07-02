@@ -274,7 +274,7 @@ def process_panels(
         batch_entries = entries[batch_start: batch_start + batch_size]
         dirty = False
 
-        for img_path, entry in zip(batch_paths, batch_entries):
+        for img_path, entry in zip(batch_paths, batch_entries, strict=False):
             if not _entry_needs_magi(entry):
                 continue
 

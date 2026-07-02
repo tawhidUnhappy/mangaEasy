@@ -22,12 +22,36 @@ def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def app_root() -> Path:
-    """Directory this install of mangaEasy lives in.
+def _default_frozen_root() -> Path:
+    """Writable data root for a frozen build running without MANGAEASY_ROOT.
 
-    Frozen build: the folder containing the running executable (so a
-    PyInstaller backend embedded inside the Electron app resolves to that
-    app's own install/portable folder, not the user's home directory).
+    The Electron app always sets MANGAEASY_ROOT before spawning the backend,
+    so this only matters when the frozen CLI is run standalone. The exe's own
+    folder is not reliably writable everywhere: inside a macOS .app bundle it
+    is sealed/read-only, and a Linux AppImage mount or /opt install is
+    read-only too — those fall back to the platform's standard data dir
+    (mirrors desktop/src/main/paths.ts's appRoot()).
+    """
+    exe_dir = Path(sys.executable).resolve().parent
+    if sys.platform == "win32":
+        return exe_dir
+    if sys.platform == "darwin":
+        if ".app/Contents" in exe_dir.as_posix():
+            return Path.home() / "Library" / "Application Support" / "mangaEasy"
+        return exe_dir
+    # Linux: use the exe dir when it's writable (plain tar.gz extract),
+    # otherwise XDG data home (AppImage mount, /opt install).
+    if os.access(exe_dir, os.W_OK):
+        return exe_dir
+    xdg = os.environ.get("XDG_DATA_HOME", "").strip()
+    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+    return base / "mangaEasy"
+
+
+def app_root() -> Path:
+    """Directory this install of mangaEasy keeps its data in.
+
+    Frozen build: a per-platform writable root (see _default_frozen_root).
     Dev checkout: the repo root (parent of the ``mangaeasy`` package).
     Electron sets MANGAEASY_ROOT explicitly when it spawns the backend, so
     that always wins when present.
@@ -36,7 +60,7 @@ def app_root() -> Path:
     if configured:
         return Path(configured).expanduser().resolve()
     if is_frozen():
-        return Path(sys.executable).resolve().parent
+        return _default_frozen_root()
     return package_root()
 
 

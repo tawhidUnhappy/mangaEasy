@@ -47,16 +47,24 @@ export function JobProvider({ children }: { children: React.ReactNode }): React.
     }
   }, [])
 
-  const run = useCallback((command: string, args: string[] = []) => guard(() => window.api.runCli(command, args)), [guard])
+  const run = useCallback(
+    (command: string, args: string[] = []) => guard(() => window.api.runCli(command, args)),
+    [guard]
+  )
 
-  const runChain = useCallback((commands: CliCommand[]) => guard(() => window.api.runChain(commands)), [guard])
+  const runChain = useCallback(
+    (commands: CliCommand[]) => guard(() => window.api.runChain(commands)),
+    [guard]
+  )
 
   const stop = useCallback(async () => {
     await window.api.terminateJob()
   }, [])
 
   return (
-    <JobContext.Provider value={{ running, progress, lastExitCode, runStartedAt, run, runChain, stop }}>
+    <JobContext.Provider
+      value={{ running, progress, lastExitCode, runStartedAt, run, runChain, stop }}
+    >
       {children}
     </JobContext.Provider>
   )

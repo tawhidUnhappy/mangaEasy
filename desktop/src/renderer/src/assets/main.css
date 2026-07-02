@@ -207,3 +207,71 @@ label {
 .mono {
   font-family: Consolas, 'Cascadia Mono', monospace;
 }
+
+/* Drag handle between the views and the terminal pane. */
+.terminal-splitter {
+  height: 5px;
+  flex-shrink: 0;
+  cursor: row-resize;
+  background: var(--border);
+  border-top: 1px solid #2d2d30;
+  border-bottom: 1px solid #2d2d30;
+}
+
+.terminal-splitter:hover {
+  background: var(--accent-bg);
+}
+
+.update-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #143a24;
+  border-bottom: 1px solid var(--positive);
+  font-size: 13px;
+}
+
+.update-banner a {
+  color: var(--accent);
+}
+
+.update-banner button {
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+/* Post-job status line (success/failure) shown when no job is running. */
+.job-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.job-status.ok {
+  background: #14301c;
+  color: var(--positive);
+}
+
+.job-status.fail {
+  background: #3a1818;
+  color: var(--negative);
+}
+
+.terminal-toolbar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+}
+
+.terminal-toolbar button {
+  font-size: 12px;
+  padding: 2px 8px;
+}

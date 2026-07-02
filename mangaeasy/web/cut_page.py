@@ -15,7 +15,7 @@ from pathlib import Path
 from flask import jsonify, render_template, request, send_from_directory, Response, stream_with_context
 from PIL import Image
 
-from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.config import load_download_config, load_system_config
 from mangaeasy.panels.ai import detect_panels_ai
 from mangaeasy.paths import chapter_dir
 from mangaeasy.utils import numeric_sort_key

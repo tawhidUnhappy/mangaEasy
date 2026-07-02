@@ -10,7 +10,14 @@ export function Editor(): React.JSX.Element {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div className="row" style={{ padding: '6px 10px', borderBottom: '1px solid #3a3a3e', justifyContent: 'space-between' }}>
+      <div
+        className="row"
+        style={{
+          padding: '6px 10px',
+          borderBottom: '1px solid #3a3a3e',
+          justifyContent: 'space-between'
+        }}
+      >
         <strong>{name ? (EDITOR_LABELS[name] ?? name) : 'Editor'}</strong>
         <div className="row">
           <button onClick={reload} disabled={!url}>
@@ -22,9 +29,15 @@ export function Editor(): React.JSX.Element {
         </div>
       </div>
       <div style={{ flex: 1, minHeight: 0, position: 'relative', background: '#111' }}>
-        {launching && <div style={{ color: '#888', padding: 16 }}>Starting {EDITOR_LABELS[launching] ?? launching}…</div>}
+        {launching && (
+          <div style={{ color: '#888', padding: 16 }}>
+            Starting {EDITOR_LABELS[launching] ?? launching}…
+          </div>
+        )}
         {!launching && !url && (
-          <div style={{ color: '#777', padding: 16 }}>Open an editor from the "Make a video" tab.</div>
+          <div style={{ color: '#777', padding: 16 }}>
+            Open an editor from the &quot;Make a video&quot; tab.
+          </div>
         )}
         {url && <webview key={reloadToken} src={url} style={{ width: '100%', height: '100%' }} />}
       </div>

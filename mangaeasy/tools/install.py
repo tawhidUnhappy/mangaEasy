@@ -469,7 +469,7 @@ def _install_uv_project(
 
 def _write_managed_pyproject(spec: ToolSpec, dest: Path, gpu_mode: str) -> None:
     deps = ",\n    ".join(f'"{d}"' for d in spec.env_deps)
-    dep_names = {re.split(r"[<>=!~\[ ]", d, 1)[0] for d in spec.env_deps}
+    dep_names = {re.split(r"[<>=!~\[ ]", d, maxsplit=1)[0] for d in spec.env_deps}
     torch_pkgs = [p for p in ("torch", "torchvision") if p in dep_names]
     index_url = _torch_index_url(gpu_mode) if torch_pkgs else None
     torch_index = "" if index_url is None else (

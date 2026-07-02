@@ -147,7 +147,8 @@ export function Workflow(): React.JSX.Element {
 
   const videoSteps = (includeAudioPrep: boolean): { command: string; args: string[] }[] => {
     const steps: { command: string; args: string[] }[] = [{ command: 'render-video', args: [] }]
-    if (includeAudioPrep && audioSource === 'faded') steps.unshift({ command: 'fade-audio', args: [] })
+    if (includeAudioPrep && audioSource === 'faded')
+      steps.unshift({ command: 'fade-audio', args: [] })
     if (bgmFile) steps.push({ command: 'add-bgm', args: [] })
     if (normalize) steps.push({ command: 'normalize-chapter-audio', args: [] })
     return steps
@@ -171,7 +172,10 @@ export function Workflow(): React.JSX.Element {
     // "no raw audio found". Generate it first instead of making the user
     // remember to click "Generate audio" before this.
     const liveStatus = await window.api.getChapterStatus(mangaName, chapter)
-    const steps = liveStatus.audio === 0 ? [{ command: 'index-tts', args: [] }, ...videoSteps(true)] : videoSteps(true)
+    const steps =
+      liveStatus.audio === 0
+        ? [{ command: 'index-tts', args: [] }, ...videoSteps(true)]
+        : videoSteps(true)
     await runChain(steps)
     refreshStatus()
   }
@@ -184,7 +188,10 @@ export function Workflow(): React.JSX.Element {
   const setAudioDuckAndSave = async (value: boolean): Promise<void> => {
     setAudioDuck(value)
     const { systemConfig } = await window.api.getConfig()
-    await window.api.setConfig(undefined, { ...systemConfig, bgm: { ...systemConfig.bgm, duck: value } })
+    await window.api.setConfig(undefined, {
+      ...systemConfig,
+      bgm: { ...systemConfig.bgm, duck: value }
+    })
   }
 
   const deleteData = async (what: DeleteWhat): Promise<void> => {
@@ -203,7 +210,13 @@ export function Workflow(): React.JSX.Element {
         <div className="row">
           <label>
             Chapter
-            <input type="number" min={1} style={{ width: 70 }} value={chapter} onChange={(e) => setChapter(Number(e.target.value))} />
+            <input
+              type="number"
+              min={1}
+              style={{ width: 70 }}
+              value={chapter}
+              onChange={(e) => setChapter(Number(e.target.value))}
+            />
           </label>
           <label>
             Language
@@ -218,25 +231,46 @@ export function Workflow(): React.JSX.Element {
         </div>
         <div className="row">
           <label>
-            <input type="radio" checked={dlMode === 'single'} onChange={() => setDlMode('single')} /> Single
+            <input
+              type="radio"
+              checked={dlMode === 'single'}
+              onChange={() => setDlMode('single')}
+            />{' '}
+            Single
           </label>
           <label>
-            <input type="radio" checked={dlMode === 'range'} onChange={() => setDlMode('range')} /> Range
+            <input type="radio" checked={dlMode === 'range'} onChange={() => setDlMode('range')} />{' '}
+            Range
           </label>
           {dlMode === 'range' && (
             <>
               <label>
                 From
-                <input type="number" style={{ width: 60 }} value={dlFrom} onChange={(e) => setDlFrom(Number(e.target.value))} />
+                <input
+                  type="number"
+                  style={{ width: 60 }}
+                  value={dlFrom}
+                  onChange={(e) => setDlFrom(Number(e.target.value))}
+                />
               </label>
               <label>
                 To
-                <input type="number" style={{ width: 60 }} value={dlTo} onChange={(e) => setDlTo(Number(e.target.value))} />
+                <input
+                  type="number"
+                  style={{ width: 60 }}
+                  value={dlTo}
+                  onChange={(e) => setDlTo(Number(e.target.value))}
+                />
               </label>
             </>
           )}
           <label>
-            <input type="checkbox" checked={dlFresh} onChange={(e) => setDlFresh(e.target.checked)} /> Force fresh metadata
+            <input
+              type="checkbox"
+              checked={dlFresh}
+              onChange={(e) => setDlFresh(e.target.checked)}
+            />{' '}
+            Force fresh metadata
           </label>
         </div>
         <div className="row">
@@ -276,21 +310,38 @@ export function Workflow(): React.JSX.Element {
             ⬇ Export ZIP for AI
           </button>
         </div>
-        {status && <p className="hint">{status.narr ? `${status.narrItems} narration line(s)` : 'not written'}</p>}
+        {status && (
+          <p className="hint">
+            {status.narr ? `${status.narrItems} narration line(s)` : 'not written'}
+          </p>
+        )}
       </div>
 
       <div className="section">
         <h3>4 · Generate audio &amp; video</h3>
         <div className="row">
           <label>
-            <input type="checkbox" checked={normalize} onChange={(e) => setNormalize(e.target.checked)} /> YouTube loudness (-14 LUFS)
+            <input
+              type="checkbox"
+              checked={normalize}
+              onChange={(e) => setNormalize(e.target.checked)}
+            />{' '}
+            YouTube loudness (-14 LUFS)
           </label>
           <label title="Audio ducking: background music automatically lowers when narration is playing, so narration is never drowned out.">
-            <input type="checkbox" checked={audioDuck} onChange={(e) => setAudioDuckAndSave(e.target.checked)} /> Audio ducking
+            <input
+              type="checkbox"
+              checked={audioDuck}
+              onChange={(e) => setAudioDuckAndSave(e.target.checked)}
+            />{' '}
+            Audio ducking
           </label>
           <label>
             Audio source
-            <select value={audioSource} onChange={(e) => setAudioSource(e.target.value as 'raw' | 'faded')}>
+            <select
+              value={audioSource}
+              onChange={(e) => setAudioSource(e.target.value as 'raw' | 'faded')}
+            >
               <option value="raw">Raw audio</option>
               <option value="faded">Faded audio (de-click)</option>
             </select>
@@ -312,7 +363,11 @@ export function Workflow(): React.JSX.Element {
         </div>
         {status && (
           <p className="hint">
-            {status.video ? 'video ready' : status.audio ? `${status.audio} audio clip(s) (no video)` : 'not generated'}
+            {status.video
+              ? 'video ready'
+              : status.audio
+                ? `${status.audio} audio clip(s) (no video)`
+                : 'not generated'}
           </p>
         )}
 

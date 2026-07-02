@@ -31,7 +31,14 @@ const STEP_GROUPS: { label: string; steps: string[] }[] = [
   { label: 'Long video assembly', steps: ['video-join', 'video-add-bgm', 'video-normalize-audio'] },
   {
     label: 'Check & maintain',
-    steps: ['video-check', 'got-ocr2', 'video-validate', 'video-clean-audio', 'video-clean-video', 'video-clean-all']
+    steps: [
+      'video-check',
+      'got-ocr2',
+      'video-validate',
+      'video-clean-audio',
+      'video-clean-video',
+      'video-clean-all'
+    ]
   }
 ]
 
@@ -42,20 +49,30 @@ const LONG_VIDEO_STEPS = new Set(['video-join', 'video-add-bgm', 'video-normaliz
 // One plain-language line per step, shown directly under the step picker so
 // it's never ambiguous what clicking Start will actually do.
 const STEP_DESCRIPTIONS: Record<string, string> = {
-  video: 'Runs the full pipeline end to end: narration audio, rendered chapter videos, and (optionally) the joined long video with background music.',
-  'video-check': 'Checks that panels, narration.json, and audio line up for each selected chapter. Nothing is generated.',
+  video:
+    'Runs the full pipeline end to end: narration audio, rendered chapter videos, and (optionally) the joined long video with background music.',
+  'video-check':
+    'Checks that panels, narration.json, and audio line up for each selected chapter. Nothing is generated.',
   'got-ocr2': 'Fills in missing narration text fields using OCR on the panel images.',
   'video-audio': 'Generates per-chapter narration audio with Kokoro TTS.',
   'video-audio-indextts': 'Generates per-chapter narration audio with IndexTTS.',
-  'video-fade-audio': 'Copies narration audio with a tiny fade in/out to remove clicks. The raw audio is never deleted.',
-  'video-render': 'Renders one video per chapter from panels + audio. Missing audio is generated first automatically.',
-  'video-join': "Joins the rendered chapter videos into one long video. No background music here -- use 'Add background music' afterward.",
-  'video-add-bgm': 'Mixes background music directly into the already-joined long video, without re-joining from chapter clips.',
-  'video-normalize-audio': "Loudness-normalizes the joined long video's audio to YouTube's target level.",
-  'video-clean-audio': 'Archives generated narration audio so it can be regenerated. Previous takes stay recoverable below.',
+  'video-fade-audio':
+    'Copies narration audio with a tiny fade in/out to remove clicks. The raw audio is never deleted.',
+  'video-render':
+    'Renders one video per chapter from panels + audio. Missing audio is generated first automatically.',
+  'video-join':
+    "Joins the rendered chapter videos into one long video. No background music here -- use 'Add background music' afterward.",
+  'video-add-bgm':
+    'Mixes background music directly into the already-joined long video, without re-joining from chapter clips.',
+  'video-normalize-audio':
+    "Loudness-normalizes the joined long video's audio to YouTube's target level.",
+  'video-clean-audio':
+    'Archives generated narration audio so it can be regenerated. Previous takes stay recoverable below.',
   'video-clean-video': 'Deletes rendered chapter videos.',
-  'video-validate': 'Checks generated audio/video against the expected inputs and reports any mismatches.',
-  'video-clean-all': 'Deletes ALL generated output for this manga (audio, videos, long video). Chapters/panels/narration are untouched.'
+  'video-validate':
+    'Checks generated audio/video against the expected inputs and reports any mismatches.',
+  'video-clean-all':
+    'Deletes ALL generated output for this manga (audio, videos, long video). Chapters/panels/narration are untouched.'
 }
 
 const DISABLED_STYLE: React.CSSProperties = { opacity: 0.45 }
@@ -141,17 +158,51 @@ export function Batch(): React.JSX.Element {
   // archived take, or a video outside the usual output folder, doesn't
   // require renaming files on disk first.
   const [inputVideo, setInputVideo] = useState('')
-  const [availableVideos, setAvailableVideos] = useState<{ path: string; label: string; mtimeMs: number }[]>([])
+  const [availableVideos, setAvailableVideos] = useState<
+    { path: string; label: string; mtimeMs: number }[]
+  >([])
 
   useEffect(() => {
     const prefs: BatchPrefs = {
-      mangaPath, useRange, rangeFrom, rangeTo, step, tts, audioSource, longVideo,
-      normalize, bgm, audioDuck, resume, overwriteAudio, skipAudio, ocrForce, renderWorkers, gpuWorkers, outDir
+      mangaPath,
+      useRange,
+      rangeFrom,
+      rangeTo,
+      step,
+      tts,
+      audioSource,
+      longVideo,
+      normalize,
+      bgm,
+      audioDuck,
+      resume,
+      overwriteAudio,
+      skipAudio,
+      ocrForce,
+      renderWorkers,
+      gpuWorkers,
+      outDir
     }
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
   }, [
-    mangaPath, useRange, rangeFrom, rangeTo, step, tts, audioSource, longVideo,
-    normalize, bgm, audioDuck, resume, overwriteAudio, skipAudio, ocrForce, renderWorkers, gpuWorkers, outDir
+    mangaPath,
+    useRange,
+    rangeFrom,
+    rangeTo,
+    step,
+    tts,
+    audioSource,
+    longVideo,
+    normalize,
+    bgm,
+    audioDuck,
+    resume,
+    overwriteAudio,
+    skipAudio,
+    ocrForce,
+    renderWorkers,
+    gpuWorkers,
+    outDir
   ])
 
   const refreshMangas = useCallback(async () => {
@@ -270,7 +321,10 @@ export function Batch(): React.JSX.Element {
   const setBgmVolume = async (db: number): Promise<void> => {
     setBgmVolumeDb(db)
     const { systemConfig } = await window.api.getConfig()
-    await window.api.setConfig(undefined, { ...systemConfig, bgm: { ...systemConfig.bgm, volume_db: db } })
+    await window.api.setConfig(undefined, {
+      ...systemConfig,
+      bgm: { ...systemConfig.bgm, volume_db: db }
+    })
   }
 
   const start = async (): Promise<void> => {
@@ -330,8 +384,10 @@ export function Batch(): React.JSX.Element {
       if (audioSource === 'faded') {
         const fadeArgs = baseArgs({ items: true }) ?? []
         fadeArgs.push(
-          '--source-audio-root', audioRoot(false),
-          '--output-audio-root', audioRoot(true),
+          '--source-audio-root',
+          audioRoot(false),
+          '--output-audio-root',
+          audioRoot(true)
         )
         chain.push({ command: 'video-fade-audio', args: fadeArgs })
       }
@@ -455,11 +511,20 @@ export function Batch(): React.JSX.Element {
   // exactly what made this tab hard to use reliably (e.g. for "just join"
   // or "just add music", which need almost none of these options).
   const usesTts = step === 'video'
-  const usesAudioSource = ['video', 'video-render', 'video-join', 'video-check', 'video-validate', 'video-clean-audio'].includes(step)
+  const usesAudioSource = [
+    'video',
+    'video-render',
+    'video-join',
+    'video-check',
+    'video-validate',
+    'video-clean-audio'
+  ].includes(step)
   // video-join still operates on a chapter range (which item clips to
   // concatenate) -- only video-add-bgm/video-normalize-audio work on the
   // whole already-joined file and have no use for a range.
-  const usesItemRange = !['video-add-bgm', 'video-normalize-audio', 'video-clean-all'].includes(step)
+  const usesItemRange = !['video-add-bgm', 'video-normalize-audio', 'video-clean-all'].includes(
+    step
+  )
   const usesResume = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
   const usesSkipAudio = step === 'video'
   const usesOcrForce = step === 'got-ocr2'
@@ -471,17 +536,24 @@ export function Batch(): React.JSX.Element {
   // A custom inputVideo (picked from availableVideos or browsed to) is
   // known to exist already -- only fall back to checking the default
   // <name>_full.mp4 path when the user hasn't picked one.
-  const missingLongVideo = usesInputVideoPicker && !!mangaPath && !inputVideo && !paths.latestLongVideoPath
+  const missingLongVideo =
+    usesInputVideoPicker && !!mangaPath && !inputVideo && !paths.latestLongVideoPath
   const startBlocked = missingLongVideo || (step === 'video-add-bgm' && !bgmFile)
 
   return (
     <div className="tab-panel">
-      <p className="hint">Pick a manga from your library, choose a chapter range, then generate narrated videos.</p>
+      <p className="hint">
+        Pick a manga from your library, choose a chapter range, then generate narrated videos.
+      </p>
 
       <div className="section">
         <h3>Manga and chapters</h3>
         <div className="row">
-          <select className="flex-1 mono" value={mangaPath} onChange={(e) => setMangaPath(e.target.value)}>
+          <select
+            className="flex-1 mono"
+            value={mangaPath}
+            onChange={(e) => setMangaPath(e.target.value)}
+          >
             {entries.map((e) => (
               <option key={e.path} value={e.path}>
                 {e.label}
@@ -495,7 +567,12 @@ export function Batch(): React.JSX.Element {
         {usesItemRange ? (
           <div className="row">
             <label>
-              <input type="checkbox" checked={useRange} onChange={(e) => setUseRange(e.target.checked)} /> Use chapter range
+              <input
+                type="checkbox"
+                checked={useRange}
+                onChange={(e) => setUseRange(e.target.checked)}
+              />{' '}
+              Use chapter range
             </label>
             <label style={!useRange ? DISABLED_STYLE : undefined}>
               From
@@ -553,17 +630,25 @@ export function Batch(): React.JSX.Element {
           {usesAudioSource && (
             <label title="Faded copies have tiny fade-in/out to remove clicks/pops. The raw audio is never deleted.">
               Audio source
-              <select value={audioSource} onChange={(e) => setAudioSource(e.target.value as typeof audioSource)}>
+              <select
+                value={audioSource}
+                onChange={(e) => setAudioSource(e.target.value as typeof audioSource)}
+              >
                 <option value="raw">Raw audio</option>
                 <option value="faded">Faded audio (de-click)</option>
               </select>
             </label>
           )}
         </div>
-        <p className="hint" style={{ marginTop: 4 }}>{STEP_DESCRIPTIONS[step]}</p>
+        <p className="hint" style={{ marginTop: 4 }}>
+          {STEP_DESCRIPTIONS[step]}
+        </p>
 
         {isLongVideoStep && (
-          <div className="hint" style={{ border: '1px solid #555', borderRadius: 6, padding: '6px 10px', marginTop: 8 }}>
+          <div
+            className="hint"
+            style={{ border: '1px solid #555', borderRadius: 6, padding: '6px 10px', marginTop: 8 }}
+          >
             <strong>Long video assembly is 3 independent steps — pick the one you need:</strong>
             <ol style={{ margin: '4px 0 0 18px', padding: 0 }}>
               <li style={step === 'video-join' ? { fontWeight: 'bold' } : undefined}>
@@ -609,14 +694,14 @@ export function Batch(): React.JSX.Element {
         )}
         {missingLongVideo && (
           <p className="hint" style={{ color: '#e08080' }}>
-            ⚠ No joined long video found yet. Run &quot;Join into one long video&quot; first, or pick a different file
-            above.
+            ⚠ No joined long video found yet. Run &quot;Join into one long video&quot; first, or
+            pick a different file above.
           </p>
         )}
         {step === 'video-join' && paths.latestLongVideoPath && (
           <p className="hint">
-            A long video already exists ({paths.latestLongVideoPath}) — Join keeps it and writes a new, separately
-            named file rather than replacing it.
+            A long video already exists ({paths.latestLongVideoPath}) — Join keeps it and writes a
+            new, separately named file rather than replacing it.
           </p>
         )}
 
@@ -646,29 +731,52 @@ export function Batch(): React.JSX.Element {
               />
             </label>
             <label title="Audio ducking: background music automatically lowers when narration is playing, so narration is never drowned out. Uses sidechain compression internally.">
-              <input type="checkbox" checked={audioDuck} onChange={(e) => setAudioDuck(e.target.checked)} /> Audio ducking
+              <input
+                type="checkbox"
+                checked={audioDuck}
+                onChange={(e) => setAudioDuck(e.target.checked)}
+              />{' '}
+              Audio ducking
             </label>
           </div>
         )}
         {step === 'video-add-bgm' && (
           <p className="hint">
-            Mixes music into the input video above without re-joining from chapter clips, and writes the result as
-            a new file named with the volume and a timestamp (e.g. "..._bgm_m25dB_20260629-143000.mp4") — the clean
-            joined video and any earlier mixes are left untouched, so trying another track or volume never
-            overwrites a previous one.
+            Mixes music into the input video above without re-joining from chapter clips, and writes
+            the result as a new file named with the volume and a timestamp (e.g.
+            &quot;..._bgm_m25dB_20260629-143000.mp4&quot;) — the clean joined video and any earlier
+            mixes are left untouched, so trying another track or volume never overwrites a previous
+            one.
           </p>
         )}
 
         {step === 'video' && (
           <div className="row" style={{ marginTop: 8 }}>
             <label>
-              <input type="checkbox" checked={longVideo} onChange={(e) => setLongVideo(e.target.checked)} /> Generate one long video
+              <input
+                type="checkbox"
+                checked={longVideo}
+                onChange={(e) => setLongVideo(e.target.checked)}
+              />{' '}
+              Generate one long video
             </label>
             <label style={!longVideo ? DISABLED_STYLE : undefined}>
-              <input type="checkbox" disabled={!longVideo} checked={normalize} onChange={(e) => setNormalize(e.target.checked)} /> YouTube loudness
+              <input
+                type="checkbox"
+                disabled={!longVideo}
+                checked={normalize}
+                onChange={(e) => setNormalize(e.target.checked)}
+              />{' '}
+              YouTube loudness
             </label>
             <label style={!longVideo ? DISABLED_STYLE : undefined}>
-              <input type="checkbox" disabled={!longVideo} checked={bgm} onChange={(e) => setBgm(e.target.checked)} /> Background music
+              <input
+                type="checkbox"
+                disabled={!longVideo}
+                checked={bgm}
+                onChange={(e) => setBgm(e.target.checked)}
+              />{' '}
+              Background music
             </label>
           </div>
         )}
@@ -677,22 +785,42 @@ export function Batch(): React.JSX.Element {
           <div className="row" style={{ marginTop: 8 }}>
             {usesResume && (
               <label title="Force narration audio to regenerate even if a file already exists for it (e.g. after fixing a narration line). The previous take is archived first, never lost -- see 'Previous audio takes' below.">
-                <input type="checkbox" checked={overwriteAudio} onChange={(e) => setOverwriteAudio(e.target.checked)} /> Regenerate audio
+                <input
+                  type="checkbox"
+                  checked={overwriteAudio}
+                  onChange={(e) => setOverwriteAudio(e.target.checked)}
+                />{' '}
+                Regenerate audio
               </label>
             )}
             {usesResume && (
               <label title="If a previous audio run was interrupted, re-verify the most recent audio file plus the previous 5 (archived first, then regenerated).">
-                <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
+                <input
+                  type="checkbox"
+                  checked={resume}
+                  onChange={(e) => setResume(e.target.checked)}
+                />{' '}
+                Resume (re-verify last 5 audio)
               </label>
             )}
             {usesSkipAudio && (
               <label title="Skip narration audio generation entirely and just re-render + re-join using whatever audio already exists.">
-                <input type="checkbox" checked={skipAudio} onChange={(e) => setSkipAudio(e.target.checked)} /> Regenerate video only
+                <input
+                  type="checkbox"
+                  checked={skipAudio}
+                  onChange={(e) => setSkipAudio(e.target.checked)}
+                />{' '}
+                Regenerate video only
               </label>
             )}
             {usesOcrForce && (
               <label>
-                <input type="checkbox" checked={ocrForce} onChange={(e) => setOcrForce(e.target.checked)} /> Redo all OCR
+                <input
+                  type="checkbox"
+                  checked={ocrForce}
+                  onChange={(e) => setOcrForce(e.target.checked)}
+                />{' '}
+                Redo all OCR
               </label>
             )}
             {usesRenderWorkers && (
@@ -728,7 +856,12 @@ export function Batch(): React.JSX.Element {
       <div className="section">
         <h3>Output</h3>
         <div className="row">
-          <input className="flex-1 mono" type="text" value={outDir} onChange={(e) => setOutDir(e.target.value)} />
+          <input
+            className="flex-1 mono"
+            type="text"
+            value={outDir}
+            onChange={(e) => setOutDir(e.target.value)}
+          />
           <button
             onClick={async () => {
               const picked = await window.api.pickDir()
@@ -739,15 +872,16 @@ export function Batch(): React.JSX.Element {
           </button>
         </div>
         <p className="hint">
-          Reusable files: {paths.projectOutputDir || `${outDir}/<manga name>`} (audio cache under {paths.audioRoot || '…'})
+          Reusable files: {paths.projectOutputDir || `${outDir}/<manga name>`} (audio cache under{' '}
+          {paths.audioRoot || '…'})
         </p>
       </div>
 
       <div className="section">
         <h3>Previous audio takes</h3>
         <p className="hint">
-          Audio is never overwritten silently — regenerating or clearing it archives the previous take first, so you
-          can pick an older one back up instead of generating a new one.
+          Audio is never overwritten silently — regenerating or clearing it archives the previous
+          take first, so you can pick an older one back up instead of generating a new one.
         </p>
         <div className="row">
           <button onClick={refreshTakes} disabled={!mangaPath || takesLoading}>
@@ -757,7 +891,9 @@ export function Batch(): React.JSX.Element {
             <span className="hint">
               Active: {takes.active.total_files} file(s)
               {Object.keys(takes.active.items).length > 0 &&
-                ` (${Object.entries(takes.active.items).map(([item, n]) => `${item}: ${n}`).join(', ')})`}
+                ` (${Object.entries(takes.active.items)
+                  .map(([item, n]) => `${item}: ${n}`)
+                  .join(', ')})`}
             </span>
           )}
         </div>
@@ -795,7 +931,11 @@ export function Batch(): React.JSX.Element {
       </div>
 
       <div className="row" style={{ alignItems: 'center' }}>
-        <button className="primary" onClick={start} disabled={running || !mangaPath || startBlocked}>
+        <button
+          className="primary"
+          onClick={start}
+          disabled={running || !mangaPath || startBlocked}
+        >
           ▶ Start
         </button>
         {startBlocked && missingLongVideo && (
@@ -804,7 +944,9 @@ export function Batch(): React.JSX.Element {
           </span>
         )}
         {startBlocked && !missingLongVideo && step === 'video-add-bgm' && !bgmFile && (
-          <span className="hint" style={{ color: '#e08080' }}>Set a background music file first (Browse… above).</span>
+          <span className="hint" style={{ color: '#e08080' }}>
+            Set a background music file first (Browse… above).
+          </span>
         )}
       </div>
     </div>

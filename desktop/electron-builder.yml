@@ -18,6 +18,8 @@ asarUnpack:
 extraResources:
   - from: resources/backend
     to: backend
+# One naming convention across every platform/target, always carrying the
+# real release version (CI stamps it into package.json from the git tag).
 win:
   executableName: mangaeasy-desktop
   # Portable only — deliberately no nsis target. An installer writes a
@@ -27,7 +29,7 @@ win:
   target:
     - portable
 portable:
-  artifactName: ${name}-${version}-portable.${ext}
+  artifactName: mangaEasy-${version}-windows-${arch}-portable.${ext}
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -39,18 +41,20 @@ mac:
   target:
     - dmg
     - zip
+  artifactName: mangaEasy-${version}-mac-${arch}.${ext}
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: mangaEasy-${version}-mac-${arch}.${ext}
 linux:
   target:
     - AppImage
     - deb
     - tar.gz
-  maintainer: electronjs.org
-  category: Utility
+  artifactName: mangaEasy-${version}-linux-${arch}.${ext}
+  maintainer: tawhidUnhappy <cyconsultancybd@gmail.com>
+  category: AudioVideo
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: mangaEasy-${version}-linux-${arch}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
+# Release uploads are done by the GitHub Actions workflow
+# (.github/workflows/release.yml), not electron-builder's publisher.
+publish: null

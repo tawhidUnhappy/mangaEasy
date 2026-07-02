@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
   AppConfig,
+  AppInfo,
   AudioTakesStatus,
   ChapterStatus,
   CliCommand,
@@ -11,12 +12,14 @@ import type {
   JobProgress,
   LibraryEntry,
   PurgeKind,
-  SystemConfig
+  SystemConfig,
+  UpdateCheck
 } from '../shared/types'
 
 const api = {
   // Job execution
-  runCli: (command: string, args: string[] = []): Promise<number> => ipcRenderer.invoke('run-cli', command, args),
+  runCli: (command: string, args: string[] = []): Promise<number> =>
+    ipcRenderer.invoke('run-cli', command, args),
   runChain: (commands: CliCommand[]): Promise<number> => ipcRenderer.invoke('run-chain', commands),
   terminateJob: (): Promise<void> => ipcRenderer.invoke('terminate-job'),
   isJobRunning: (): Promise<boolean> => ipcRenderer.invoke('is-job-running'),
@@ -26,29 +29,43 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:data', listener)
   },
   onJobProgress: (callback: (progress: JobProgress) => void): (() => void) => {
-    const listener = (_e: Electron.IpcRendererEvent, progress: JobProgress): void => callback(progress)
+    const listener = (_e: Electron.IpcRendererEvent, progress: JobProgress): void =>
+      callback(progress)
     ipcRenderer.on('job:progress', listener)
     return () => ipcRenderer.removeListener('job:progress', listener)
   },
-  resizeTerminal: (cols: number, rows: number): void => ipcRenderer.send('terminal:resize', cols, rows),
+  resizeTerminal: (cols: number, rows: number): void =>
+    ipcRenderer.send('terminal:resize', cols, rows),
 
   getDoctorStatus: (checkUpdates = false): Promise<DoctorStatus> =>
     ipcRenderer.invoke('get-doctor-status', checkUpdates),
 
+  // App info + update check
+  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:get-info'),
+  checkAppUpdate: (force = false): Promise<UpdateCheck> =>
+    ipcRenderer.invoke('app:check-updates', force),
+
   listAudioTakes: (projectRoot: string, audioRoot: string): Promise<AudioTakesStatus> =>
     ipcRenderer.invoke('list-audio-takes', projectRoot, audioRoot),
-  restoreAudioTake: (projectRoot: string, audioRoot: string, run: string, items?: string[]): Promise<string> =>
+  restoreAudioTake: (
+    projectRoot: string,
+    audioRoot: string,
+    run: string,
+    items?: string[]
+  ): Promise<string> =>
     ipcRenderer.invoke('restore-audio-take', projectRoot, audioRoot, run, items),
 
   // Project root + config
   getProjectRoot: (): Promise<string> => ipcRenderer.invoke('get-project-root'),
-  setProjectRoot: (projectRoot: string): Promise<void> => ipcRenderer.invoke('set-project-root', projectRoot),
+  setProjectRoot: (projectRoot: string): Promise<void> =>
+    ipcRenderer.invoke('set-project-root', projectRoot),
   getConfig: (): Promise<ConfigPair> => ipcRenderer.invoke('get-config'),
   setConfig: (config?: AppConfig, systemConfig?: SystemConfig): Promise<void> =>
     ipcRenderer.invoke('set-config', config, systemConfig),
 
   // Library / chapter status
-  listLibrary: (): Promise<{ library: string; entries: LibraryEntry[] }> => ipcRenderer.invoke('library:list'),
+  listLibrary: (): Promise<{ library: string; entries: LibraryEntry[] }> =>
+    ipcRenderer.invoke('library:list'),
   getChapterStatus: (name: string, chapter: number): Promise<ChapterStatus> =>
     ipcRenderer.invoke('chapter:status', name, chapter),
   deleteChapter: (chapter: number, what: DeleteWhat): Promise<string[]> =>
@@ -69,19 +86,24 @@ const api = {
     longVideoDir: string
     latestLongVideoPath: string | null
   }> => ipcRenderer.invoke('batch:resolve-paths', outDir, mangaPath),
-  listBatchVideos: (longVideoDir: string): Promise<{ path: string; label: string; mtimeMs: number }[]> =>
+  listBatchVideos: (
+    longVideoDir: string
+  ): Promise<{ path: string; label: string; mtimeMs: number }[]> =>
     ipcRenderer.invoke('batch:list-videos', longVideoDir),
 
   // Editors
   launchEditor: (name: string): Promise<string> => ipcRenderer.invoke('editor:launch', name),
   stopEditor: (name: string): Promise<void> => ipcRenderer.invoke('editor:stop', name),
-  isEditorRunning: (name: string): Promise<boolean> => ipcRenderer.invoke('editor:is-running', name),
+  isEditorRunning: (name: string): Promise<boolean> =>
+    ipcRenderer.invoke('editor:is-running', name),
 
   // Native dialogs / shell
   pickDir: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-dir'),
-  pickFile: (extensions?: string[]): Promise<string | null> => ipcRenderer.invoke('dialog:pick-file', extensions),
+  pickFile: (extensions?: string[]): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:pick-file', extensions),
   pickAudioFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-audio-file'),
-  openFolder: (targetPath: string): Promise<string> => ipcRenderer.invoke('shell:open-folder', targetPath)
+  openFolder: (targetPath: string): Promise<string> =>
+    ipcRenderer.invoke('shell:open-folder', targetPath)
 }
 
 if (process.contextIsolated) {

@@ -6,7 +6,6 @@ timestamps match the actual video precisely.  Output goes to ./tmp/<video-stem>.
 """
 
 import sys
-from pathlib import Path
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
 from mangaeasy.paths import manga_dir

@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -131,7 +130,7 @@ def build_manifest(
             with ThreadPoolExecutor(max_workers=1) as executor:
                 list(
                     executor.map(
-                        lambda item: validate_panel(item_dir, item.get("image", "")),
+                        lambda item, item_dir=item_dir: validate_panel(item_dir, item.get("image", "")),
                         narration[: args.prefetch],
                     )
                 )

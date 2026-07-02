@@ -27,7 +27,6 @@ import webbrowser
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from flask import Flask, Response, stream_with_context
 

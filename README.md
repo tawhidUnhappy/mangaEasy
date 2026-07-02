@@ -17,7 +17,7 @@ Everything is exposed through a single command:
 
 ```console
 $ mangaeasy --help
-mangaeasy 0.3.0 - manga & image-to-video automation
+mangaeasy 1.0.0 - manga & image-to-video automation
 
 Usage:
   mangaeasy <command> [args...]
@@ -71,18 +71,18 @@ Usage:
 The easiest way to get mangaEasy is to download the desktop app from the
 [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest).
 It's a self-contained Electron app with the Python backend bundled inside —
-**no Python or uv required**, and it auto-detects your GPU (NVIDIA CUDA,
-Apple Silicon, or CPU-only) with no setup. Plain `git` is the one thing
-still expected on your system (used to fetch the optional AI tools).
-**ffmpeg ships bundled on Windows and Linux; on macOS there's no trusted
-static build to bundle yet, so `brew install ffmpeg` is required** (the app
-will tell you if it's missing).
+**no Python, Node, or ffmpeg install required**, and it auto-detects your
+GPU (NVIDIA CUDA, Apple Silicon, or CPU-only) with no setup. On first launch
+the Setup tab offers a one-time ~100 MB **Download core tools** (ffmpeg and
+friends) into the app's own data folder — on all three platforms, macOS
+included. Plain `git` is the one thing still expected on your system (used
+to fetch the optional AI tools).
 
 **Windows**
 
 | File | Type | How to use |
 |---|---|---|
-| `mangaeasy-desktop-X.Y.Z-portable.exe` | Portable | No install — just run it |
+| `mangaEasy-X.Y.Z-windows-x64-portable.exe` | Portable | No install — just run it (SmartScreen: *More info → Run anyway*) |
 
 There is deliberately no Windows installer (`.exe` setup). An installer would
 write a registry uninstall key and a Start Menu shortcut outside wherever you
@@ -94,28 +94,35 @@ run the exe, delete the folder when you're done.
 
 | File | Type | How to use |
 |---|---|---|
-| `mangaeasy-desktop-X.Y.Z.dmg` | Installer | Drag to Applications |
-| `mangaeasy-desktop-X.Y.Z-mac.zip` | Portable | Extract, `xattr -cr mangaEasy.app`, run it |
+| `mangaEasy-X.Y.Z-mac-arm64.dmg` | Installer | Drag to Applications |
+| `mangaEasy-X.Y.Z-mac-arm64.zip` | Portable | Extract, `xattr -cr mangaEasy.app`, run it |
 
 **Linux**
 
 | File | Type | How to use |
 |---|---|---|
-| `mangaeasy-desktop-X.Y.Z.AppImage` | Portable | `chmod +x`, run it — no install |
-| `mangaeasy-desktop-X.Y.Z.deb` | Installer | `sudo dpkg -i mangaeasy-desktop-*.deb` |
-| `mangaeasy-desktop-X.Y.Z.tar.gz` | Portable | Extract, run the binary inside |
+| `mangaEasy-X.Y.Z-linux-x86_64.AppImage` | Portable | `chmod +x`, run it — no install |
+| `mangaEasy-X.Y.Z-linux-amd64.deb` | Installer | `sudo dpkg -i mangaEasy-*.deb` |
+| `mangaEasy-X.Y.Z-linux-x64.tar.gz` | Portable | Extract, run the binary inside |
 
 Launch the app and use the **Setup** tab to install whichever AI tools you
 want (index-tts, kokoro, magi-v3, got-ocr2) — each downloads on demand into
 the app's own self-contained data folder, never your home directory.
 
-**Everything mangaEasy ever writes lives under `<install folder>/.mangaeasy/`**
-— AI tool installs, model weights, Hugging Face/torch/uv caches, app state.
-Delete the install folder and nothing is left anywhere else on the machine.
-(macOS `.dmg` and Linux `.deb` are still OS-native installers and register
-with `Applications`/`dpkg` as usual — use the `.zip`/`.AppImage`/`.tar.gz`
-portable builds on those platforms for the same "delete the folder, it's
-gone" guarantee Windows portable gives you.)
+**Everything mangaEasy ever writes lives in one data folder** — AI tool
+installs, model weights, Hugging Face/torch/uv caches, app state, logs, even
+Electron's own browser caches:
+
+| Platform | Data folder |
+|---|---|
+| Windows (portable) | next to the `.exe` — the folder *is* the install |
+| macOS | `~/Library/Application Support/mangaEasy` |
+| Linux | `~/.local/share/mangaEasy` |
+
+The Setup tab's **About** section shows the exact path with an Open button.
+Delete that folder (plus the app itself) and nothing is left anywhere else
+on the machine. Override the location with the `MANGAEASY_ROOT` environment
+variable if you want it somewhere specific.
 
 > **macOS Gatekeeper note:** the first time you may need to right-click → Open
 > to bypass the "unidentified developer" warning, or run
@@ -128,9 +135,9 @@ See [docs/install.md](docs/install.md) for full installation instructions.
 ## Requirements
 
 **Using the desktop app from the Releases page:** just `git` — used to fetch
-the optional AI tools. Python and uv ship inside the app on every platform;
-ffmpeg ships inside the app on Windows and Linux. On macOS, install it once
-with `brew install ffmpeg`.
+the optional AI tools. Python ships inside the app on every platform;
+ffmpeg/ffprobe/uv/git-lfs download once via the Setup tab's
+**Download core tools** button (all platforms, macOS included).
 
 **Running from source / as a CLI tool (developers):**
 
@@ -226,7 +233,7 @@ mangaeasy install-tool magi-v3    # MAGI v3 manga panel detection (env + adapter
 mangaeasy install-tool got-ocr2   # GOT-OCR 2.0 panel OCR (HF model + env)
 ```
 
-Tools install into `<install folder>/.mangaeasy/tools` and are found automatically from any
+Tools install into `<data folder>/.mangaeasy/tools` and are found automatically from any
 folder. The installer **detects your hardware**: NVIDIA GPU → CUDA builds,
 Apple Silicon → MPS-enabled builds, otherwise CPU builds that work on any
 machine (force one with `--cuda` / `--cpu`). Other flags: `--ref <branch/tag>`
@@ -319,7 +326,7 @@ easiest way to get them is [`mangaeasy install-tool`](#install-the-ai-tools-one-
 which puts them in the managed folder:
 
 ```text
-<install folder>/.mangaeasy/tools/
+<data folder>/.mangaeasy/tools/
   index-tts/      # IndexTTS-2  (cloned uv project + model checkpoints)
   magi-v3/        # MAGI v3 panel detection (generated env + detect_magi.py)
   got-ocr2/       # GOT-OCR 2.0 panel OCR (generated env + HF model)

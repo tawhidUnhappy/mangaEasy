@@ -1,2 +1,2 @@
 # mangaeasy — manga & image-to-video automation.
-__version__ = "0.9.30"
+__version__ = "1.0.0"

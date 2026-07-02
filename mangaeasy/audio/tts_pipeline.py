@@ -223,7 +223,7 @@ def main() -> int:
     generated = 0
     failures: list[Path] = []
     i = 0
-    for chapter_idx, (item_dir, jobs_for_item) in enumerate(zip(selected, per_chapter), start=1):
+    for chapter_idx, (item_dir, jobs_for_item) in enumerate(zip(selected, per_chapter, strict=False), start=1):
         for text, dst in jobs_for_item:
             i += 1
             print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
