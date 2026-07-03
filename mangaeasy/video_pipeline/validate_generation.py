@@ -34,6 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-long", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--long-video", type=Path, default=None, help="Override the long video path to validate.")
     parser.add_argument("--duration-tolerance", type=float, default=3.0)
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit one JSON object on stdout instead of the human report.",
+    )
     return parser.parse_args()
 
 
@@ -186,11 +192,12 @@ def check_item(item_dir: Path, args: argparse.Namespace, totals: dict[str, int],
                 f"item_wav={item_wav_duration:.2f}s"
             )
 
-    print(
-        f"[{item_name}] panels={len(panels)} narration={len(narration_stems)} "
-        f"audio={len(audios)} item_wav={'yes' if item_wav.exists() else 'no'} "
-        f"item_video={'yes' if item_video.exists() else 'no'}"
-    )
+    if not args.as_json:
+        print(
+            f"[{item_name}] panels={len(panels)} narration={len(narration_stems)} "
+            f"audio={len(audios)} item_wav={'yes' if item_wav.exists() else 'no'} "
+            f"item_video={'yes' if item_video.exists() else 'no'}"
+        )
     return item_wav_duration
 
 
@@ -243,6 +250,13 @@ def main() -> int:
                     f"Long video duration mismatch: video={long_duration:.2f}s "
                     f"item_wav_sum={long_expected_duration:.2f}s"
                 )
+
+    if args.as_json:
+        print(json.dumps(
+            {"items": expected_items, "totals": totals, "errors": errors, "ok": not errors},
+            ensure_ascii=False,
+        ))
+        return 1 if errors else 0
 
     print("\nValidation totals:")
     print(f"  items:          {expected_items}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from mangaeasy.utils import emit_result
 from mangaeasy.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 from mangaeasy.video_pipeline.long_video_builder import LongVideoConfig, build_long_video
 
@@ -38,7 +39,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    build_long_video(
+    out_path = build_long_video(
         LongVideoConfig(
             project_root=args.project_root,
             project_name_override=args.project_name,
@@ -64,6 +65,7 @@ def main() -> int:
             narration_volume=args.narration_volume,
         )
     )
+    emit_result(outputs=[out_path])
     return 0
 
 

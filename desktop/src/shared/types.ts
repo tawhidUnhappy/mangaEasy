@@ -113,6 +113,8 @@ export interface AppInfo {
   logsDir: string
   platform: string
   packaged: boolean
+  /** argv prefix that runs this install's `mangaeasy` CLI (backend exe when packaged). */
+  cli: string[]
 }
 
 /** Shape of the `app:check-updates` IPC reply. */

@@ -33,6 +33,12 @@ def parse_args() -> argparse.Namespace:
         help="Delete corrupt/empty audio files so the next audio-generation run regenerates "
              "exactly those (generation skips files that already exist).",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit one JSON object on stdout instead of the human report.",
+    )
     return parser.parse_args()
 
 
@@ -118,6 +124,29 @@ def main() -> int:
         total_checked += audit_item(item_dir, audio_root, name, missing_panels, bad_audio, not_ready)
 
     checked_items = len(selected) - len(not_ready)
+    ok = not missing_panels and not bad_audio
+
+    removed = 0
+    if bad_audio and args.fix:
+        for _item_name, _image_name, audio_path in bad_audio:
+            if audio_path.exists():
+                audio_path.unlink()
+                removed += 1
+
+    if args.as_json:
+        import json
+
+        print(json.dumps({
+            "checked_entries": total_checked,
+            "checked_items": checked_items,
+            "not_ready": not_ready,
+            "missing_panels": [{"item": i, "image": img} for i, img in missing_panels],
+            "bad_audio": [{"item": i, "image": img, "path": str(p)} for i, img, p in bad_audio],
+            "fixed_deleted": removed,
+            "ok": ok,
+        }, ensure_ascii=False))
+        return 0 if ok else 1
+
     print(f"Checked {total_checked} narration entry/entries across {checked_items} item folder(s).")
     if not_ready:
         print(f"Skipped {len(not_ready)} item folder(s) with no narration.json yet (not ready for audio): "
@@ -138,7 +167,7 @@ def main() -> int:
         if len(bad_audio) > 30:
             print(f"  ...and {len(bad_audio) - 30} more")
 
-    if not missing_panels and not bad_audio:
+    if ok:
         print("\nAUDIO AUDIT OK: every panel has valid, readable audio.")
         return 0
 
@@ -150,11 +179,6 @@ def main() -> int:
               "to regenerate exactly those (it skips files that already exist).")
         return 1
 
-    removed = 0
-    for _item_name, _image_name, audio_path in bad_audio:
-        if audio_path.exists():
-            audio_path.unlink()
-            removed += 1
     print(f"\nDeleted {removed} corrupt/empty audio file(s) (missing ones were already absent). "
           "Run audio generation again to regenerate them, then re-run this audit to confirm.")
     return 1

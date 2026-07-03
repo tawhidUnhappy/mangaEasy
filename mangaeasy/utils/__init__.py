@@ -8,6 +8,18 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 
+def emit_result(**payload) -> None:
+    """Print the machine-parsable success marker line.
+
+    Generation commands end a successful run with exactly one
+    ``MANGAEASY_RESULT {...json...}`` line so scripts and AI agents can find
+    the produced files without scraping human log text — same family as the
+    ``MANGAEASY_PROGRESS n/m`` and ``MANGAEASY_OPEN_URL`` markers. Keep the
+    payload JSON on a single line; Paths are stringified automatically.
+    """
+    print("MANGAEASY_RESULT " + json.dumps(payload, ensure_ascii=False, default=str), flush=True)
+
+
 def numeric_sort_key(path: "Path | str") -> list:
     """Natural-sort key: extracts all integers from a filename stem.
 

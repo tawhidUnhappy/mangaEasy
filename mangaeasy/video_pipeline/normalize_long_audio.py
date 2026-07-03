@@ -7,6 +7,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
+from mangaeasy.utils import emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
@@ -155,8 +156,10 @@ def main() -> int:
         output_path.replace(input_path)
         print(f"\nReplaced input: {input_path}", flush=True)
         print(f"Backup written: {backup_path}", flush=True)
+        emit_result(outputs=[input_path], backup=str(backup_path))
     else:
         print(f"\nNormalized video written to: {output_path}", flush=True)
+        emit_result(outputs=[output_path])
     return 0
 
 

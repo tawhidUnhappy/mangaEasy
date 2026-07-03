@@ -315,6 +315,29 @@ Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not bundled** into the
 installers — `mangaeasy bootstrap-tools` downloads them on demand (the
 Setup tab offers this on first run when doctor reports them missing).
 
+## The machine-readable CLI contract (agents/scripts depend on this)
+
+Added in v1.1.0 and documented in `docs/ai-guide.md` (root `AGENTS.md`
+points there). When changing CLI behaviour, keep these stable:
+
+- `commands --json` (catalog from `COMMANDS`), `where --json` (resolved
+  paths), `library-list --json` (`mangaeasy/library_scan.py` — mirrors the
+  desktop's `config.ts` scan; keep the two in sync), and `--json` modes on
+  `doctor`/`tools`/`video-check`/`video-validate`/`video-audio-audit`/
+  `audio-takes-list`: exactly one JSON object on stdout.
+- Marker lines: `MANGAEASY_PROGRESS n/m`, and `MANGAEASY_RESULT {...}` via
+  `mangaeasy.utils.emit_result()` as the final line of successful
+  generation commands — new generation commands must emit it too.
+- Exit codes: 0 ok / 1 runtime failure / 2 usage error. No command may ever
+  prompt for interactive input.
+- stdout/stderr are forced to UTF-8 in `cli.py` (`_force_utf8_stdio`) —
+  don't remove; piped output on Windows is cp1252 otherwise and crashes.
+- `mangaeasy mcp` (`mangaeasy/mcp_server.py`) is a stdlib-only MCP stdio
+  server whose tools shell out to the CLI; adding a tool means adding an
+  entry to its `TOOLS` dict (schema + flag mapping) — no SDK, keep it
+  dependency-free. `tests/test_docs_crossref.py` fails if docs mention
+  commands that don't exist.
+
 ## Tests, lint, CI
 
 - `tests/` is a pytest suite for the pipeline's pure logic (item selection,

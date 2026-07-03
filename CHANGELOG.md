@@ -1,5 +1,46 @@
 # Changelog
 
+## v1.1.0 — 2026-07-03
+
+AI-assistant / scripting release: the whole pipeline is now drivable by any
+AI agent (or shell script) through a documented, machine-readable CLI
+contract — isolation story unchanged.
+
+### Added
+- **`docs/ai-guide.md`** — the complete operating manual for AI assistants
+  and scripts (install modes, data anatomy, recipes, output contract,
+  safety rules), plus a root `AGENTS.md` pointer that agent tools
+  auto-discover. A test cross-references the guide against the real command
+  catalog so the docs can't rot silently.
+- **`mangaeasy mcp`** — a built-in MCP stdio server (pure stdlib, no new
+  dependencies) exposing 13 typed tools (doctor, where, library_list,
+  video_check, audio_audit, generate_audio, render_videos,
+  build_long_video, add_bgm, run_full_pipeline, …) to any MCP-capable
+  assistant. Register with `claude mcp add mangaeasy -- mangaeasy mcp`.
+- **`mangaeasy commands --json`** — machine-readable catalog of every
+  command; **`mangaeasy where --json`** — this install's resolved
+  data/tool paths (the first thing an agent should run).
+- **`mangaeasy library-list [--json]`** — list projects and per-item
+  readiness (panels/narration/intro/audio) without opening the GUI; handles
+  both the item-pipeline and legacy chapter layouts.
+- **`--json` output** for `video-check`, `video-validate`,
+  `video-audio-audit`, and `tools` (joining the existing `doctor` and
+  `audio-takes-list`).
+- **`MANGAEASY_RESULT {"outputs": [...]}`** — a stable machine-parsable
+  final line on successful generation commands (`video`, `video-render`,
+  `video-join`, `video-add-bgm`, `video-normalize-audio`) so callers find
+  the produced files without scraping log text.
+- Setup → About now shows the exact CLI command for this install (with a
+  copy button including `MANGAEASY_ROOT`), so agents can share the GUI's
+  data and installed tools.
+- Agent-style end-to-end test: fixture project → `video-check --json` →
+  `video-render` over plain pipes, asserting the result marker.
+
+### Fixed
+- **Piped output no longer crashes on Windows**: stdout/stderr are forced
+  to UTF-8, so running any command from a script/agent (where stdout is a
+  pipe defaulting to cp1252) can't die on characters like "−".
+
 ## v1.0.0 — 2026-07-02
 
 First production release. Focus: the downloaded app now actually works as an

@@ -6,12 +6,14 @@ import subprocess
 from pathlib import Path
 
 from mangaeasy.runtime import cli_command
+from mangaeasy.utils import emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_KOKORO_ROOT,
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
     DEFAULT_WORK_DIR,
+    find_latest_long_video,
     merge_item_selection,
     project_name,
 )
@@ -272,6 +274,20 @@ def main() -> int:
             if args.project_name:
                 bgm_cmd += ["--project-name", args.project_name]
             run(bgm_cmd, cwd)
+
+    # Machine-parsable summary of what this run produced: the sub-commands
+    # each emit their own MANGAEASY_RESULT, but agents driving the all-in-one
+    # `video` command shouldn't have to scrape a child's output out of ours.
+    name = project_name(args.project_root, args.project_name)
+    outputs: list[str] = []
+    if args.build_long_video:
+        latest_long = find_latest_long_video(args.output_root, name)
+        if latest_long is not None:
+            outputs = [str(latest_long)]
+    if not outputs:
+        items_dir = args.output_root.resolve() / name / "items"
+        outputs = sorted(str(p) for p in items_dir.glob("item_*.mp4")) if items_dir.exists() else []
+    emit_result(outputs=outputs)
     return 0
 
 

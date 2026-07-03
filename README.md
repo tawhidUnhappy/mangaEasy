@@ -130,6 +130,17 @@ variable if you want it somewhere specific.
 
 See [docs/install.md](docs/install.md) for full installation instructions.
 
+### Using mangaEasy with an AI assistant
+
+The whole tool surface is one non-interactive CLI, so AI assistants (Claude
+Code, Cursor, any agent with a shell) can drive it directly —
+**[docs/ai-guide.md](docs/ai-guide.md)** is the complete operating manual:
+machine-readable discovery (`mangaeasy commands --json`, `where --json`,
+`library-list --json`), stable `MANGAEASY_RESULT`/`MANGAEASY_PROGRESS`
+output markers, exit codes, and copy-paste recipes. There's also a built-in
+MCP server: register `mangaeasy mcp` and the pipeline shows up as typed
+tools in any MCP-capable assistant.
+
 ---
 
 ## Requirements

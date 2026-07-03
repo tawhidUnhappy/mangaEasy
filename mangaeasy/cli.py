@@ -27,10 +27,36 @@ from mangaeasy.tools.vendored import ensure_vendored_path
 # safe to run unconditionally on every invocation.
 ensure_vendored_path()
 
+
+def _force_utf8_stdio() -> None:
+    """Emit UTF-8 regardless of how stdout/stderr are attached.
+
+    On Windows a *piped* stdout defaults to the legacy ANSI code page
+    (cp1252), so any command whose output contains a character outside it
+    (e.g. the true minus sign in "−14 LUFS" help text) would crash with
+    UnicodeEncodeError precisely when run from a script or AI agent — the
+    plain-pipe case. Terminals, node-pty/xterm.js, and JSON consumers all
+    expect UTF-8 anyway.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+_force_utf8_stdio()
+
 # command name -> (module path, function, group, one-line help)
 COMMANDS: dict[str, tuple[str, str, str, str]] = {
     # ── Setup & app ───────────────────────────────────────────────────────────
     "app":                  ("mangaeasy.web.app",                              "main",        "Setup & app",      "Open the mangaEasy control center (desktop app)."),
+    "commands":             ("mangaeasy.cli",                                  "commands_main","Setup & app",     "List every command, or emit the full machine-readable catalog (--json)."),
+    "where":                ("mangaeasy.tools.external",                       "where_main",  "Setup & app",      "Show this install's resolved data/tool paths (--json). Run this first from scripts/AI agents."),
+    "library-list":         ("mangaeasy.library_scan",                         "main",        "Setup & app",      "List projects and per-item readiness under a project root (--json)."),
+    "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup & app",      "Run an MCP stdio server exposing mangaEasy as typed tools for AI assistants."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, got-ocr2, ...) from GitHub/Hugging Face."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Download ffmpeg/uv/git-lfs into this install's own tools dir (the desktop app runs this on first launch)."),
@@ -126,6 +152,37 @@ def _print_help(stream=None) -> None:
             if grp == group:
                 write(f"  {name:<{width}}{help_text}\n")
         write("\n")
+
+
+def commands_main() -> int:
+    """`mangaeasy commands [--json]` — the machine-readable command catalog.
+
+    Static data straight from COMMANDS (no module imports, so the lazy-import
+    design survives); each command's own ``--help`` remains the source of
+    truth for its flags.
+    """
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="List every mangaeasy command.")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Emit the catalog as a single JSON object on stdout.")
+    args = parser.parse_args()
+
+    catalog = [
+        {
+            "name": name,
+            "group": group,
+            "help": help_text,
+            "usage": f"mangaeasy {name} --help",
+        }
+        for name, (_, _, group, help_text) in COMMANDS.items()
+    ]
+    if args.as_json:
+        print(json.dumps({"version": __version__, "commands": catalog}, ensure_ascii=False))
+    else:
+        _print_help()
+    return 0
 
 
 def _dispatch(command: str, rest: list[str]) -> int:

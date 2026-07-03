@@ -206,16 +206,74 @@ def run_tool_python(tool_name: str, script: Path, args: list[str], *, env_var: s
     subprocess.run(command, cwd=tool_dir, env=tool_env(), check=True)
 
 
+def _tools_report() -> dict[str, str | None]:
+    return {
+        tool_name: (str(path) if (path := resolve_tool_dir(tool_name, required=False)) else None)
+        for tool_name in TOOL_ENVS
+    }
+
+
 def main() -> int:
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="Show where external tool envs resolve.")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Emit the report as a single JSON object on stdout.")
+    args = parser.parse_args()
+
+    report = _tools_report()
+    if args.as_json:
+        print(json.dumps({"tools_home": str(tools_home()), "tools": report}, ensure_ascii=False))
+        return 0
+
     print("External tool lookup:")
     for tool_name, env_vars in TOOL_ENVS.items():
-        path = resolve_tool_dir(tool_name, required=False)
-        status = str(path) if path else "not found"
+        status = report[tool_name] or "not found"
         print(f"  {tool_name:10s} {status}  ({', '.join(env_vars)})")
     print()
     print(f"Tools are installed to: {tools_home()}")
     print("Run `mangaeasy install-tool <name>` to provision a tool.")
     print("Override with MANGAEASY_TOOLS_DIR or per-tool env vars above.")
+    return 0
+
+
+def where_main() -> int:
+    """`mangaeasy where [--json]` — resolved paths + environment facts.
+
+    The first command a script or AI agent should run: answers "where does
+    this install keep everything on THIS machine" without guessing.
+    """
+    import argparse
+    import json
+
+    from mangaeasy import __version__
+    from mangaeasy.tools.vendored import vendored_bin_dirs
+
+    parser = argparse.ArgumentParser(description="Show this install's resolved paths.")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Emit the report as a single JSON object on stdout.")
+    args = parser.parse_args()
+
+    info = {
+        "version": __version__,
+        "platform": sys.platform,
+        "frozen": is_frozen(),
+        "executable": sys.executable,
+        "app_root": str(app_root()),
+        "mangaeasy_home": str(mangaeasy_home()),
+        "tools_home": str(tools_home()),
+        "vendored_bin_dirs": [str(d) for d in vendored_bin_dirs()],
+        "env_overrides": {
+            name: os.environ.get(name)
+            for name in ("MANGAEASY_ROOT", "MANGAEASY_HOME", "MANGAEASY_TOOLS_DIR")
+        },
+    }
+    if args.as_json:
+        print(json.dumps(info, ensure_ascii=False))
+        return 0
+    for key, value in info.items():
+        print(f"  {key:18s} {value}")
     return 0
 
 

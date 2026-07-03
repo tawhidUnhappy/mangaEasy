@@ -28,7 +28,7 @@ import {
   stopNamedGui,
   terminateCurrentJob
 } from './jobs'
-import { appRoot, buildCli, mangaeasyHome } from './paths'
+import { appRoot, buildCli, mangaeasyCommand, mangaeasyHome } from './paths'
 import { ProgressParser } from './progress'
 import {
   getProjectRoot,
@@ -170,7 +170,11 @@ export function registerIpcHandlers(): void {
     home: mangaeasyHome(),
     logsDir: logsDir(),
     platform: process.platform,
-    packaged: app.isPackaged
+    packaged: app.isPackaged,
+    // The exact argv prefix that runs this install's CLI — shown in About so
+    // scripts/AI agents can drive the same engine (with MANGAEASY_ROOT set
+    // to dataRoot they share this GUI's projects and tools).
+    cli: mangaeasyCommand()
   }))
 
   // Checks the GitHub Releases page for a newer version. `force` bypasses

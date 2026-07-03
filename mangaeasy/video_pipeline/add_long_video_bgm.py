@@ -5,7 +5,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from mangaeasy.utils import archive_before_overwrite
+from mangaeasy.utils import archive_before_overwrite, emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
@@ -138,6 +138,7 @@ def main() -> int:
         duck=args.duck, duck_ratio=args.duck_ratio, duck_attack=args.duck_attack, duck_release=args.duck_release,
     )
     print(f"\nAdded background music: {video_out}", flush=True)
+    emit_result(outputs=[video_out])
     return 0
 
 

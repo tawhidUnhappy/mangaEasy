@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from mangaeasy.video_pipeline.common import (
@@ -40,6 +41,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Exit with code 1 if any warning is found.",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Emit one JSON object on stdout instead of the human report.",
+    )
     return parser.parse_args()
 
 
@@ -57,52 +64,58 @@ def files_by_stem(folder: Path, extensions: set[str]) -> dict[str, Path]:
     return result
 
 
-def warn(message: str, warnings: list[str]) -> None:
-    warnings.append(message)
-    print(f"  WARNING: {message}")
-
-
-def check_item(item_dir: Path, args: argparse.Namespace) -> int:
+def check_item(item_dir: Path, args: argparse.Namespace, *, quiet: bool) -> dict:
+    """Check one item; returns {item, counts, warnings} and (unless quiet)
+    prints the same information as the human report."""
     warnings: list[str] = []
+
+    def echo(message: str) -> None:
+        if not quiet:
+            print(message)
+
+    def warn(message: str) -> None:
+        warnings.append(message)
+        echo(f"  WARNING: {message}")
+
     narration_path = item_dir / "narration.json"
     panels_dir = item_dir / "panels"
     audio_dir = item_audio_dir(args, item_dir)
 
-    print(f"\n[{item_dir.name}]")
+    echo(f"\n[{item_dir.name}]")
 
     narration = []
     if not narration_path.exists():
-        warn(f"Missing {narration_path.name}", warnings)
+        warn(f"Missing {narration_path.name}")
     else:
         try:
             narration = load_narration(item_dir)
         except Exception as exc:
-            warn(f"Could not read narration.json: {exc}", warnings)
+            warn(f"Could not read narration.json: {exc}")
 
     panels = files_by_stem(panels_dir, IMAGE_EXTENSIONS)
     audios = files_by_stem(audio_dir, AUDIO_EXTENSIONS)
     narration_images = [item.get("image", "") for item in narration if isinstance(item, dict)]
     narration_stems = [Path(name).stem for name in narration_images if name]
 
-    print(f"  narration: {len(narration_stems)}")
-    print(f"  panels:    {len(panels)}")
-    print(f"  audio:     {len(audios)}")
+    echo(f"  narration: {len(narration_stems)}")
+    echo(f"  panels:    {len(panels)}")
+    echo(f"  audio:     {len(audios)}")
 
     if not panels_dir.exists():
-        warn("Missing panels folder", warnings)
+        warn("Missing panels folder")
     if not audio_dir.exists():
-        warn(f"Missing audio folder: {audio_dir}", warnings)
+        warn(f"Missing audio folder: {audio_dir}")
 
     if len(narration_stems) != len(panels):
-        warn(f"Narration count does not match panel count: {len(narration_stems)} vs {len(panels)}", warnings)
+        warn(f"Narration count does not match panel count: {len(narration_stems)} vs {len(panels)}")
     if len(narration_stems) != len(audios):
-        warn(f"Narration count does not match audio count: {len(narration_stems)} vs {len(audios)}", warnings)
+        warn(f"Narration count does not match audio count: {len(narration_stems)} vs {len(audios)}")
     if len(panels) != len(audios):
-        warn(f"Panel count does not match audio count: {len(panels)} vs {len(audios)}", warnings)
+        warn(f"Panel count does not match audio count: {len(panels)} vs {len(audios)}")
 
     duplicate_narration = sorted({stem for stem in narration_stems if narration_stems.count(stem) > 1})
     if duplicate_narration:
-        warn("Duplicate narration image stems: " + ", ".join(duplicate_narration[:20]), warnings)
+        warn("Duplicate narration image stems: " + ", ".join(duplicate_narration[:20]))
 
     narration_set = set(narration_stems)
     panel_set = set(panels)
@@ -116,21 +129,28 @@ def check_item(item_dir: Path, args: argparse.Namespace) -> int:
     audio_without_panel = sorted(audio_set - panel_set)
 
     if missing_panel:
-        warn("Narration references missing panels: " + ", ".join(missing_panel[:20]), warnings)
+        warn("Narration references missing panels: " + ", ".join(missing_panel[:20]))
     if extra_panel:
-        warn("Panels not listed in narration: " + ", ".join(extra_panel[:20]), warnings)
+        warn("Panels not listed in narration: " + ", ".join(extra_panel[:20]))
     if missing_audio:
-        warn("Missing audio for narration entries: " + ", ".join(missing_audio[:20]), warnings)
+        warn("Missing audio for narration entries: " + ", ".join(missing_audio[:20]))
     if extra_audio:
-        warn("Audio not listed in narration: " + ", ".join(extra_audio[:20]), warnings)
+        warn("Audio not listed in narration: " + ", ".join(extra_audio[:20]))
     if panel_without_audio:
-        warn("Panels without matching audio: " + ", ".join(panel_without_audio[:20]), warnings)
+        warn("Panels without matching audio: " + ", ".join(panel_without_audio[:20]))
     if audio_without_panel:
-        warn("Audio without matching panel: " + ", ".join(audio_without_panel[:20]), warnings)
+        warn("Audio without matching panel: " + ", ".join(audio_without_panel[:20]))
 
     if not warnings:
-        print("  OK: narration, panels, and audio match.")
-    return len(warnings)
+        echo("  OK: narration, panels, and audio match.")
+    return {
+        "item": item_dir.name,
+        "path": str(item_dir),
+        "narration": len(narration_stems),
+        "panels": len(panels),
+        "audio": len(audios),
+        "warnings": warnings,
+    }
 
 
 def main() -> int:
@@ -143,11 +163,17 @@ def main() -> int:
     if not chapters:
         raise FileNotFoundError("No item folders found.")
 
-    total_warnings = 0
-    for item_dir in chapters:
-        total_warnings += check_item(item_dir, args)
+    results = [check_item(item_dir, args, quiet=args.as_json) for item_dir in chapters]
+    total_warnings = sum(len(result["warnings"]) for result in results)
 
-    print(f"\nChecked {len(chapters)} item folder(s). Warnings: {total_warnings}")
+    if args.as_json:
+        print(json.dumps(
+            {"project_root": str(project_root), "items": results,
+             "total_warnings": total_warnings, "ok": total_warnings == 0},
+            ensure_ascii=False,
+        ))
+    else:
+        print(f"\nChecked {len(chapters)} item folder(s). Warnings: {total_warnings}")
     if args.strict and total_warnings:
         return 1
     return 0

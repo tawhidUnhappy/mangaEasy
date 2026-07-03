@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from mangaeasy.utils import emit_result
 from mangaeasy.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 from mangaeasy.video_pipeline.item_video_builder import VideoBuildConfig, build_item_videos
 
@@ -43,7 +44,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    build_item_videos(
+    output_dir = build_item_videos(
         VideoBuildConfig(
             project_root=args.project_root,
             audio_root=args.audio_root,
@@ -72,6 +73,10 @@ def main() -> int:
             render_mode=args.render_mode,
             workers=args.workers,
         )
+    )
+    emit_result(
+        output_dir=output_dir,
+        outputs=sorted(str(p) for p in output_dir.glob("item_*.mp4")),
     )
     return 0
 

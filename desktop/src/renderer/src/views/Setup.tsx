@@ -214,6 +214,21 @@ export function Setup(): React.JSX.Element {
                 <button onClick={() => window.api.openFolder(info.dataRoot)}>Open</button>
               </div>
               <div className="row" style={{ gap: 8 }}>
+                <span className="hint">CLI / AI-agent access (same engine, same data):</span>
+                <span className="mono" style={{ userSelect: 'all' }}>
+                  {info.cli.join(' ')} --help
+                </span>
+                <button
+                  onClick={() =>
+                    navigator.clipboard.writeText(
+                      `MANGAEASY_ROOT="${info.dataRoot}" ${info.cli.join(' ')} --help`
+                    )
+                  }
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="row" style={{ gap: 8 }}>
                 <span className="hint">
                   Deleting that folder{info.platform === 'win32' ? ' (and the app itself)' : ''}{' '}
                   removes everything mangaEasy ever wrote.
