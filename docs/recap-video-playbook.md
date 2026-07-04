@@ -360,12 +360,18 @@ mangaeasy youtube-upload \
   --video output/<Project>/<Project>_full_<timestamp>.mp4 \
   --title "<title>" --description-file description.txt \
   --tags "tag1,tag2,..." --thumbnail thumbnail.png \
-  --privacy private --json
+  --privacy public --json
 ```
 
-- Uploads **always arrive private** (YouTube force-locks unaudited API
-  projects); the human publishes in YouTube Studio. ~1,600 quota units of
-  the 10,000/day.
+- **Upload with `--privacy public`** — the channel owner's standing
+  instruction is to publish directly, not leave the video private for a
+  manual Studio step. Check the `--json` result's `privacy` field.
+  Caveat: YouTube force-locks uploads from *unaudited* personal API
+  projects to "Private (locked)" regardless of the requested privacy. If
+  the result comes back private/locked despite `public`, stop and tell
+  the human (the fix is completing YouTube's API audit for the Google
+  Cloud project — not re-uploading). ~1,600 quota units of the
+  10,000/day either way.
 - Custom thumbnails need a phone-verified YouTube account. The upload
   prints `[warn] thumbnail not set: ...` on failure and nothing on success.
 - **Replacing a take**: upload the new video first, verify the `--json`
@@ -386,4 +392,4 @@ mangaeasy youtube-upload \
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
 - [ ] Thumbnail rendered, viewed, no unsafe bubble text
 - [ ] Title ≤ 100 chars, tags ≤ 500 chars, description leads with the hook
-- [ ] Uploaded private + thumbnail set; human told to publish (and what to delete, if replacing)
+- [ ] Uploaded with `--privacy public` + thumbnail set; `--json` result's privacy verified (and human told what to delete, if replacing)

@@ -261,9 +261,13 @@ Agent rules for uploads:
 
 - If `youtube-status --json` says `"connected": false`, do **not** attempt
   auth yourself — tell the user to connect (Setup tab or `youtube-auth`).
-- Default and recommended `--privacy` is `private`: YouTube force-locks
-  uploads from personal (unaudited) API projects to private; the user
-  publishes in YouTube Studio. Don't fight this.
+- `--privacy`: follow the channel owner's instruction. This repo's owner
+  wants uploads **published directly — pass `--privacy public`** (see
+  docs/recap-video-playbook.md, Phase 11). The CLI *default* stays
+  `private` because YouTube force-locks uploads from personal (unaudited)
+  API projects to "Private (locked)" regardless of the requested value —
+  if an upload arrives private despite `public`, stop and tell the user
+  (the fix is YouTube's API audit, not re-uploading).
 - Quota: one upload = 1,600 of 10,000 daily units (~6 uploads/day,
   resets midnight Pacific). A `quotaExceeded` error means wait, not retry.
 - Uploads are resumable and LONG-RUNNING; progress comes as
