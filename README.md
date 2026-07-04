@@ -394,6 +394,11 @@ mangaeasy narration-editor # web editor: write narration
 mangaeasy render-video     # render the chapter video
 ```
 
+`download` records where each manga came from in
+`library/<name>/manga.json` (source link, title, downloaded chapters), and
+`mangaeasy library-list` shows it — so the link isn't lost when you point
+`config.json` at the next manga.
+
 If the tool is installed globally but your project files live elsewhere, run
 commands from the project folder or set:
 

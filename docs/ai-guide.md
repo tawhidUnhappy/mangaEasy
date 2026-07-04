@@ -92,12 +92,20 @@ A *project* is a folder of numbered *items* (chapters) under a project root:
 
 ```
 <project-root>/library/<project-name>/
+  manga.json           machine-managed source record (written by `download`):
+                       source site, title URL, manga_id, canonical title,
+                       per-chapter download info — read this when you need
+                       the manga's link or official title
   01/
     panels/              panel images (.png/.jpg/.webp), one per narration entry
     narration.json       [{"image": "chapter1_001.png", "narration": "text..."}, ...]
     intro.json           OPTIONAL, same shape — prepended at load time (cold open)
   02/ ...
 ```
+
+`mangaeasy library-list --json` includes each project's `manga.json` as a
+`manga` field (`null` when absent), so you don't need to read the file
+yourself when scanning.
 
 Generated output goes to separate roots you pass explicitly (recommended
 for agents — never rely on cwd defaults):
@@ -113,7 +121,8 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 
 - Never create/delete/rename files inside `library/` items except
   `narration.json`/`intro.json` content edits the user asked for.
-  `narration.backup.json` is machine-managed — do not touch.
+  `narration.backup.json` and the project-level `manga.json` are
+  machine-managed — read them freely, don't hand-edit them.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.

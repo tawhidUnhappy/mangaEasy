@@ -54,6 +54,9 @@ A project is a folder containing chapters/items, conventionally under
 
 ```
 library/<project-name>/
+  manga.json                 source record, written by `mangaeasy download`:
+                             site, title URL, manga_id, canonical title,
+                             per-chapter download info (see below)
   01/
     panels/                  source panel images (png/jpg/webp)
     narration.json            [{"image": "chapter1_001.png", "narration": "..."}]
@@ -77,6 +80,16 @@ library/<project-name>/
   syntax across the CLI is `--items 01 02 05-08` or `--item-range 01-12`
   (parsed by `expand_item_tokens` / `merge_item_selection` in
   `video_pipeline/common.py`).
+- `manga.json` (project root, machine-managed) answers "where did this manga
+  come from?" — `mangaeasy download` writes/merges it on every run
+  (`update_manga_json()` in `mangaeasy/download/mangadex.py`): `source`,
+  canonical `url` (`https://mangadex.org/title/<uuid>`), the original
+  `source_url` the user pasted, `title` (fetched from the API once, then
+  cached), and a `chapters` map (`chapter_id`, `language`, `pages`,
+  `downloaded_at`). `library-list` surfaces it (human view prints
+  `title:`/`source:` lines; `--json` has a per-project `manga` field, null
+  when absent). Config.json only holds the *current* download target, so
+  without this file the link of previously downloaded manga was lost.
 
 Generated output lives in separate root folders (override via env vars or
 `--*-root` flags), never inside `library/`:

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`library/<name>/manga.json`** — `mangaeasy download` now records where
+  each manga came from: source site, canonical MangaDex title URL, the
+  original link you pasted, the canonical title (fetched from the API once,
+  then cached), and per-chapter download info (chapter UUID, language, page
+  count, timestamp). Previously the link only lived in `config.json`'s
+  *current* download target, so it was lost as soon as you moved on to the
+  next manga. Existing projects get the file on their next `download` run.
+- `mangaeasy library-list` surfaces it: the human view prints `title:` and
+  `source:` lines per project; `--json` gains a per-project `manga` field
+  (`null` when the file is absent).
+
 ## v1.3.1 — 2026-07-03
 
 - Setup tab → YouTube account: the downloaded `client_secret.json` file now

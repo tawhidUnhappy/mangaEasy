@@ -162,6 +162,92 @@ def _save_cache(ch_dir: Path, data: dict) -> None:
     )
 
 
+# ── Manga metadata (library/<name>/manga.json) ───────────────────────────────
+# One file per manga answering "where did this come from?": source site,
+# title URL, MangaDex UUID, canonical title, and which chapters were
+# downloaded when. Written/merged on every download; surfaced by
+# `mangaeasy library-list`.
+
+_MANGA_JSON = "manga.json"
+
+
+def manga_url(manga_id: str) -> str:
+    return f"https://mangadex.org/title/{manga_id}"
+
+
+def load_manga_json(manga_root: Path) -> dict:
+    p = manga_root / _MANGA_JSON
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8-sig"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def fetch_manga_title(sess: requests.Session, manga_id: str) -> str | None:
+    """Best-effort canonical title from the MangaDex API — never fatal."""
+    try:
+        resp = _api_get(sess, f"{API_BASE}/manga/{manga_id}", retries=2)
+        titles = (resp.json().get("data", {}).get("attributes", {})
+                  .get("title") or {})
+        return titles.get("en") or next(iter(titles.values()), None)
+    except Exception:
+        return None
+
+
+def merge_manga_record(
+    existing: dict,
+    *,
+    name: str,
+    manga_id: str,
+    lang: str,
+    chapter_str: str,
+    chapter_id: str,
+    pages: int,
+    source_url: str | None = None,
+    title: str | None = None,
+    when: str | None = None,
+) -> dict:
+    """Merge one downloaded chapter into a manga.json record (pure)."""
+    record = dict(existing) if isinstance(existing, dict) else {}
+    record["name"] = name
+    record["source"] = "mangadex"
+    record["manga_id"] = manga_id
+    record["url"] = manga_url(manga_id)
+    if title:
+        record["title"] = title
+    # Keep the user's original link only when it adds information
+    # (e.g. the slugged URL they pasted) — not a bare UUID.
+    if source_url and source_url.startswith(("http://", "https://")) \
+            and source_url != record["url"]:
+        record["source_url"] = source_url
+    chapters = record.get("chapters")
+    if not isinstance(chapters, dict):
+        chapters = {}
+    chapters[chapter_str] = {
+        "chapter_id": chapter_id,
+        "language": lang,
+        "pages": pages,
+        "downloaded_at": when or datetime.now(timezone.utc).isoformat(),
+    }
+    record["chapters"] = {k: chapters[k] for k in sorted(chapters)}
+    return record
+
+
+def update_manga_json(manga_root: Path, **kwargs) -> Path:
+    """Read-merge-write library/<name>/manga.json; returns the file path."""
+    record = merge_manga_record(load_manga_json(manga_root), **kwargs)
+    manga_root.mkdir(parents=True, exist_ok=True)
+    path = manga_root / _MANGA_JSON
+    path.write_text(
+        json.dumps(record, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 # ── MangaDex API calls ────────────────────────────────────────────────────────
 
 def normalize_manga_id(raw: str) -> str:
@@ -342,7 +428,8 @@ def main() -> None:
     manga_id       = normalize_manga_id(raw_id)
     chapter_str    = str(chapter).zfill(2)
     lang           = dl_cfg.get("translated_language", "en")
-    output_dir     = manga_dir(str(dl_cfg.get("name"))) / chapter_str / "download"
+    manga_root     = manga_dir(str(dl_cfg.get("name")))
+    output_dir     = manga_root / chapter_str / "download"
     ch_dir         = output_dir.parent   # <library>/<name>/<chapter_str>/
     use_data_saver = bool(dl_cfg.get("use_data_saver", False))
     delay          = float(dl_cfg.get("download_delay", 1.5))
@@ -400,6 +487,22 @@ def main() -> None:
         "total":      total,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     })
+
+    # ── Record the manga's source link (library/<name>/manga.json) ────────
+    title = load_manga_json(manga_root).get("title") \
+        or fetch_manga_title(sess, manga_id)
+    info_path = update_manga_json(
+        manga_root,
+        name=str(dl_cfg.get("name")),
+        manga_id=manga_id,
+        lang=lang,
+        chapter_str=chapter_str,
+        chapter_id=chapter_id,
+        pages=total,
+        source_url=raw_id,
+        title=title,
+    )
+    print(f"[INFO] Manga info recorded → {info_path}", flush=True)
 
     print(f"[INFO] {total} page(s) to download.\n", flush=True)
     download_images(sess, urls, fnames, output_dir, delay, chapter_str)

@@ -87,9 +87,13 @@ def scan_project(project_dir: Path) -> dict:
         (p for p in project_dir.iterdir() if p.is_dir() and p.name[:1].isdigit()),
         key=lambda p: p.name,
     )
+    # manga.json is written by `mangaeasy download` (source site, title URL,
+    # manga_id, downloaded chapters) — see mangaeasy/download/mangadex.py.
+    manga = _read_json(project_dir / "manga.json")
     return {
         "project": project_dir.name,
         "path": str(project_dir),
+        "manga": manga or None,
         "items": [scan_item(item) for item in item_dirs],
     }
 
@@ -133,6 +137,11 @@ def main() -> int:
         return 0
     for project in report["projects"]:
         print(f"\n{project['project']}  ({len(project['items'])} item(s))")
+        manga = project.get("manga") or {}
+        if manga.get("title"):
+            print(f"  title:  {manga['title']}")
+        if manga.get("url"):
+            print(f"  source: {manga['url']}")
         for item in project["items"]:
             narr = (
                 f"{item['narration_entries']} entries"

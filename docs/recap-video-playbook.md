@@ -46,6 +46,13 @@ mangaeasy download
 Put/keep the raw pages in `library/<Project>/<item>/download/` (item =
 zero-padded chapter, e.g. `01`). Page files are `01_00.jpg … 01_NN.jpg`.
 
+`download` also writes/updates `library/<Project>/manga.json` — the manga's
+source record (MangaDex title URL, canonical title, per-chapter download
+info). Read it later when you need the manga's link or the official title,
+e.g. for the description's credits / "support the official release" section
+(`mangaeasy library-list --json` includes it as each project's `manga`
+field).
+
 ## Phase 2 — Panel detection (MAGI v3)
 
 **This applies to paged manga.** Vertical webtoons don't need MAGI — use
