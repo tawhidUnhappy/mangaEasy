@@ -341,21 +341,21 @@ mangaeasy video --project-root library/<Project> --items 01 \
 - `--music-volume-db -17` is the recap-channel sweet spot (music audible,
   voice clearly on top; the value is dB below the narration, which is
   never attenuated). −15 to −20 is the sane range.
-- **QC the music file before mixing** — `video-add-bgm` loops the track
-  raw (`-stream_loop -1`, no crossfade), so any defect repeats through the
-  whole video. Production incident: a YouTube-ripped WAV had two ~80 ms
-  splice holes (level drops of 45+ dB mid-phrase) that surfaced as "the
-  music cuts out and restarts" at 1:24 and 2:15 of a published video, plus
-  a ~0.5 s dead zone at every track-end loop seam. `silencedetect` misses
-  holes shorter than its `d=` window — scan a 20 ms RMS envelope instead
-  (flag windows > ~20 dB below the recent median) over the *whole* track.
-  If the track has holes, a sparse intro, or an end fade, build a bed:
-  cut around defects with short equal-power crossfades, keep only the
-  continuous groove, self-crossfade (~3 s) repeats until longer than the
-  video, and pass that bed as `--background-music`. Re-mixing is cheap:
-  run `video-add-bgm` alone against the archived pre-BGM long video in
-  `old/run_NNNN/` — no re-render needed, and the duration (hence chapter
-  timestamps) stays identical.
+- **Music QC is automatic** — `video-add-bgm` scans the track's 20 ms RMS
+  envelope before mixing (`mangaeasy/video_pipeline/music_bed.py`): splice
+  holes (brief 25+ dB collapses mid-phrase — `silencedetect` can't see
+  them) are cut out with short crossfades, silent lead/tail is trimmed,
+  and when the track is defective or shorter than the video it's replaced
+  by a crossfade-looped seamless bed, cached under `<work-dir>/music_bed/`
+  and logged as a `[music-bed] ...` line. Check that line in the build
+  log: `repaired N splice hole(s)` on a track you expected to be clean
+  means the source file is damaged (common with YouTube-ripped WAVs —
+  the 2026-07-06 incident shipped audible music cut-outs at 1:24 and 2:15
+  of a published video before this existed). `--raw-music` bypasses the
+  whole mechanism when you really want the file untouched. Re-mixing is
+  still cheap: run `video-add-bgm` alone against the archived pre-BGM
+  long video in `old/run_NNNN/` — no re-render needed, and the duration
+  (hence chapter timestamps) stays identical.
 - A published bad take can be replaced without a Studio trip: upload the
   fixed file first, verify, then `mangaeasy youtube-delete --video-id <id>
   --confirm` the old one.

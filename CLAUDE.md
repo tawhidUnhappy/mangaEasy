@@ -156,7 +156,17 @@ entry point. It shells out to the narrower commands in this order:
      *already-joined, already-normalized* long video via ffmpeg
      `amix`/`alimiter`, archiving the previous file first. This is the step
      to re-run alone when a user just wants to try a different track or
-     volume — it's far cheaper than re-joining.
+     volume — it's far cheaper than re-joining. Before mixing, the track is
+     QC'd and repaired automatically (`video_pipeline/music_bed.py`): a
+     20 ms RMS envelope scan finds sub-window splice holes that
+     `silencedetect` can't see, silent lead/tail is trimmed, and when the
+     track is defective or shorter than the video it's replaced by a
+     crossfade-looped seamless bed cached under `<work-dir>/music_bed/`.
+     This exists because a raw `-stream_loop -1` of a rip with ~80 ms
+     splice holes shipped a public video with audible music cut-outs
+     (2026-07-06) that had to be replaced. `--raw-music` bypasses it;
+     bed preparation failures fall back to the raw file rather than
+     breaking the mix.
 
    The ordering (join → normalize → add BGM) is deliberate: narration
    loudness gets normalized to target on its own, *then* music is layered on

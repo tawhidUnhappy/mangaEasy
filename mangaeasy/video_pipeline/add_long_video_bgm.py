@@ -9,6 +9,7 @@ from mangaeasy.utils import archive_before_overwrite, emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
+    DEFAULT_WORK_DIR,
     find_latest_long_video,
     project_name,
 )
@@ -31,6 +32,13 @@ def parse_args() -> argparse.Namespace:
                         help="Overwrite --input in place instead of writing a new file (the previous file is "
                              "archived first, same as other generation steps).")
     parser.add_argument("--background-music", type=Path, required=True)
+    parser.add_argument("--raw-music", action="store_true",
+                        help="Mix the music file exactly as given. By default the track is QC'd and, when it "
+                             "has splice holes, silent lead/tail, or is shorter than the video, replaced by a "
+                             "repaired seamless crossfaded bed (cached under <work-dir>/music_bed/) so raw "
+                             "-stream_loop seams and in-track defects can't repeat through the whole video.")
+    parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR,
+                        help="Scratch dir for the cached music bed (default: the pipeline work dir).")
     parser.add_argument("--music-volume-db", type=float, default=-25.0,
                         help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
@@ -138,8 +146,18 @@ def main() -> int:
         video_out = video_in
     else:
         video_out = (args.output or default_bgm_output(video_in, args.music_volume_db)).resolve()
+
+    music = args.background_music
+    if not args.raw_music:
+        from mangaeasy.video_pipeline.audio_audit import ffprobe_duration
+        from mangaeasy.video_pipeline.music_bed import describe_report, prepare_music_bed
+
+        video_duration = ffprobe_duration(video_in) or 0.0
+        music, bed_report = prepare_music_bed(args.background_music, video_duration, args.work_dir)
+        print(describe_report(bed_report), flush=True)
+
     add_background_music(
-        video_in, video_out, args.background_music, args.music_volume_db, args.narration_volume, args.audio_bitrate,
+        video_in, video_out, music, args.music_volume_db, args.narration_volume, args.audio_bitrate,
         duck=args.duck, duck_ratio=args.duck_ratio, duck_attack=args.duck_attack, duck_release=args.duck_release,
     )
     print(f"\nAdded background music: {video_out}", flush=True)
