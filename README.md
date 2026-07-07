@@ -243,10 +243,11 @@ environments** so they never break the main install. Check what your system has
 and provision what's missing:
 
 ```bash
-mangaeasy doctor                  # prerequisite + tool status report
-mangaeasy install-tool index-tts  # IndexTTS-2 voice-cloning TTS (clone + env + model)
-mangaeasy install-tool magi-v3    # MAGI v3 manga panel detection (env + adapter)
-mangaeasy install-tool got-ocr2   # GOT-OCR 2.0 panel OCR (HF model + env)
+mangaeasy doctor                       # prerequisite + tool status report
+mangaeasy install-tool index-tts       # IndexTTS-2 voice-cloning TTS (clone + env + model)
+mangaeasy install-tool magi-v3         # MAGI v3 manga panel detection (env + adapter)
+mangaeasy install-tool got-ocr2        # GOT-OCR 2.0 panel OCR (HF model + env)
+mangaeasy install-tool z-image-turbo   # Z-Image Turbo text-to-image (thumbnails; ~33 GB)
 ```
 
 Tools install into `<data folder>/.mangaeasy/tools` and are found automatically from any

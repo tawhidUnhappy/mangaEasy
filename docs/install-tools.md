@@ -110,6 +110,26 @@ mangaEasy adds it to the tool's PATH automatically when present.
 Used by: `mangaeasy video` (the default engine on machines without an NVIDIA
 GPU, or when IndexTTS isn't set up), `mangaeasy video-audio`.
 
+## z-image-turbo (Z-Image Turbo image generation)
+
+Z-Image Turbo ([Tongyi-MAI/Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo),
+Apache-2.0) is installed as a managed environment: the installer writes an
+isolated `pyproject.toml` (torch matching your hardware, diffusers ≥ 0.36,
+transformers ≥ 4.51, accelerate, bitsandbytes on Windows/Linux), copies the
+`generate_zimage.py` adapter in, and downloads the **~33 GB** model into
+`z-image-turbo/model` (skip the download with `--skip-model`; weights then
+come from Hugging Face on first use).
+
+```bash
+mangaeasy install-tool z-image-turbo
+mangaeasy zimage --prompt "..." --output out.png --width 1280 --height 720
+```
+
+It runs on 8–16 GB NVIDIA GPUs via automatic NF4 quantization (this is why
+bitsandbytes is a dependency), full bf16 on 16 GB+ GPUs and Apple Silicon,
+and fp32 on CPU (slow). See `docs/external-tools.md` for the strategy table
+and calling conventions.
+
 ## Manual installs / custom locations
 
 `install-tool` is a convenience, not a requirement. Any folder that contains a
@@ -117,6 +137,7 @@ GPU, or when IndexTTS isn't set up), `mangaeasy video-audio`.
 
 - managed: `<install folder>/.mangaeasy/tools/<name>`
 - sibling: `./<name>` next to where you run `mangaeasy`
-- explicit: `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`
+- explicit: `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`,
+  `Z_IMAGE_TURBO_ROOT`
 
 Check resolution any time with `mangaeasy tools` or `mangaeasy doctor`.

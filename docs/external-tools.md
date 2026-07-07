@@ -95,3 +95,41 @@ isolated uv environment and downloads the `stepfun-ai/GOT-OCR-2.0-hf` model
 from Hugging Face into `got-ocr2/model`. The command scans narration JSON files,
 finds each panel image, and adds an `ocr` field to every entry that does not
 already have one. Use `--force` to regenerate existing OCR.
+
+## Z-Image Turbo (image generation)
+
+Text-to-image generation with Alibaba Tongyi's
+[Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
+(Apache-2.0, 6B DiT + Qwen3-4B text encoder) — thumbnails, backgrounds,
+channel art. Used by:
+
+```bash
+mangaeasy zimage --prompt "glossy anime scene, two characters facing off..." \
+    --output thumb.png --width 1280 --height 720
+mangaeasy zimage --prompt-file prompt.txt --output art.png --count 4 --seed 7
+```
+
+Install with `mangaeasy install-tool z-image-turbo` (~33 GB model download
+into `z-image-turbo/model`). The `generate_zimage.py` adapter ships inside
+the mangaeasy package and is copied into the tool folder.
+
+Hardware handling is automatic (`--strategy auto`):
+
+| Hardware | Strategy |
+|---|---|
+| NVIDIA GPU ≥ 15 GB VRAM | full bf16 on GPU (fastest) |
+| NVIDIA GPU 8–12 GB (e.g. RTX 3060) | NF4 4-bit quantization via bitsandbytes (~7 GB VRAM, ~24 s/image) |
+| NVIDIA GPU without bitsandbytes | sequential CPU offload (slow but works) |
+| Apple Silicon | bf16 on MPS |
+| CPU only | fp32 (several minutes per image) |
+
+Facts to respect when calling it programmatically (all enforced by the
+adapter): `guidance_scale` is always `0.0` (Turbo has no CFG; negative
+prompts are ignored), 8–9 steps is the operating point, **never fp16**
+(produces black images — bf16 or fp32 only), sizes are rounded to multiples
+of 16. Prompts: English and Chinese, up to 512 tokens; long descriptive
+prompts (scene, subject, attire, lighting, composition) give the best
+results, and quoted text renders legibly in the image.
+
+On success the command prints `MANGAEASY_RESULT {"outputs": [...]}` with
+every generated file.

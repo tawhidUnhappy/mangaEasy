@@ -148,6 +148,30 @@ TOOLS: dict[str, ToolSpec] = {
         needs_gpu=False,
         notes="Light TTS (voice af_heart); the default engine for `mangaeasy video` on machines without an NVIDIA GPU. Model downloads from Hugging Face on first run.",
     ),
+    "z-image-turbo": ToolSpec(
+        key="z-image-turbo",
+        title="Z-Image Turbo (image generation)",
+        kind="managed_env",
+        git_url=None,
+        model_repo="Tongyi-MAI/Z-Image-Turbo",
+        model_subdir="model",
+        adapter="generate_zimage.py",
+        env_deps=[
+            "torch>=2.5.0",
+            "diffusers>=0.36.0",       # ZImagePipeline landed in 0.36.0
+            "transformers>=4.51.0",    # text encoder is Qwen3 (added in 4.51)
+            "accelerate>=1.0.0",
+            "safetensors>=0.4.0",
+            "pillow>=10.0.0",
+            "numpy>=1.24.0",
+            # NF4 4-bit quantization — how the 6B model fits consumer GPUs
+            # (8-12 GB). No macOS builds; Apple Silicon runs bf16 on MPS instead.
+            "bitsandbytes>=0.45 ; sys_platform != 'darwin'",
+        ],
+        verify_import="diffusers",
+        needs_gpu=True,
+        notes="Text-to-image generation (thumbnails, backgrounds) with Alibaba's Z-Image Turbo, Apache-2.0. ~33 GB model download from Hugging Face. Runs on 8-16 GB NVIDIA GPUs via automatic NF4 quantization; bf16 on 16 GB+ GPUs and Apple Silicon.",
+    ),
 }
 
 
@@ -338,6 +362,21 @@ def _has_gpu() -> bool:
     return False
 
 
+def _nvidia_gpu_name() -> str | None:
+    """GPU model name via nvidia-smi — works without torch in the main env."""
+    smi = _find_nvidia_smi()
+    if not smi:
+        return None
+    try:
+        out = subprocess.run(
+            [smi, "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=8, **popen_kwargs(),
+        ).stdout.strip()
+        return out.splitlines()[0].strip() if out else None
+    except Exception:
+        return None
+
+
 def default_gpu_mode() -> str:
     """Pick the torch build that actually fits this machine.
 
@@ -385,9 +424,12 @@ def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
     # PYTHONUTF8=1 prevents Windows charmap errors when hf CLI prints Unicode
     # success symbols (e.g. ✓ U+2713) to a pipe that uses a legacy code page.
     env = {**tool_env(), "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    # Plain huggingface-hub: since 1.x the `hf` CLI and Xet transfer are part
+    # of the base package — the old `[cli,hf_xet]` extras no longer exist and
+    # only produced install warnings.
     _run(
         [
-            "uvx", "--from", "huggingface-hub[cli,hf_xet]",
+            "uvx", "--from", "huggingface-hub",
             "hf", "download", spec.model_repo, "--local-dir", str(target),
         ],
         log,
@@ -624,9 +666,12 @@ def doctor(*, check_updates: bool = False) -> dict:
         # on PATH still see the real path instead of a false "missing".
         executables[exe] = _find_nvidia_smi() if exe == "nvidia-smi" else _which(exe)
 
-    # Check if torch CUDA/MPS is actually usable in this Python environment.
-    # AMD ROCm and non-NVIDIA Linux GPUs aren't probed for — those fall back
-    # to CPU, same as before.
+    # Machine-level GPU capability — what install-tool's build choice and the
+    # pipeline's engine selection actually key on (nvidia-smi / platform), NOT
+    # the main env's torch: heavy torch installs live in the isolated tool
+    # envs, so the main env usually has no torch at all. Probing only torch
+    # here used to report gpu_backend "cpu" on CUDA machines, which misled
+    # agents and showed "CPU only" in the app's Setup tab.
     cuda_available = False
     cuda_device: str | None = None
     mps_available = False
@@ -639,6 +684,12 @@ def doctor(*, check_updates: bool = False) -> dict:
         mps_available = bool(mps_backend is not None and mps_backend.is_available())
     except Exception:
         pass
+    if not cuda_available and sys.platform in ("win32", "linux") and _has_gpu():
+        cuda_available = True
+        cuda_device = _nvidia_gpu_name()
+    if not mps_available and sys.platform == "darwin":
+        import platform
+        mps_available = platform.machine() == "arm64"
     gpu_backend = "cuda" if cuda_available else "mps" if mps_available else "cpu"
 
     tools = {}

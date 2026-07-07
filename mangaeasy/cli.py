@@ -92,6 +92,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI) resolve."),
     "index-tts":            ("mangaeasy.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
     "got-ocr2":             ("mangaeasy.tools.got_ocr2",                       "main",        "External tools",   "Run GOT-OCR 2.0 and write `ocr` fields into narration JSON files."),
+    "zimage":               ("mangaeasy.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
 
     # ── Manga chapter workflow: acquire & edit ────────────────────────────────
     "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download a manga chapter from MangaDex."),

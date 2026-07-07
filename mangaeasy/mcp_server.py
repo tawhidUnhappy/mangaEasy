@@ -29,6 +29,7 @@ MAX_OUTPUT_CHARS = 8000
 
 _STR = {"type": "string"}
 _BOOL = {"type": "boolean"}
+_INT = {"type": "integer"}
 _NUM = {"type": "number"}
 _ITEMS = {
     "type": "array",
@@ -186,10 +187,25 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "install_tool": (
         "install-tool",
         "Install an external AI tool env (multi-GB download). LONG-RUNNING.",
-        {"name": {"type": "string", "enum": ["kokoro-82m", "index-tts", "magi-v3", "got-ocr2"]},
+        {"name": {"type": "string", "enum": ["kokoro-82m", "index-tts", "magi-v3", "got-ocr2", "z-image-turbo"]},
          "update": _BOOL},
         ["name"],
         {"name": (None, "positional"), "update": ("--update", "flag")},
+    ),
+    "generate_image": (
+        "zimage",
+        "Generate images with Z-Image Turbo (text-to-image). LONG-RUNNING on first call "
+        "(model load ~1-2 min; then ~10-30 s per image on a GPU). Requires "
+        "`mangaeasy install-tool z-image-turbo` first. Long descriptive prompts work best.",
+        {"prompt": {**_STR, "description": "Text prompt (English or Chinese)."},
+         "output": {**_STR, "description": "Absolute output PNG path."},
+         "width": _INT, "height": _INT,
+         "count": {**_INT, "description": "Number of variants (files get _01.._NN suffixes)."},
+         "seed": _INT},
+        ["prompt", "output"],
+        {"prompt": ("--prompt", "value"), "output": ("--output", "value"),
+         "width": ("--width", "value"), "height": ("--height", "value"),
+         "count": ("--count", "value"), "seed": ("--seed", "value")},
     ),
 }
 
