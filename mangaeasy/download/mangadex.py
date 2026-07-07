@@ -265,14 +265,17 @@ def normalize_manga_id(raw: str) -> str:
     sys.exit(1)
 
 
-def find_chapter_id(
-    sess: requests.Session, manga_id: str, chapter: str, lang: str
-) -> str:
-    """Return the chapter UUID, paginating the full feed if necessary."""
-    offset   = 0
-    limit    = 100
-    checked  = 0
-    ch_str   = str(chapter)
+def fetch_chapter_map(
+    sess: requests.Session, manga_id: str, lang: str
+) -> dict[str, dict]:
+    """Return {chapter number string: {"id", "pages", "title"}} for the manga.
+
+    Paginates the whole feed once. When the same chapter number exists in
+    several scanlations, keeps the version with the most pages (partial
+    uploads of a chapter are common on MangaDex) and logs the choice.
+    """
+    offset, limit, checked = 0, 100, 0
+    best: dict[str, dict] = {}
 
     while True:
         print(f"[INFO] Fetching chapter feed (offset={offset})…", flush=True)
@@ -292,25 +295,52 @@ def find_chapter_id(
 
         for ch_obj in items:
             attrs = ch_obj.get("attributes", {})
+            if attrs.get("externalUrl"):
+                continue  # hosted off-site; images not downloadable via at-home
             # MangaDex stores chapter numbers as strings ("1", "1.5", …)
-            if str(attrs.get("chapter") or "") == ch_str:
-                cid = ch_obj["id"]
-                title = attrs.get("title") or ""
-                print(f"[INFO] Found chapter {ch_str}: {cid}"
-                      + (f' "{title}"' if title else ""), flush=True)
-                return cid
+            ch_str = str(attrs.get("chapter") or "")
+            if not ch_str:
+                continue
+            cand = {
+                "id": ch_obj["id"],
+                "pages": int(attrs.get("pages") or 0),
+                "title": attrs.get("title") or "",
+            }
+            prev = best.get(ch_str)
+            if prev is None:
+                best[ch_str] = cand
+            elif cand["pages"] > prev["pages"]:
+                print(
+                    f"[INFO] Chapter {ch_str}: preferring {cand['pages']}-page "
+                    f"version over {prev['pages']}-page duplicate.",
+                    flush=True,
+                )
+                best[ch_str] = cand
 
         checked += len(items)
         offset  += len(items)
         if not items or checked >= total or len(items) < limit:
             break
 
-    print(
-        f"[ERROR] Chapter '{chapter}' not found for manga {manga_id} "
-        f"in language '{lang}' (checked {checked} entries).",
-        flush=True,
-    )
-    sys.exit(1)
+    return best
+
+
+def find_chapter_id(
+    sess: requests.Session, manga_id: str, chapter: str, lang: str
+) -> str:
+    """Return the chapter UUID (best duplicate), or exit if not found."""
+    entry = fetch_chapter_map(sess, manga_id, lang).get(str(chapter))
+    if entry is None:
+        print(
+            f"[ERROR] Chapter '{chapter}' not found for manga {manga_id} "
+            f"in language '{lang}'.",
+            flush=True,
+        )
+        sys.exit(1)
+    title = entry["title"]
+    print(f"[INFO] Found chapter {chapter}: {entry['id']}"
+          + (f' "{title}"' if title else ""), flush=True)
+    return entry["id"]
 
 
 def fetch_at_home(sess: requests.Session, chapter_id: str) -> dict:
@@ -402,31 +432,45 @@ def download_images(
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="mangaeasy download",
-        description="Download a manga chapter from MangaDex.",
-    )
-    parser.add_argument(
-        "--fresh", action="store_true",
-        help="Bypass the local cache and re-fetch all metadata from MangaDex.",
-    )
-    args = parser.parse_args()
+def _parse_chapter_tokens(tokens: List[str]) -> List[str]:
+    """Expand chapter tokens ("0", "7-12", "3.5") into an ordered list.
 
-    dl_cfg = load_download_config()
+    Ranges only expand over integers; decimal chapters must be named
+    explicitly (MangaDex numbers them "3.5" etc.).
+    """
+    out: List[str] = []
+    for tok in tokens:
+        tok = tok.strip()
+        if not tok:
+            continue
+        m = re.fullmatch(r"(\d+)-(\d+)", tok)
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+            if hi < lo:
+                lo, hi = hi, lo
+            out.extend(str(n) for n in range(lo, hi + 1))
+        else:
+            out.append(tok)
+    seen: set[str] = set()
+    return [c for c in out if not (c in seen or seen.add(c))]
 
-    raw_id = str(dl_cfg.get("manga_id", "")).strip()
-    if not raw_id:
-        print("[ERROR] 'manga_id' is missing in config.json download section")
-        sys.exit(1)
 
-    chapter = dl_cfg.get("chapter")
-    if chapter is None:
-        print("[ERROR] 'chapter' is missing in config.json download section")
-        sys.exit(1)
+def _download_one_chapter(
+    sess: requests.Session,
+    dl_cfg: dict,
+    manga_id: str,
+    raw_id: str,
+    chapter: str,
+    *,
+    fresh: bool,
+    chapter_entry: dict | None,
+) -> bool:
+    """Download a single chapter. Returns True on success.
 
-    manga_id       = normalize_manga_id(raw_id)
-    chapter_str    = str(chapter).zfill(2)
+    ``chapter_entry`` is the pre-fetched feed entry ({"id", "pages", ...})
+    or None when the caller wants this function to look it up itself.
+    """
+    chapter_str    = str(chapter).zfill(2) if "." not in str(chapter) else str(chapter)
     lang           = dl_cfg.get("translated_language", "en")
     manga_root     = manga_dir(str(dl_cfg.get("name")))
     output_dir     = manga_root / chapter_str / "download"
@@ -444,7 +488,7 @@ def main() -> None:
 
     # ── Load / clear cache ─────────────────────────────────────────────────
     cache: dict | None = None
-    if args.fresh:
+    if fresh:
         cache_file = ch_dir / _CACHE_FILE
         if cache_file.exists():
             cache_file.unlink()
@@ -460,13 +504,16 @@ def main() -> None:
             print("  Cache      : miss — will fetch from MangaDex")
     print("===========================\n")
 
-    sess = _session()
-
     # ── Chapter ID ─────────────────────────────────────────────────────────
     # Cache the UUID forever — it never changes for a given manga/chapter/lang.
     if cache and cache.get("chapter_id"):
         chapter_id = cache["chapter_id"]
         print(f"[INFO] Cached chapter ID: {chapter_id}", flush=True)
+    elif chapter_entry is not None:
+        chapter_id = chapter_entry["id"]
+        title = chapter_entry.get("title") or ""
+        print(f"[INFO] Found chapter {chapter}: {chapter_id}"
+              + (f' "{title}"' if title else ""), flush=True)
     else:
         chapter_id = find_chapter_id(sess, manga_id, str(chapter), lang)
 
@@ -518,8 +565,94 @@ def main() -> None:
             f"{total - actual} missing. Run again to resume.",
             flush=True,
         )
+        return False
+    print(f"\n[INFO] All {total} pages present ✓", flush=True)
+    return True
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="mangaeasy download",
+        description="Download manga chapters from MangaDex.",
+    )
+    parser.add_argument(
+        "--fresh", action="store_true",
+        help="Bypass the local cache and re-fetch all metadata from MangaDex.",
+    )
+    parser.add_argument(
+        "--chapter", metavar="N",
+        help="Chapter to download (overrides config.json). "
+             "Accepts decimals like 3.5.",
+    )
+    parser.add_argument(
+        "--chapters", nargs="+", metavar="TOKEN",
+        help="Several chapters: numbers and inclusive ranges, "
+             "e.g. --chapters 0-12 14 20.5. Missing chapters are skipped "
+             "with a warning instead of aborting the batch.",
+    )
+    args = parser.parse_args()
+    if args.chapter and args.chapters:
+        parser.error("use either --chapter or --chapters, not both")
+
+    dl_cfg = load_download_config()
+
+    raw_id = str(dl_cfg.get("manga_id", "")).strip()
+    if not raw_id:
+        print("[ERROR] 'manga_id' is missing in config.json download section")
+        sys.exit(1)
+
+    if args.chapters:
+        chapters = _parse_chapter_tokens(args.chapters)
+    elif args.chapter is not None:
+        chapters = [str(args.chapter)]
     else:
-        print(f"\n[INFO] All {total} pages present ✓", flush=True)
+        chapter = dl_cfg.get("chapter")
+        if chapter is None:
+            print("[ERROR] 'chapter' is missing in config.json download section"
+                  " (or pass --chapter / --chapters)")
+            sys.exit(1)
+        chapters = [str(chapter)]
+
+    manga_id = normalize_manga_id(raw_id)
+    lang     = dl_cfg.get("translated_language", "en")
+    sess     = _session()
+
+    # One feed fetch covers every chapter in a batch (and disambiguates
+    # duplicate scanlations by page count).
+    chapter_map: dict[str, dict] | None = None
+    if len(chapters) > 1:
+        chapter_map = fetch_chapter_map(sess, manga_id, lang)
+
+    ok, missing, failed = [], [], []
+    for chapter in chapters:
+        entry = chapter_map.get(chapter) if chapter_map is not None else None
+        if chapter_map is not None and entry is None:
+            print(f"[WARN] Chapter {chapter} not on MangaDex in '{lang}' — skipped.",
+                  flush=True)
+            missing.append(chapter)
+            continue
+        try:
+            done = _download_one_chapter(
+                sess, dl_cfg, manga_id, raw_id, chapter,
+                fresh=args.fresh, chapter_entry=entry,
+            )
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            print(f"[ERROR] Chapter {chapter} failed: {exc}", flush=True)
+            failed.append(chapter)
+            continue
+        (ok if done else failed).append(chapter)
+
+    if len(chapters) > 1:
+        print("\n=== Batch summary ===")
+        print(f"  downloaded : {len(ok)} ({', '.join(ok) or '-'})")
+        if missing:
+            print(f"  not found  : {len(missing)} ({', '.join(missing)})")
+        if failed:
+            print(f"  incomplete : {len(failed)} ({', '.join(failed)}) — rerun to resume")
+    if failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

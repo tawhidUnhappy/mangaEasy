@@ -80,11 +80,13 @@ mangaeasy install-tool kokoro-82m  # the CPU-friendly TTS voice (~1-2 GB, one-ti
 ```
 
 `doctor --json` fields that matter: `executables.ffmpeg`/`ffprobe`
-(null = missing → run `bootstrap-tools`), `gpu_backend` (`cuda`/`mps`/`cpu`),
-`tools` (installed AI tools). Optional bigger tools: `index-tts` (voice
-cloning, needs NVIDIA GPU), `magi-v3` (panel detection), `got-ocr2` (OCR).
-All installs are **long-running downloads** — expect minutes, stream the
-output.
+(null = missing → run `bootstrap-tools`), `gpu_backend` (`cuda`/`mps`/`cpu`
+— the *machine's* capability, which is what installs and engine selection key
+on; the main env deliberately has no torch), `tools` (installed AI tools).
+Optional bigger tools: `index-tts` (voice cloning, needs NVIDIA GPU),
+`magi-v3` (panel detection), `got-ocr2` (OCR), `z-image-turbo`
+(text-to-image generation, ~33 GB). All installs are **long-running
+downloads** — expect minutes, stream the output.
 
 ## 3. Project anatomy
 
@@ -126,11 +128,15 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
-  `--music-volume-db -25`. The value is how far the music sits *below the
+  `--music-volume-db -19`. The value is how far the music sits *below the
   narration*: mixing never attenuates the narration track, so a long video
-  normalized to −14 LUFS stays at −14 LUFS after `video-add-bgm`. For
-  narration-driven recap videos, −15 to −20 keeps music audible but clearly
-  under the voice.
+  normalized to −14 LUFS stays at −14 LUFS after `video-add-bgm`. The music
+  stem is loudness-aligned to the same −14 LUFS reference before the offset
+  (disable with `--no-music-loudnorm`), so the number is a true LU
+  separation regardless of the track's mastering. For narration-driven
+  recap videos the researched sweet spot is **−18 to −20 (default −19)**;
+  below −25 the bed is inaudible on phone speakers, above −15 it masks the
+  voice.
 - `--gpu-workers` above 4 is known to crash consumer NVIDIA cards; default
   is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.
@@ -163,6 +169,11 @@ Run `mangaeasy commands --json` for the always-current list and
 `install-tool <name>`, `tools`, `library-list`, `mcp`, `app` (GUI —
 don't launch from agents).
 
+**External tools** — `index-tts`, `got-ocr2`, `zimage` (Z-Image Turbo
+text-to-image: `mangaeasy zimage --prompt "..." --output out.png --width
+1280 --height 720 [--count 4] [--seed N]`; prints `MANGAEASY_RESULT` with
+the generated files; needs `install-tool z-image-turbo` once).
+
 **Video pipeline (the recommended workflow)** —
 `video` (all-in-one: audio → render → optional join/normalize/BGM),
 `video-audio` (Kokoro TTS), `video-audio-indextts` (IndexTTS, GPU),
@@ -172,7 +183,10 @@ don't launch from agents).
 `audio-takes-list`, `audio-takes-restore`.
 
 **Manga acquire/narration/render (single-chapter era)** — `download`
-(MangaDex), `gutter-split`, `process-panels`, the browser editors
+(MangaDex; `--chapter N` overrides config, `--chapters 0-12 14 20.5`
+batch-downloads with one feed fetch, skipping chapters that don't exist and
+preferring the fullest version when several scanlations share a number),
+`gutter-split`, `process-panels`, the browser editors
 (`narration-editor`, `panel-editor`, `cut-page` — interactive, for humans),
 `join-narration`, `normalize-narration`, `clean-narration`,
 `backup-narration`, `render-video`, `add-bgm`, `join-chapters`,
@@ -283,7 +297,7 @@ Agent rules for uploads:
 | `MANGAEASY_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
 | `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
 | `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, `WORK_DIR` | Defaults for the corresponding `--*-root` flags. Agents should pass explicit flags instead. |
-| `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT` | Point at externally-managed tool envs (rarely needed). |
+| `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
 
 HF/torch/uv caches are automatically redirected under the data folder —
 model downloads never touch `~/.cache`.
@@ -299,8 +313,8 @@ Register: `claude mcp add mangaeasy -- mangaeasy mcp` (or client config
 "..."}` to share a GUI install's data). Tools: `doctor`, `where`,
 `library_list`, `video_check`, `video_validate`, `audio_audit`,
 `generate_audio`, `render_videos`, `build_long_video`, `add_bgm`,
-`run_full_pipeline`, `bootstrap_tools`, `install_tool`, `youtube_status`,
-`youtube_upload`. Tool results are a
+`run_full_pipeline`, `bootstrap_tools`, `install_tool`, `generate_image`,
+`youtube_status`, `youtube_upload`. Tool results are a
 JSON text block: `exit_code`, parsed `report` (for `--json` commands),
 parsed `result` (the `MANGAEASY_RESULT` payload), and tail `output`.
 Generation/install tools block until done — that can be many minutes.
