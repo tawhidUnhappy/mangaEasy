@@ -3,6 +3,37 @@
 ## Unreleased
 
 ### Added
+- **Z-Image Turbo image generation** — `mangaeasy install-tool z-image-turbo`
+  provisions Alibaba's Apache-2.0 text-to-image model (~33 GB) in an
+  isolated env, and `mangaeasy zimage --prompt "..." --output out.png`
+  generates images (thumbnails, backgrounds, channel art). Hardware is
+  handled automatically: full bf16 on 16 GB+ NVIDIA GPUs and Apple
+  Silicon, NF4 4-bit quantization on 8–12 GB NVIDIA cards (~24 s/image on
+  an RTX 3060), CPU offload/fp32 fallbacks below that. Also exposed as the
+  `generate_image` MCP tool. See docs/external-tools.md.
+- **`mangaeasy download --chapter N` / `--chapters 0-12 14 20.5`** —
+  download any chapter (or a whole batch) without editing config.json.
+  Batches fetch the MangaDex feed once, skip chapters that don't exist in
+  the requested language (with a warning and a final summary instead of
+  aborting), and when several scanlations upload the same chapter number,
+  the fullest version (most pages) is picked instead of feed order.
+- **Music loudness alignment in `video-add-bgm`** — the music stem's
+  integrated loudness is measured (ffmpeg ebur128) and pre-gained to the
+  narration's −14 LUFS reference before `--music-volume-db` is applied, so
+  the offset is a true LU separation regardless of how hot the track was
+  mastered. Disable with `--no-music-loudnorm`. The default offset changed
+  −25 → **−19 dB**, the audio-engineering consensus for continuous
+  narration (music clearly audible but never masking the voice).
+
+### Fixed
+- `mangaeasy doctor` reported `gpu_backend: "cpu"` (and the app's Setup tab
+  showed "CPU only") on CUDA machines whenever the main env had no torch —
+  which is the normal state, since torch lives in the isolated tool envs.
+  GPU capability is now probed at machine level (nvidia-smi / Apple
+  Silicon), matching what `install-tool` and TTS auto-selection actually
+  use; `cuda_device` is filled from nvidia-smi when torch isn't available.
+
+### Added (earlier)
 - **`library/<name>/manga.json`** — `mangaeasy download` now records where
   each manga came from: source site, canonical MangaDex title URL, the
   original link you pasted, the canonical title (fetched from the API once,
