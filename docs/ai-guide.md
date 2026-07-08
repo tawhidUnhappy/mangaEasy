@@ -302,9 +302,15 @@ Agent rules for uploads:
 | `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
 | `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, `WORK_DIR` | Defaults for the corresponding `--*-root` flags. Agents should pass explicit flags instead. |
 | `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
+| `MANGAEASY_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
 
-HF/torch/uv caches are automatically redirected under the data folder —
-model downloads never touch `~/.cache`.
+HF/torch/uv caches for external-tool subprocesses are **force-pinned** under
+the data folder (`<data>/.mangaeasy/{hf_cache,torch_cache,uv_cache}`), so a
+global `HF_HOME`/`UV_CACHE_DIR` you exported for other tools can't scatter
+multi-GB model downloads outside the install folder — deleting the folder
+really does leave nothing behind. Set `MANGAEASY_SHARE_CACHES=1` to opt into
+a shared ambient cache instead (models already downloaded there are then
+reused rather than re-fetched under `.mangaeasy`).
 
 ## 9. MCP server
 

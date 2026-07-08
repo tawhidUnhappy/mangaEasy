@@ -140,12 +140,26 @@ def python_command(tool_dir: Path) -> list[str]:
     return ["uv", "run", "--project", str(tool_dir), "python"]
 
 
+def _share_caches() -> bool:
+    """True when the user opts into inheriting ambient cache locations."""
+    return os.environ.get("MANGAEASY_SHARE_CACHES", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
 def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     """Env for subprocesses that run inside an isolated tool venv.
 
-    Every cache an external tool (or `uv` itself) might write lives under
-    this install's own `.mangaeasy/` dir, never the user's home directory —
-    `setdefault` so an explicit shell export still wins.
+    Every cache an external tool (or `uv` itself) might write is pinned under
+    this install's own `.mangaeasy/` dir, so the "everything mangaEasy writes
+    lives in one folder" promise holds and deleting the install folder leaves
+    nothing behind. These are **force-set** (they override an inherited
+    ``HF_HOME`` / ``UV_CACHE_DIR`` / ... from the ambient environment): a
+    global cache var the user exported for *other* tools would otherwise
+    silently scatter multi-GB model downloads outside the install folder.
+    Set ``MANGAEASY_SHARE_CACHES=1`` to deliberately defer to those inherited
+    locations instead (a shared cross-project cache); then they are only
+    filled in when absent.
 
     Always drops VIRTUAL_ENV/PYTHONHOME inherited from mangaeasy's own
     process. Every caller launches a subprocess by an explicit absolute
@@ -161,11 +175,15 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     env.pop("VIRTUAL_ENV", None)
     env.pop("PYTHONHOME", None)
     hf_cache = mangaeasy_home() / "hf_cache"
-    env.setdefault("HF_HOME", str(hf_cache))
-    env.setdefault("HF_HUB_CACHE", str(hf_cache / "hub"))
-    env.setdefault("TRANSFORMERS_CACHE", str(hf_cache / "hub"))
-    env.setdefault("TORCH_HOME", str(mangaeasy_home() / "torch_cache"))
-    env.setdefault("UV_CACHE_DIR", str(mangaeasy_home() / "uv_cache"))
+    # Force these under .mangaeasy so an inherited global HF_HOME/UV_CACHE_DIR
+    # can't leak downloads out of the install folder (opt out with
+    # MANGAEASY_SHARE_CACHES=1, which reverts them to setdefault semantics).
+    set_cache = env.setdefault if _share_caches() else env.__setitem__
+    set_cache("HF_HOME", str(hf_cache))
+    set_cache("HF_HUB_CACHE", str(hf_cache / "hub"))
+    set_cache("TRANSFORMERS_CACHE", str(hf_cache / "hub"))
+    set_cache("TORCH_HOME", str(mangaeasy_home() / "torch_cache"))
+    set_cache("UV_CACHE_DIR", str(mangaeasy_home() / "uv_cache"))
     env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     env.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")

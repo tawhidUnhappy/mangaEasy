@@ -359,6 +359,18 @@ bare subprocess call (`"ffmpeg"`, `"npm"`, ...) picks up the vendored copy
 automatically. See `docs/external-tools.md` and `docs/install-tools.md` for
 the install mechanics; this file just covers what calls what.
 
+`tool_env()` (in `tools/external.py`) is the env for every tool subprocess.
+It **force-pins** `HF_HOME`/`HF_HUB_CACHE`/`TRANSFORMERS_CACHE`/`TORCH_HOME`/
+`UV_CACHE_DIR` under `<data>/.mangaeasy/` — these override an inherited
+global value, they are **not** `setdefault`. This is deliberate and was a
+real bug: a machine with a global `HF_HOME=D:\hf_cache` / `UV_CACHE_DIR=D:\uv`
+(set for other tools) otherwise scattered multi-GB model downloads outside
+the install folder, silently breaking the "everything in one folder" promise.
+`MANGAEASY_SHARE_CACHES=1` reverts them to `setdefault` for users who
+genuinely want a shared cross-project cache. Don't turn these back into plain
+`setdefault` without that opt-out. (The non-path vars — telemetry, xet perf,
+tokenizers — stay `setdefault`.)
+
 ## Packaging (`packaging/`)
 
 `packaging/mangaeasy.spec` + `launcher.py` build a self-contained
