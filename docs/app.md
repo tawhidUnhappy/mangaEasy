@@ -31,7 +31,7 @@ folder when the current directory doesn't look like a project.
 
 - Prerequisite checks: git, git-lfs, uv, ffmpeg, ffprobe, GPU (NVIDIA CUDA or
   Apple Silicon MPS, auto-detected).
-- One card per external AI tool (IndexTTS, MAGI v3, GOT-OCR 2.0, Kokoro) showing
+- One card per external AI tool (IndexTTS, MAGI v3, DeepSeek-OCR 2, Kokoro, Z-Image Turbo) showing
   whether it is installed and where it resolved.
 - **Install** buttons run `mangaeasy install-tool` for you, with the full
   output streaming into the terminal pane. **Check for updates** queries

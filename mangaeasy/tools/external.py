@@ -12,7 +12,7 @@ TOOL_ENVS = {
     "kokoro-82m": ("KOKORO_ROOT",),
     "index-tts": ("INDEX_TTS_ROOT", "INDEX_TTS_DIR"),
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
-    "got-ocr2": ("GOT_OCR2_ROOT", "GOT_OCR2_DIR", "GOT_OCR_ROOT"),
+    "deepseek-ocr2": ("DEEPSEEK_OCR2_ROOT", "DEEPSEEK_OCR2_DIR"),
     "z-image-turbo": ("Z_IMAGE_TURBO_ROOT", "Z_IMAGE_TURBO_DIR"),
 }
 

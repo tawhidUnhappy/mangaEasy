@@ -2,13 +2,12 @@
  * config.json / config.system.json read-write + on-disk chapter/library
  * helpers — ports of the inline Python helpers in
  * `mangaeasy/web/nicegui_app.py` (`_ch_status`, `_delete_chapter`, `_purge`,
- * `_library_manga_entries`, `_ensure_narration_for_ocr`) and
+ * `_library_manga_entries`) and
  * `mangaeasy/web/app/api_workflow.py`'s `_library_dir`. Reading these
  * directly in Node avoids a Python round-trip for simple filesystem checks.
  */
 import {
   existsSync,
-  mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -213,54 +212,4 @@ export function purge(projectRoot: string, kind: PurgeKind): number {
     }
   }
   return removed
-}
-
-/** Returns the chapter's narration JSON path, creating a blank
- * `[{image, narration: ""}]` template from the panels folder if missing.
- * Returns null (with a reason) if there's nothing to base a template on. */
-export function ensureNarrationForOcr(
-  projectRoot: string,
-  chapter: number
-): { path: string | null; reason?: string } {
-  const { config, systemConfig } = readConfig(projectRoot)
-  const name = String(config.download?.name ?? '')
-  if (!name) return { path: null, reason: 'no manga name configured' }
-
-  const lib = libraryDir(projectRoot, systemConfig)
-  const chNum = String(chapter).padStart(2, '0')
-  const chDir = path.join(lib, name, chNum)
-  const narrPath = path.join(chDir, `narration_${chNum}.json`)
-  if (existsSync(narrPath)) return { path: narrPath }
-
-  const panelsSub = systemConfig.paths?.panels_subdir ?? 'panels'
-  const panelsDir = path.join(chDir, panelsSub)
-  if (!existsSync(panelsDir) || !statSync(panelsDir).isDirectory()) {
-    return { path: null, reason: 'panels folder not found; cut panels first' }
-  }
-
-  const images = readdirSync(panelsDir)
-    .filter((f) => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-    .sort(naturalCompare)
-  if (images.length === 0) return { path: null, reason: 'no panel images found' }
-
-  mkdirSync(path.dirname(narrPath), { recursive: true })
-  const template = images.map((image) => ({ image, narration: '' }))
-  writeFileSync(narrPath, JSON.stringify(template, null, 2) + '\n', 'utf-8')
-  return { path: narrPath }
-}
-
-/** Natural sort by embedded digits — matches `mangaeasy.utils.numeric_sort_key`. */
-function naturalCompare(a: string, b: string): number {
-  const numsOf = (s: string): number[] => {
-    const stem = s.replace(/\.[^.]+$/, '')
-    const found = stem.match(/\d+/g)
-    return found ? found.map(Number) : [Infinity]
-  }
-  const na = numsOf(a)
-  const nb = numsOf(b)
-  for (let i = 0; i < Math.max(na.length, nb.length); i++) {
-    const diff = (na[i] ?? -Infinity) - (nb[i] ?? -Infinity)
-    if (diff !== 0) return diff
-  }
-  return a.localeCompare(b)
 }

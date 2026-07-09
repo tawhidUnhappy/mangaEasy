@@ -11,7 +11,6 @@ import { logsDir } from './log'
 import {
   chapterStatus,
   deleteChapter,
-  ensureNarrationForOcr,
   libraryDir,
   libraryMangaEntries,
   purge,
@@ -257,10 +256,6 @@ export function registerIpcHandlers(): void {
     deleteChapter(getProjectRoot(), chapter, what)
   )
   ipcMain.handle('chapter:purge', (_event, kind: PurgeKind) => purge(getProjectRoot(), kind))
-  ipcMain.handle('chapter:ensure-narration', (_event, chapter: number) =>
-    ensureNarrationForOcr(getProjectRoot(), chapter)
-  )
-
   ipcMain.handle('chapter:export-ai-zip', async (event, chapter: number) => {
     const { config, systemConfig } = readConfig(getProjectRoot())
     const name = String(config.download?.name ?? '')

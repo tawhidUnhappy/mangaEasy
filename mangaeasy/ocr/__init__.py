@@ -1,1 +1,1 @@
-"""mangaeasy.ocr — panel OCR and visual analysis pipeline."""
+"""OCR integrations for mangaEasy."""

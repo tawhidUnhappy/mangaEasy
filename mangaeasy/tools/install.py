@@ -1,9 +1,10 @@
 """mangaeasy.tools.install — provision the external AI tool environments.
 
-These heavy tools (IndexTTS, MAGI v3, GOT-OCR 2.0, Kokoro) are deliberately kept in
-their own isolated ``uv`` environments instead of being dependencies of
-mangaeasy, so their conflicting torch/transformers stacks never clash with the
-core install. This module clones / sets them up into the managed tools dir
+These heavy tools (IndexTTS, MAGI v3, DeepSeek-OCR 2, Kokoro, Z-Image Turbo)
+are deliberately kept in their own isolated ``uv`` environments instead of
+being dependencies of mangaeasy, so their conflicting torch/transformers stacks
+never clash with the core install. This module clones / sets them up into the
+managed tools dir
 (``<app_root>/.mangaeasy/tools`` by default — self-contained, removed along
 with the install/repo folder).
 
@@ -16,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -31,6 +31,14 @@ from mangaeasy.tools.external import (
     resolve_tool_dir,
     tool_env,
     tools_home,
+)
+from mangaeasy.tools.hardware import (
+    default_torch_build,
+    detect_gpu,
+    find_nvidia_smi,
+    has_nvidia_gpu,
+    nvidia_gpu_name,
+    which,
 )
 
 LogFn = Callable[[str], None]
@@ -112,26 +120,29 @@ TOOLS: dict[str, ToolSpec] = {
         needs_gpu=True,
         notes="Detects manga panels. The magiv3 model + code download from Hugging Face on first run.",
     ),
-    "got-ocr2": ToolSpec(
-        key="got-ocr2",
-        title="GOT-OCR 2.0",
+    "deepseek-ocr2": ToolSpec(
+        key="deepseek-ocr2",
+        title="DeepSeek-OCR 2",
         kind="managed_env",
-        git_url=None,
-        model_repo="stepfun-ai/GOT-OCR-2.0-hf",
+        git_url="https://github.com/deepseek-ai/DeepSeek-OCR-2",
+        model_repo="deepseek-ai/DeepSeek-OCR-2",
         model_subdir="model",
         env_deps=[
-            "torch>=2.5.0",
-            "torchvision>=0.20.0",
-            "transformers>=4.49,<5.0",
-            "accelerate>=0.28.0",
+            "torch>=2.6.0",
+            "torchvision>=0.21.0",
+            "transformers>=4.46.3,<4.57",
+            "tokenizers>=0.20.3",
+            "accelerate>=1.0.0",
             "safetensors>=0.4.0",
             "pillow>=10.0.0",
             "numpy>=1.24.0",
-            "tiktoken>=0.6.0",
+            "einops>=0.8.0",
+            "addict>=2.4.0",
+            "easydict>=1.13",
         ],
         verify_import="transformers",
         needs_gpu=True,
-        notes="Panel OCR with the Hugging Face Transformers model stepfun-ai/GOT-OCR-2.0-hf. Writes an `ocr` field into narration JSON files. Model downloads from Hugging Face; no GitHub clone is needed.",
+        notes="DeepSeek-OCR 2 document/panel OCR. Installs a managed Transformers env and downloads the Apache-2.0 deepseek-ai/DeepSeek-OCR-2 model from Hugging Face.",
     ),
     "kokoro-82m": ToolSpec(
         key="kokoro-82m",
@@ -302,7 +313,7 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
 
 
 def _which(exe: str) -> str | None:
-    return shutil.which(exe)
+    return which(exe)
 
 
 def _require(executables: list[str], log: LogFn) -> None:
@@ -327,65 +338,19 @@ def _git_lfs_ok() -> bool:
 
 
 def _find_nvidia_smi() -> str | None:
-    """Return the path to nvidia-smi, checking PATH and standard Windows install locations."""
-    where = _which("nvidia-smi")
-    if where:
-        return where
-    if sys.platform == "win32":
-        # NVIDIA drivers install nvidia-smi to System32 or the NVSMI folder, but
-        # neither location is always on PATH.
-        prog = os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles", r"C:\Program Files")
-        for candidate in (
-            Path(r"C:\Windows\System32\nvidia-smi.exe"),
-            Path(prog) / "NVIDIA Corporation" / "NVSMI" / "nvidia-smi.exe",
-        ):
-            if candidate.is_file():
-                return str(candidate)
-    return None
+    return find_nvidia_smi()
 
 
 def _has_gpu() -> bool:
-    if _find_nvidia_smi() is not None:
-        return True
-    if sys.platform == "win32":
-        # Last resort: WMI query for NVIDIA-branded video controllers. Catches
-        # setups where nvidia-smi is present but not readable by _find_nvidia_smi.
-        try:
-            out = subprocess.run(
-                ["wmic", "path", "Win32_VideoController", "get", "AdapterCompatibility"],
-                capture_output=True, text=True, timeout=8,
-            ).stdout
-            if "NVIDIA" in out:
-                return True
-        except Exception:
-            pass
-    return False
+    return has_nvidia_gpu()
 
 
 def _nvidia_gpu_name() -> str | None:
-    """GPU model name via nvidia-smi — works without torch in the main env."""
-    smi = _find_nvidia_smi()
-    if not smi:
-        return None
-    try:
-        out = subprocess.run(
-            [smi, "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=8, **popen_kwargs(),
-        ).stdout.strip()
-        return out.splitlines()[0].strip() if out else None
-    except Exception:
-        return None
+    return nvidia_gpu_name()
 
 
 def default_gpu_mode() -> str:
-    """Pick the torch build that actually fits this machine.
-
-    CUDA wheels only exist for Windows/Linux and only help with an NVIDIA GPU;
-    everyone else (macOS, AMD, Intel, plain CPU) gets standard PyPI builds.
-    """
-    if sys.platform in ("win32", "linux") and _has_gpu():
-        return "cuda"
-    return "cpu"
+    return default_torch_build()
 
 
 def _torch_index_url(mode: str) -> str | None:
@@ -666,32 +631,14 @@ def doctor(*, check_updates: bool = False) -> dict:
         # on PATH still see the real path instead of a false "missing".
         executables[exe] = _find_nvidia_smi() if exe == "nvidia-smi" else _which(exe)
 
+    gpu_info = detect_gpu()
+
     # Machine-level GPU capability — what install-tool's build choice and the
     # pipeline's engine selection actually key on (nvidia-smi / platform), NOT
     # the main env's torch: heavy torch installs live in the isolated tool
     # envs, so the main env usually has no torch at all. Probing only torch
     # here used to report gpu_backend "cpu" on CUDA machines, which misled
     # agents and showed "CPU only" in the app's Setup tab.
-    cuda_available = False
-    cuda_device: str | None = None
-    mps_available = False
-    try:
-        import torch  # type: ignore[import-untyped]
-        cuda_available = bool(torch.cuda.is_available())
-        if cuda_available:
-            cuda_device = torch.cuda.get_device_name(0)
-        mps_backend = getattr(torch.backends, "mps", None)
-        mps_available = bool(mps_backend is not None and mps_backend.is_available())
-    except Exception:
-        pass
-    if not cuda_available and sys.platform in ("win32", "linux") and _has_gpu():
-        cuda_available = True
-        cuda_device = _nvidia_gpu_name()
-    if not mps_available and sys.platform == "darwin":
-        import platform
-        mps_available = platform.machine() == "arm64"
-    gpu_backend = "cuda" if cuda_available else "mps" if mps_available else "cpu"
-
     tools = {}
     for key, spec in TOOLS.items():
         path = resolve_tool_dir(key, required=False)
@@ -713,11 +660,11 @@ def doctor(*, check_updates: bool = False) -> dict:
     return {
         "tools_home": str(tools_home()),
         "git_lfs": _git_lfs_ok(),
-        "gpu": _has_gpu(),
-        "cuda": cuda_available,
-        "cuda_device": cuda_device,
-        "mps": mps_available,
-        "gpu_backend": gpu_backend,
+        "gpu": gpu_info.has_nvidia,
+        "cuda": gpu_info.cuda,
+        "cuda_device": gpu_info.cuda_device,
+        "mps": gpu_info.mps,
+        "gpu_backend": gpu_info.backend,
         "whisper": whisper_installed,
         "executables": executables,
         "tools": tools,

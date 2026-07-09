@@ -29,15 +29,17 @@ The default project root is the current working directory. Set
 
 ## External tools
 
-Kokoro, IndexTTS, MAGI, and GOT-OCR can each keep their own Python, CUDA, Torch,
-and Transformers dependencies as isolated `uv` projects:
+Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, and Z-Image Turbo can each keep their
+own Python, CUDA, Torch, and Transformers dependencies as isolated `uv`
+projects:
 
 ```text
-<install folder>/.mangaeasy/tools/   (or siblings of your project)
+<install folder>/.mangaeasy/tools/
   kokoro-82m/
   index-tts/
   magi-v3/
-  got-ocr2/
+  deepseek-ocr2/
+  z-image-turbo/
 ```
 
 This avoids dependency conflicts while still allowing full GPU acceleration.
@@ -54,7 +56,7 @@ Tool installs (`mangaeasy install-tool`):
 
 OCR:
 
-- `mangaeasy got-ocr2` runs inside the isolated GOT-OCR 2.0 environment and
+- `mangaeasy deepseek-ocr2` runs inside the isolated DeepSeek-OCR 2 environment and
   writes an `ocr` field into narration JSON entries.
 - `--device auto` uses CUDA when the tool env can see it, otherwise CPU.
 

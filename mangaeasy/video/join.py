@@ -112,8 +112,8 @@ def main() -> None:
     bg_img_rel    = vid_cfg.get("background_image", "background_image/grid_background_1920x1080.png")
     bg_img        = PROJECT_ROOT / bg_img_rel
     wm_cfg        = syscfg.get("watermark", {})
-    bg_music      = PROJECT_ROOT / bgm_cfg.get("file", "music/bgm.mp3")
-    bg_vol        = float(bgm_cfg.get("volume_db", -32))
+    bg_music      = PROJECT_ROOT / bgm_cfg.get("file", "music/Thapin_by_the_sea.wav")
+    bg_vol        = float(bgm_cfg.get("volume_db", -22))
     audio_bitrate = str(enc_cfg.get("bgm_bitrate", "192k"))
 
     panels_subdir    = path_cfg.get("panels_subdir",    "panels")

@@ -84,7 +84,7 @@ mangaeasy install-tool kokoro-82m  # optional CPU-friendly fallback voice (~1-2 
 (null = missing → run `bootstrap-tools`), `gpu_backend` (`cuda`/`mps`/`cpu`
 — the *machine's* capability, which is what installs and engine selection key
 on; the main env deliberately has no torch), `tools` (installed AI tools).
-Optional bigger tools: `magi-v3` (panel detection), `got-ocr2` (OCR),
+Optional bigger tools: `magi-v3` (panel detection), `deepseek-ocr2` (OCR),
 `z-image-turbo` (text-to-image generation, ~33 GB). `index-tts` is the
 default full-pipeline TTS engine and is also a long-running download. All
 model/tool installs can take minutes, so stream the output.
@@ -175,7 +175,7 @@ Run `mangaeasy commands --json` for the always-current list and
 `install-tool <name>`, `tools`, `library-list`, `mcp`, `app` (GUI —
 don't launch from agents).
 
-**External tools** — `index-tts`, `got-ocr2`, `zimage` (Z-Image Turbo
+**External tools** — `index-tts`, `deepseek-ocr2`, `zimage` (Z-Image Turbo
 text-to-image: `mangaeasy zimage --prompt "..." --output out.png --width
 1280 --height 720 [--count 4] [--seed N]`; prints `MANGAEASY_RESULT` with
 the generated files; needs `install-tool z-image-turbo` once).
@@ -303,7 +303,7 @@ Agent rules for uploads:
 | `MANGAEASY_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
 | `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
 | `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, `WORK_DIR` | Defaults for the corresponding `--*-root` flags. Agents should pass explicit flags instead. |
-| `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
+| `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
 | `MANGAEASY_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
 
 HF/torch/uv caches for external-tool subprocesses are **force-pinned** under

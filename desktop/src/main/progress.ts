@@ -16,7 +16,7 @@ const CHAPTER_RE = /^MANGAEASY_PROGRESS\s+(\d{1,6})\/(\d{1,6})(?:\s+(.*))?$/
 
 function progressLabel(line: string, fallback: string): string {
   const lower = `${line} ${fallback}`.toLowerCase()
-  if (lower.includes('got-ocr') || lower.includes('ocr')) return 'OCR panels'
+  if (lower.includes('deepseek-ocr') || lower.includes('ocr')) return 'OCR panels'
   if (lower.includes('[frame]') || lower.includes('render')) return 'Rendering frames'
   if (lower.includes('[pcm]') || lower.includes('fade')) return 'Preparing audio'
   if (lower.includes('download') || lower.includes('skip (exists)')) return 'Downloading pages'

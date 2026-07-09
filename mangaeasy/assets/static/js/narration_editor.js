@@ -85,11 +85,6 @@
   const lastTranscript = document.getElementById("lastTranscript");
   const insertModeBtn = document.getElementById("insertModeBtn");
   const clearLastBtn = document.getElementById("clearLastBtn");
-  const ocrRunBtn = document.getElementById("ocrRunBtn");
-  const ocrForceBtn = document.getElementById("ocrForceBtn");
-  const ocrInsertBtn = document.getElementById("ocrInsertBtn");
-  const ocrProgress = document.getElementById("ocrProgress");
-  const ocrText = document.getElementById("ocrText");
 
   const resizer = document.getElementById("resizer");
   const leftPane = document.getElementById("left-pane");
@@ -127,7 +122,6 @@
   let chunkInFlight = false;
 
   let liveText = "";
-  let currentOcr = "";
 
   // Live update frequency (ms)
   const LIVE_CHUNK_MS = 2000;
@@ -177,22 +171,6 @@
     return res.json();
   }
 
-  async function requestOcr(force) {
-    const res = await fetch("/api/ocr", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index: currentIndex, force, device: "auto" }),
-    });
-    return res.json();
-  }
-
-  function setOcrText(text) {
-    currentOcr = (text || "").trim();
-    ocrText.textContent = currentOcr || "No OCR yet";
-    ocrText.classList.toggle("empty", !currentOcr);
-    ocrInsertBtn.disabled = !currentOcr;
-  }
-
   // -------------------------
   // Render
   // -------------------------
@@ -216,13 +194,11 @@
     const item = state.item || {};
     const img = (item.image || "").trim();
     const narr = item.narration || "";
-    const ocr = item.ocr || "";
 
     pageCounter.textContent = `Page ${currentIndex + 1} of ${totalItems}`;
     imageFilename.textContent = img;
 
     textArea.value = narr;
-    setOcrText(ocr);
     dirty = false;
     statusLabel.textContent = "All changes saved";
     statusLabel.style.color = "#888";
@@ -360,52 +336,6 @@
   });
 
   micToggleBtn.addEventListener("click", () => toggleRecording());
-
-  async function runOcr(force) {
-    await saveTextNow();
-    loader.style.display = "block";
-    const btn = force ? ocrForceBtn : ocrRunBtn;
-    const original = btn.textContent;
-    ocrRunBtn.disabled = true;
-    ocrForceBtn.disabled = true;
-    ocrInsertBtn.disabled = true;
-    ocrProgress.classList.add("active");
-    btn.textContent = "Working...";
-    statusLabel.textContent = "Running GOT-OCR...";
-    statusLabel.style.color = "#e5c07b";
-    try {
-      const data = await requestOcr(force);
-      if (data.status !== "ok") {
-        throw new Error(data.msg || "GOT-OCR failed");
-      }
-      setOcrText(data.ocr || "");
-      statusLabel.textContent = "OCR saved";
-      statusLabel.style.color = "#888";
-    } catch (err) {
-      statusLabel.textContent = "OCR error";
-      statusLabel.style.color = "#f44336";
-      ocrText.textContent = err.message;
-      ocrText.classList.remove("empty");
-    } finally {
-      loader.style.display = "none";
-      ocrProgress.classList.remove("active");
-      ocrRunBtn.disabled = false;
-      ocrForceBtn.disabled = false;
-      ocrInsertBtn.disabled = !currentOcr;
-      btn.textContent = original;
-    }
-  }
-
-  ocrRunBtn.addEventListener("click", () => runOcr(false));
-  ocrForceBtn.addEventListener("click", () => runOcr(true));
-  ocrInsertBtn.addEventListener("click", () => {
-    if (!currentOcr) return;
-    const prefix = textArea.value && !textArea.value.endsWith("\n") ? "\n" : "";
-    textArea.value = textArea.value + prefix + currentOcr;
-    markDirty();
-    queueSave(400);
-    textArea.focus();
-  });
 
   async function toggleRecording() {
     if (!isRecording) await startRecording();

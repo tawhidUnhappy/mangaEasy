@@ -952,7 +952,7 @@ function initLogSidebar() {
       return "error";
     if (m.includes("warn") || m.includes("⚠"))
       return "warn";
-    if (m.includes("[manga-ai]") || m.includes("magi") || m.includes("manga-ocr")
+    if (m.includes("[manga-ai]") || m.includes("magi") || m.includes("deepseek-ocr")
         || m.includes("✅") || m.includes("ready"))
       return "ai";
     if (m.includes("[info]") || m.includes("loading") || m.includes("starting")

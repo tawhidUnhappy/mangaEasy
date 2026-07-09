@@ -26,6 +26,7 @@ Install what's missing:
 ```bash
 mangaeasy install-tool magi-v3     # panel detection (needed for paged manga)
 mangaeasy install-tool index-tts   # default recap TTS: voice clone, slow, best quality
+mangaeasy install-tool z-image-turbo # generated thumbnails; auto GPU/CPU strategy
 # Kokoro installs the same way if absent: mangaeasy install-tool kokoro-82m
 ```
 
@@ -432,7 +433,8 @@ Two proven approaches — pick by what tools are installed:
 
 **A. Generated scene (big-recap-channel style, e.g. MamoruManhwa).** Top
 manhwa-recap channels don't collage panels; the thumbnail is one coherent
-glossy anime/manhwa illustration with a fanservice-leaning "gooner" edge —
+glossy anime/manhwa illustration with a platform-safe, fanservice-leaning
+"gooner" edge —
 that's the established house style for this niche (see the MamoruManhwa
 style guide referenced above: flustered/blushing faces, exaggerated curvy
 proportions, foregrounded characters) and it measurably drives CTR. Write

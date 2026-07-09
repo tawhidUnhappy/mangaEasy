@@ -5,7 +5,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from mangaeasy.config import load_system_config
+from mangaeasy.defaults import default_speaker_wav
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -16,8 +16,7 @@ from mangaeasy.video_pipeline.common import (
 
 
 def _default_speaker_wav() -> Path:
-    cfg = load_system_config().get("tts", {})
-    return Path(cfg.get("speaker_wav", "vocal/manga[vocal2].wav"))
+    return default_speaker_wav()
 
 
 def parse_args() -> argparse.Namespace:

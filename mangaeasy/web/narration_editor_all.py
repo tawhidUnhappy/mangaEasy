@@ -3,16 +3,14 @@
 
 import json
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from flask import jsonify, render_template, request, send_from_directory
 
-from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.config import load_download_config, load_system_config
 from mangaeasy.paths import manga_dir
-from mangaeasy.runtime import cli_command, popen_kwargs
 from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.flask_utils import make_app, register_shutdown, run_app
 
@@ -244,7 +242,6 @@ def api_state():
         "item": {
             "image":     item.get("image", ""),
             "narration": item.get("narration", ""),
-            "ocr":       item.get("ocr", ""),
             "chapter":   item["_chapter"],
         },
         "whisper": _whisper_info(),
@@ -309,67 +306,6 @@ def api_transcribe():
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
-
-
-@app.route("/api/ocr", methods=["POST"])
-def api_ocr():
-    try:
-        data = request.get_json(silent=True) or {}
-        idx = int(data.get("index"))
-        force = bool(data.get("force"))
-        device = str(data.get("device") or "auto")
-        if device not in {"auto", "cuda", "cpu"}:
-            device = "auto"
-        if not (0 <= idx < len(NARRATIONS)):
-            return jsonify({"status": "error", "msg": "Index out of bounds"}), 400
-
-        item = NARRATIONS[idx]
-        chapter_name = str(item.get("_chapter") or "")
-        image = str(item.get("image") or "")
-        narration_path = CHAPTER_JSON_PATHS.get(chapter_name)
-        if narration_path is None:
-            return jsonify({"status": "error", "msg": "Narration file not found"}), 400
-        if not image:
-            return jsonify({"status": "error", "msg": "No image for this entry"}), 400
-
-        cmd = cli_command(
-            "got-ocr2",
-            "--project-root", str(PROJECT_ROOT),
-            "--narration", str(narration_path),
-            "--only-images", image,
-            "--device", device,
-            "--batch-size", "1",
-            "--max-new-tokens", "1024",
-            *(("--force",) if force else ()),
-        )
-        env = dict(os.environ)
-        env["MANGAEASY_PROJECT_ROOT"] = str(PROJECT_ROOT)
-        env.setdefault("PYTHONUNBUFFERED", "1")
-        proc = subprocess.run(
-            cmd,
-            cwd=str(PROJECT_ROOT),
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            **popen_kwargs(),
-        )
-        if proc.returncode != 0:
-            return jsonify({"status": "error", "msg": (proc.stdout + proc.stderr).strip() or "GOT-OCR failed"}), 500
-
-        with narration_path.open("r", encoding="utf-8-sig") as f:
-            updated = json.load(f)
-        if isinstance(updated, dict):
-            updated = [updated]
-        updated_entries = updated if isinstance(updated, list) else []
-        for entry in updated_entries:
-            if isinstance(entry, dict) and entry.get("image") == image:
-                item["ocr"] = entry.get("ocr", "")
-                break
-        return jsonify({"status": "ok", "ocr": item.get("ocr", ""), "log": (proc.stdout + proc.stderr).strip()})
-    except Exception as exc:
-        return jsonify({"status": "error", "msg": str(exc)}), 500
 
 
 @app.route("/images/<chapter>/<path:filename>")

@@ -44,10 +44,14 @@ config.system.json
 /static/
 /templates/
 /prompts/
-/music/
+/music/*
+!/music/
+!/music/Thapin_by_the_sea.wav
 /fonts/
 /background_image/
-/vocal/
+/vocal/*
+!/vocal/
+!/vocal/manga_vocal2.wav
 /upscale/
 /thumbnail/
 
@@ -55,6 +59,8 @@ config.system.json
 /kokoro-82m/
 /index-tts/
 /magi-v3/
+/deepseek-ocr2/
+/z-image-turbo/
 
 # Isolated dev tooling (e.g. portable Node.js) — not vendored, not global
 /.tools/

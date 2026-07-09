@@ -54,10 +54,10 @@ Usage:
 - **Desktop app** — `mangaeasy app` opens a control center: install AI tools with
   one click, edit configs, run the pipeline, and launch editors with live logs.
 - **One-command AI tool install** — `mangaeasy install-tool index-tts` or
-  `mangaeasy install-tool got-ocr2` builds isolated model environments for you.
+  `mangaeasy install-tool deepseek-ocr2` builds isolated model environments for you.
 - **General item-based video pipeline** — point it at numbered folders of images +
   `narration.json` and get per-item videos plus an optional joined long video.
-- **Isolated AI tools** — Kokoro / IndexTTS / MAGI / GOT-OCR run in their own `uv`
+- **Isolated AI tools** — Kokoro / IndexTTS / MAGI / DeepSeek-OCR 2 / Z-Image Turbo run in their own `uv`
   environments so their Torch/CUDA stacks never clash with the core install.
 - **Hardware-aware everything** — `--encoder auto` picks NVENC, AMF, Quick Sync,
   VideoToolbox, or falls back to `libx264`; `--tts auto` (the default) uses
@@ -113,7 +113,7 @@ run the exe, delete the folder when you're done.
 | `mangaEasy-X.Y.Z-linux-x64.tar.gz` | Portable | Extract, run the binary inside |
 
 Launch the app and use the **Setup** tab to install whichever AI tools you
-want (index-tts, kokoro, magi-v3, got-ocr2) — each downloads on demand into
+want (index-tts, kokoro, magi-v3, deepseek-ocr2, z-image-turbo) — each downloads on demand into
 the app's own self-contained data folder, never your home directory.
 
 **Everything mangaEasy ever writes lives in one data folder** — AI tool
@@ -207,7 +207,7 @@ root — it syncs Python deps, builds the desktop app on first run, and opens
 `mangaeasy app` for you in one step.
 
 Optional extras (only if you want heavy models *inside* the main env instead of
-as isolated sibling tools — most users should not need these):
+managed external tool environments — most users should not need these):
 
 ```bash
 uv sync --extra whisper   # faster-whisper
@@ -240,7 +240,7 @@ See [docs/app.md](docs/app.md) for details.
 
 ## Install the AI tools (one command)
 
-The heavy AI models (TTS, panel detection) live in their **own isolated
+The heavy AI models (TTS, panel detection, OCR, image generation) live in their **own isolated
 environments** so they never break the main install. Check what your system has
 and provision what's missing:
 
@@ -248,7 +248,7 @@ and provision what's missing:
 mangaeasy doctor                       # prerequisite + tool status report
 mangaeasy install-tool index-tts       # IndexTTS-2 voice-cloning TTS (clone + env + model)
 mangaeasy install-tool magi-v3         # MAGI v3 manga panel detection (env + adapter)
-mangaeasy install-tool got-ocr2        # GOT-OCR 2.0 panel OCR (HF model + env)
+mangaeasy install-tool deepseek-ocr2   # DeepSeek-OCR 2 panel/document OCR (HF model + env)
 mangaeasy install-tool z-image-turbo   # Z-Image Turbo text-to-image (thumbnails; ~33 GB)
 ```
 
@@ -331,7 +331,7 @@ Command groups:
 |-------|----------------|
 | **Setup & app** | `app` (desktop control center), `doctor` (environment report), `install-tool` (provision AI tools from GitHub/Hugging Face). |
 | **Video pipeline** | `video`, `video-audio`, `video-render`, `video-join`, `video-check`, `video-validate`, and audio/clean helpers — the general image-folder workflow. |
-| **External tools** | `tools` (show where envs resolve), `index-tts`, `got-ocr2`. |
+| **External tools** | `tools` (show where envs resolve), `index-tts`, `deepseek-ocr2`, `zimage`. |
 | **Manga: acquire** | `download`, `cut-page`, `panel-editor`, `gutter-split`, `process-panels`. |
 | **Manga: narration** | `narration-editor`, `narration-editor-all`, `narration-review`, `join-narration`, `normalize-narration`, `clean-narration`, `backup-narration`, `rename-file`. |
 | **Manga: render** | `render-video`, `add-bgm`, `join-chapters`, `timestamps`, `to-pdf`, `watermark`, `convert-images`, … |
@@ -348,13 +348,12 @@ which puts them in the managed folder:
 <data folder>/.mangaeasy/tools/
   index-tts/       # IndexTTS-2  (cloned uv project + model checkpoints)
   magi-v3/         # MAGI v3 panel detection (generated env + detect_magi.py)
-  got-ocr2/        # GOT-OCR 2.0 panel OCR (generated env + HF model)
+  deepseek-ocr2/   # DeepSeek-OCR 2 panel/document OCR (generated env + HF model)
   kokoro-82m/      # Kokoro TTS  (generated env, default voice af_heart)
   z-image-turbo/   # Z-Image Turbo text-to-image (generated env + HF model)
 ```
 
-Sibling folders next to your project (`./index-tts`, `./magi-v3`, `./got-ocr2`, ...) also work —
-handy if you manage the tools yourself. Check what resolves:
+Check what resolves:
 
 ```bash
 mangaeasy tools
@@ -368,14 +367,14 @@ globally but your models live elsewhere):
 $env:KOKORO_ROOT    = "D:/kokoro-82m"
 $env:INDEX_TTS_ROOT = "D:/index-tts"
 $env:MAGI_V3_ROOT   = "D:/magi-v3"
-$env:GOT_OCR2_ROOT  = "D:/got-ocr2"
+$env:DEEPSEEK_OCR2_ROOT = "D:/deepseek-ocr2"
 ```
 
 ```bash
 # macOS / Linux
 export KOKORO_ROOT=~/models/kokoro-82m
 export INDEX_TTS_ROOT=~/models/index-tts
-export GOT_OCR2_ROOT=~/models/got-ocr2
+export DEEPSEEK_OCR2_ROOT=~/models/deepseek-ocr2
 ```
 
 See [docs/external-tools.md](docs/external-tools.md) for how each tool is invoked.
@@ -441,7 +440,8 @@ work/<project>/                        # scratch / intermediates
 - [The desktop app](docs/app.md) — the `mangaeasy app` control center
 - [Installing AI tools](docs/install-tools.md) — what `install-tool` sets up for each tool
 - [Architecture](docs/architecture.md) — how the package and external tools fit together
-- [External tools](docs/external-tools.md) — Kokoro, IndexTTS, MAGI, GOT-OCR
+- [External tools](docs/external-tools.md) — Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, Z-Image Turbo
+- [Thumbnail guide](docs/thumbnail.md) — Z-Image Turbo prompts and checks for recap thumbnails
 - [Publishing](docs/publishing.md) — release checklist and CI workflow
 
 ## Contributing

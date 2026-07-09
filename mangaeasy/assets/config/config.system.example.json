@@ -6,8 +6,8 @@
     "download_delay": 0.5
   },
   "bgm": {
-    "file": "music/background.mp3",
-    "volume_db": -34
+    "file": "music/Thapin_by_the_sea.wav",
+    "volume_db": -22
   },
   "video": {
     "width": 1920,
@@ -62,7 +62,8 @@
     "compute": "float16"
   },
   "tts": {
-    "speaker_wav": "vocal/manga[vocal2].wav",
+    "engine": "indextts",
+    "speaker_wav": "vocal/manga_vocal2.wav",
     "use_raw_narration": true
   },
   "ports": {

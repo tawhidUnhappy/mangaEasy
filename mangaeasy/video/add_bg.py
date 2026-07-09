@@ -84,8 +84,8 @@ def main() -> None:
     name    = str(dl["name"])
 
     bgm_cfg       = syscfg.get("bgm", {})
-    bg_vol        = float(bgm_cfg.get("volume_db", -25))
-    music         = PROJECT_ROOT / bgm_cfg.get("file", "music/bgm.mp3")
+    bg_vol        = float(bgm_cfg.get("volume_db", -22))
+    music         = PROJECT_ROOT / bgm_cfg.get("file", "music/Thapin_by_the_sea.wav")
     duck          = bool(bgm_cfg.get("duck", False))
     duck_ratio    = float(bgm_cfg.get("duck_ratio", 10.0))
     duck_attack   = float(bgm_cfg.get("duck_attack", 5.0))

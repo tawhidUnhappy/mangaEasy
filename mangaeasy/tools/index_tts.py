@@ -11,7 +11,7 @@ from mangaeasy.runtime import popen_kwargs
 def print_help() -> None:
     print("usage: mangaeasy index-tts")
     print()
-    print("Generate narration audio by delegating to the sibling ./index-tts uv environment.")
+    print("Generate narration audio by delegating to the managed index-tts uv environment.")
     print("The command reads mangaEasy config.json/config.system.json from the current project root.")
     print()
     print("Environment overrides:")

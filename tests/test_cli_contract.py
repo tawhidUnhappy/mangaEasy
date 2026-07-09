@@ -40,7 +40,7 @@ def test_tools_json(capsys):
     assert main(["tools", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert "tools_home" in data
-    assert set(data["tools"]) == {"kokoro-82m", "index-tts", "magi-v3", "got-ocr2", "z-image-turbo"}
+    assert set(data["tools"]) == {"kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"}
 
 
 def test_emit_result_line_is_parseable(capsys):

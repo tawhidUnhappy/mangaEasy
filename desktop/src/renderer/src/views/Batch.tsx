@@ -5,7 +5,7 @@ import type { AudioTakesStatus, LibraryEntry, YoutubeStatus } from '../../../sha
 const STEPS: Record<string, string> = {
   video: 'Everything (IndexTTS + blur + long video)',
   'video-check': 'Check items only',
-  'got-ocr2': 'Fill OCR fields (GOT-OCR 2.0)',
+  'deepseek-ocr2': 'Fill OCR fields (DeepSeek-OCR 2)',
   'video-audio': 'Audio only (Kokoro)',
   'video-audio-indextts': 'Audio only (IndexTTS)',
   'video-fade-audio': 'Create faded audio copies (de-click)',
@@ -35,7 +35,7 @@ const STEP_GROUPS: { label: string; steps: string[] }[] = [
     label: 'Check & maintain',
     steps: [
       'video-check',
-      'got-ocr2',
+      'deepseek-ocr2',
       'video-validate',
       'video-clean-audio',
       'video-clean-video',
@@ -55,7 +55,7 @@ const STEP_DESCRIPTIONS: Record<string, string> = {
     'Runs the full pipeline end to end: narration audio, rendered chapter videos, and (optionally) the joined long video with background music.',
   'video-check':
     'Checks that panels, narration.json, and audio line up for each selected chapter. Nothing is generated.',
-  'got-ocr2': 'Fills in missing narration text fields using OCR on the panel images.',
+  'deepseek-ocr2': 'Fills missing narration OCR fields with DeepSeek-OCR 2.',
   'video-audio': 'Generates per-chapter narration audio with Kokoro TTS.',
   'video-audio-indextts': 'Generates per-chapter narration audio with IndexTTS.',
   'video-fade-audio':
@@ -376,12 +376,12 @@ export function Batch(): React.JSX.Element {
       return
     }
 
-    if (step === 'got-ocr2') {
-      const args = baseArgs()
+    if (step === 'deepseek-ocr2') {
+      const args = baseArgs({ items: true })
       if (!args) return
       args.push('--device', 'auto')
       if (ocrForce) args.push('--force')
-      await run('got-ocr2', args)
+      await run('deepseek-ocr2', args)
       return
     }
 
@@ -578,7 +578,7 @@ export function Batch(): React.JSX.Element {
   ].includes(step)
   const usesResume = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
   const usesSkipAudio = step === 'video'
-  const usesOcrForce = step === 'got-ocr2'
+  const usesOcrForce = step === 'deepseek-ocr2'
   const usesRenderWorkers = ['video', 'video-render'].includes(step)
   const usesGpuWorkers = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
   const usesBgmFields = step === 'video-add-bgm' || (step === 'video' && bgm)
@@ -933,7 +933,7 @@ export function Batch(): React.JSX.Element {
                   checked={ocrForce}
                   onChange={(e) => setOcrForce(e.target.checked)}
                 />{' '}
-                Redo all OCR
+                Replace existing OCR
               </label>
             )}
             {usesRenderWorkers && (

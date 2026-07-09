@@ -123,21 +123,7 @@ export function Workflow(): React.JSX.Element {
   }
   const launchNarration = async (): Promise<void> => {
     await saveWfConfig()
-    await window.api.ensureNarrationForOcr(chapter)
     await launchEditor('narration-editor')
-  }
-
-  const runOcr = async (force: boolean): Promise<void> => {
-    await saveWfConfig()
-    const { path: narrPath, reason } = await window.api.ensureNarrationForOcr(chapter)
-    if (!narrPath) {
-      setStatus((s) => s)
-      console.warn('got-ocr2:', reason)
-      return
-    }
-    const args = ['--narration', narrPath, '--device', 'auto']
-    if (force) args.push('--force')
-    await run('got-ocr2', args)
   }
 
   const exportZip = async (): Promise<void> => {
@@ -299,12 +285,6 @@ export function Workflow(): React.JSX.Element {
         <div className="row">
           <button className="primary" onClick={launchNarration} disabled={running}>
             📝 Open narration editor
-          </button>
-          <button onClick={() => runOcr(false)} disabled={running}>
-            Run GOT-OCR
-          </button>
-          <button onClick={() => runOcr(true)} disabled={running}>
-            Re-run GOT-OCR
           </button>
           <button onClick={exportZip} disabled={running}>
             ⬇ Export ZIP for AI

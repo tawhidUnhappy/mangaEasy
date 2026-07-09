@@ -5,6 +5,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from mangaeasy.defaults import configured_background_music, default_music_volume_db
 from mangaeasy.utils import archive_before_overwrite, emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
@@ -31,7 +32,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace", action="store_true",
                         help="Overwrite --input in place instead of writing a new file (the previous file is "
                              "archived first, same as other generation steps).")
-    parser.add_argument("--background-music", type=Path, required=True)
+    parser.add_argument("--background-music", type=Path, default=None,
+                        help="Music file to mix in. Defaults to config.system.json -> bgm.file "
+                             "or the tracked default music asset.")
     parser.add_argument("--raw-music", action="store_true",
                         help="Mix the music file exactly as given. By default the track is QC'd and, when it "
                              "has splice holes, silent lead/tail, or is shorter than the video, replaced by a "
@@ -39,7 +42,7 @@ def parse_args() -> argparse.Namespace:
                              "-stream_loop seams and in-track defects can't repeat through the whole video.")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR,
                         help="Scratch dir for the cached music bed (default: the pipeline work dir).")
-    parser.add_argument("--music-volume-db", type=float, default=-22.0,
+    parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-normalized to the narration's -14 LUFS reference first (see "
                              "--no-music-loudnorm), so this value is a true LU separation regardless of how hot "
@@ -195,7 +198,12 @@ def main() -> int:
     else:
         video_out = (args.output or default_bgm_output(video_in, args.music_volume_db)).resolve()
 
-    music = args.background_music
+    requested_music = args.background_music or configured_background_music()
+    if args.background_music is None:
+        print(f"[bgm] using default background music: {requested_music}", flush=True)
+    music = requested_music
+    if not requested_music.is_file():
+        raise FileNotFoundError(f"Background music not found: {requested_music}")
     if not args.raw_music:
         from mangaeasy.video_pipeline.audio_audit import ffprobe_duration
         from mangaeasy.video_pipeline.music_bed import (
@@ -205,7 +213,7 @@ def main() -> int:
         )
 
         video_duration = ffprobe_duration(video_in) or 0.0
-        music, bed_report = prepare_music_bed(args.background_music, video_duration, args.work_dir)
+        music, bed_report = prepare_music_bed(requested_music, video_duration, args.work_dir)
         print(describe_report(bed_report), flush=True)
 
         # Tame the bed's own dynamics (and carve the vocal band) so it sits at

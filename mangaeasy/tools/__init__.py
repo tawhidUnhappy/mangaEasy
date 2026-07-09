@@ -1,1 +1,1 @@
-"""External tool adapters for isolated sibling uv projects."""
+"""External tool adapters for isolated managed uv projects."""

@@ -58,7 +58,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "library-list":         ("mangaeasy.library_scan",                         "main",        "Setup & app",      "List projects and per-item readiness under a project root (--json)."),
     "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup & app",      "Run an MCP stdio server exposing mangaEasy as typed tools for AI assistants."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
-    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, got-ocr2, ...) from GitHub/Hugging Face."),
+    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Download ffmpeg/uv/git-lfs into this install's own tools dir (the desktop app runs this on first launch)."),
     "ensure-node":          ("mangaeasy.tools.vendored",                       "ensure_node_main", "Setup & app", "Vendor a portable Node.js/npm on demand (run.sh/run.bat use this to build the desktop app from source)."),
 
@@ -89,9 +89,9 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "youtube-delete":       ("mangaeasy.youtube.delete",                       "main",        "YouTube",          "Delete a video from the connected channel (two-step: requires --confirm)."),
 
     # ── External AI tool environments ─────────────────────────────────────────
-    "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI) resolve."),
+    "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image) resolve."),
     "index-tts":            ("mangaeasy.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
-    "got-ocr2":             ("mangaeasy.tools.got_ocr2",                       "main",        "External tools",   "Run GOT-OCR 2.0 and write `ocr` fields into narration JSON files."),
+    "deepseek-ocr2":        ("mangaeasy.tools.deepseek_ocr2",                  "main",        "External tools",   "Run DeepSeek-OCR 2 and write `ocr` fields into narration JSON files."),
     "zimage":               ("mangaeasy.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
 
     # ── Manga chapter workflow: acquire & edit ────────────────────────────────

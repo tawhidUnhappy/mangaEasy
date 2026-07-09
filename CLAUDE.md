@@ -348,7 +348,7 @@ main/preload vs. renderer) then the electron-vite build.
 
 ## External AI tool environments (`mangaeasy/tools/`)
 
-Kokoro, IndexTTS, MAGI (panel detection), GOT-OCR 2.0, and Z-Image Turbo
+Kokoro, IndexTTS, MAGI (panel detection), DeepSeek-OCR 2, and Z-Image Turbo
 (image generation, `mangaeasy zimage`) each live in their own
 isolated `uv` project under `<install>/.mangaeasy/tools/<tool>/` so their
 CUDA/Torch/Transformers versions can't conflict with the main package or

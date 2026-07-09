@@ -2,16 +2,14 @@
 """mangaeasy.web.narration_editor — Flask UI for editing narration + Whisper transcription."""
 
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 
 from flask import jsonify, render_template, request, send_from_directory
 
-from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.config import load_download_config, load_system_config
 from mangaeasy.narration import load_narration, save_narration
 from mangaeasy.paths import narration_json as _narration_json, panels_dir
-from mangaeasy.runtime import cli_command, popen_kwargs
 from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.flask_utils import make_app, register_shutdown, run_app
 
@@ -124,8 +122,7 @@ def api_state():
         idx = 0
     item = NARRATIONS[idx]
     return jsonify({"status": "ok", "finished": False, "total": total, "index": idx,
-                    "item": {"image": item.get("image", ""), "narration": item.get("narration", ""),
-                             "ocr": item.get("ocr", "")},
+                    "item": {"image": item.get("image", ""), "narration": item.get("narration", "")},
                     "whisper": {"model": WHISPER_ACTIVE_MODEL, "device": WHISPER_ACTIVE_DEVICE,
                                 "compute": WHISPER_ACTIVE_COMPUTE}})
 
@@ -172,54 +169,6 @@ def api_transcribe():
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
-
-@app.route("/api/ocr", methods=["POST"])
-def api_ocr():
-    global NARRATIONS
-    try:
-        data = request.get_json(silent=True) or {}
-        idx = int(data.get("index"))
-        force = bool(data.get("force"))
-        device = str(data.get("device") or "auto")
-        if device not in {"auto", "cuda", "cpu"}:
-            device = "auto"
-        if not (0 <= idx < len(NARRATIONS)):
-            return jsonify({"status": "error", "msg": "Index out of bounds"}), 400
-        image = str(NARRATIONS[idx].get("image") or "")
-        if not image:
-            return jsonify({"status": "error", "msg": "No image for this entry"}), 400
-
-        cmd = cli_command(
-            "got-ocr2",
-            "--project-root", str(PROJECT_ROOT),
-            "--narration", str(NARRATION_JSON),
-            "--only-images", image,
-            "--device", device,
-            "--batch-size", "1",
-            "--max-new-tokens", "1024",
-            *(("--force",) if force else ()),
-        )
-        env = dict(os.environ)
-        env["MANGAEASY_PROJECT_ROOT"] = str(PROJECT_ROOT)
-        env.setdefault("PYTHONUNBUFFERED", "1")
-        proc = subprocess.run(
-            cmd,
-            cwd=str(PROJECT_ROOT),
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            **popen_kwargs(),
-        )
-        if proc.returncode != 0:
-            return jsonify({"status": "error", "msg": (proc.stdout + proc.stderr).strip() or "GOT-OCR failed"}), 500
-
-        NARRATIONS = load_narration(NARRATION_JSON)
-        item = NARRATIONS[idx] if idx < len(NARRATIONS) else {}
-        return jsonify({"status": "ok", "ocr": item.get("ocr", ""), "log": (proc.stdout + proc.stderr).strip()})
-    except Exception as exc:
-        return jsonify({"status": "error", "msg": str(exc)}), 500
 
 @app.route("/images/<path:filename>")
 def serve_image(filename: str):

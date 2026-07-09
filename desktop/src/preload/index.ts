@@ -76,8 +76,6 @@ const api = {
   deleteChapter: (chapter: number, what: DeleteWhat): Promise<string[]> =>
     ipcRenderer.invoke('chapter:delete', chapter, what),
   purgeChapters: (kind: PurgeKind): Promise<number> => ipcRenderer.invoke('chapter:purge', kind),
-  ensureNarrationForOcr: (chapter: number): Promise<{ path: string | null; reason?: string }> =>
-    ipcRenderer.invoke('chapter:ensure-narration', chapter),
   exportAiZip: (chapter: number): Promise<{ ok: boolean; output?: string; reason?: string }> =>
     ipcRenderer.invoke('chapter:export-ai-zip', chapter),
   resolveBatchPaths: (

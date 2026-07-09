@@ -34,7 +34,7 @@ tools" in Setup, or `mangaeasy install-tool`), not distributed with mangaEasy:
 - **Kokoro-82M** TTS — model and code under their respective licenses
   (https://huggingface.co/hexgrad/Kokoro-82M, Apache-2.0)
 - **IndexTTS** — https://github.com/index-tts/index-tts (see repo license)
-- **MAGI v3** panel detection / **GOT-OCR 2.0** — research models from
+- **MAGI v3** panel detection / **DeepSeek-OCR 2** — research models from
   Hugging Face; see their model cards for license terms
 
 If you redistribute mangaEasy or a derivative, review these licenses —

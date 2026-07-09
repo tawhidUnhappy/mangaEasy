@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from mangaeasy.defaults import default_music_volume_db
 from mangaeasy.utils import emit_result
 from mangaeasy.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 from mangaeasy.video_pipeline.long_video_builder import LongVideoConfig, build_long_video
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
                         help="Used to strictly check every item has a matching audio file before joining.")
     parser.add_argument("--narration-dir", type=Path, default=None)
     parser.add_argument("--background-music", type=Path, default=None)
-    parser.add_argument("--music-volume-db", type=float, default=-25.0,
+    parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
     return parser.parse_args()

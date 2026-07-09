@@ -18,12 +18,9 @@ The resolver checks, in order:
    - `KOKORO_ROOT`
    - `INDEX_TTS_ROOT` (or legacy `INDEX_TTS_DIR`)
    - `MAGI_V3_ROOT` (or legacy `MAGI_V3_DIR`)
-   - `GOT_OCR2_ROOT` (or `GOT_OCR2_DIR`, `GOT_OCR_ROOT`)
+   - `DEEPSEEK_OCR2_ROOT` (or `DEEPSEEK_OCR2_DIR`)
 2. The managed tools dir: `<install folder>/.mangaeasy/tools/<name>`
    (override with `MANGAEASY_TOOLS_DIR`)
-3. A folder named `<name>` in the current directory, its parent, or next to the
-   installed package
-
 If a tool has `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix),
 `mangaeasy` uses it directly. Otherwise it falls back to `uv run --project`.
 
@@ -81,20 +78,22 @@ download from Hugging Face on the first run.
 Set `MANGAEASY_EXTERNAL_MAGI=0` only when the main package env has the `ml`
 extra installed and you intentionally want in-process detection.
 
-## GOT-OCR 2.0
+## DeepSeek-OCR 2
 
 Used by:
 
 ```bash
-mangaeasy got-ocr2 --project-root content
-mangaeasy got-ocr2 --project-root content --item-range 01-24 --device cuda
+mangaeasy deepseek-ocr2 --project-root content
+mangaeasy deepseek-ocr2 --project-root content --item-range 01-24 --device cuda
 ```
 
-Install with `mangaeasy install-tool got-ocr2`. The installer creates an
-isolated uv environment and downloads the `stepfun-ai/GOT-OCR-2.0-hf` model
-from Hugging Face into `got-ocr2/model`. The command scans narration JSON files,
-finds each panel image, and adds an `ocr` field to every entry that does not
-already have one. Use `--force` to regenerate existing OCR.
+Install with `mangaeasy install-tool deepseek-ocr2`. The installer creates an
+isolated uv environment and downloads the `deepseek-ai/DeepSeek-OCR-2` model
+from Hugging Face into `deepseek-ocr2/model`. The command scans narration JSON
+files, finds each panel image, and adds an `ocr` field to every entry that does
+not already have one. Use `--force` to regenerate existing OCR, or pass
+`--prompt "<image>\n<|grounding|>Convert the document to markdown."` for
+document-style markdown OCR.
 
 ## Z-Image Turbo (image generation)
 

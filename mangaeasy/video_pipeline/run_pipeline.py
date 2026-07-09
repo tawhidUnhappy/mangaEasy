@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import subprocess
 from pathlib import Path
 
+from mangaeasy.defaults import default_background_music, default_music_volume_db, default_tts_engine
 from mangaeasy.runtime import cli_command
+from mangaeasy.tools.hardware import has_nvidia_gpu
 from mangaeasy.utils import emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -32,7 +33,7 @@ def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
     from mangaeasy.tools.external import resolve_tool_dir
     from mangaeasy.video_pipeline.generate_audio_indextts import _default_speaker_wav
 
-    if shutil.which("nvidia-smi") is None:
+    if not has_nvidia_gpu():
         print("[tts:auto] no NVIDIA GPU -> Kokoro")
         return "kokoro"
     tool_dir = resolve_tool_dir("index-tts", required=False)
@@ -58,8 +59,9 @@ def parse_args() -> argparse.Namespace:
         description="Generate narration audio (IndexTTS when your machine is ready for it, Kokoro otherwise), "
                      "then build videos."
     )
-    parser.add_argument("--tts", choices=("auto", "kokoro", "indextts"), default="auto",
-                        help="TTS engine. auto (the default) picks IndexTTS when an NVIDIA GPU, the index-tts "
+    parser.add_argument("--tts", choices=("auto", "kokoro", "indextts"), default=default_tts_engine(),
+                        help="TTS engine. Defaults to config.system.json -> tts.engine, else auto. "
+                             "auto picks IndexTTS when an NVIDIA GPU, the index-tts "
                              "tool + checkpoints, and a speaker WAV are all present, else Kokoro -- this is what "
                              "keeps 'mangaeasy video' working on any machine out of the box. Force one "
                              "explicitly with --tts indextts / --tts kokoro; forcing indextts on a machine "
@@ -101,8 +103,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--blur-backend", choices=("auto", "vulkan", "cpu"), default="auto")
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
-    parser.add_argument("--background-music", type=Path, default=None)
-    parser.add_argument("--music-volume-db", type=float, default=-22.0,
+    parser.add_argument("--background-music", type=Path, default=None,
+                        help="Music file for the final long-video mix. Defaults to config.system.json -> bgm.file "
+                             "or the tracked default music asset when present; use --no-background-music to skip.")
+    parser.add_argument("--no-background-music", action="store_true",
+                        help="Do not add background music even if a default BGM file is configured.")
+    parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-aligned to the narration's -14 LUFS reference first, so this is "
                              "a true LU separation; default -22 suits dense recap narration, -18 to -20 sparser "
@@ -149,6 +155,11 @@ def main() -> int:
     args = parse_args()
     cwd = Path.cwd()
     selected_items = merge_item_selection(args.items, args.item_range)
+    background_music = None if args.no_background_music else (args.background_music or default_background_music())
+    if args.build_long_video and background_music is None and not args.no_background_music:
+        print("[bgm] no configured/default background music found; keeping the long video narration-only.", flush=True)
+    elif args.build_long_video and args.background_music is None and background_music is not None:
+        print(f"[bgm] using default background music: {background_music}", flush=True)
 
     engine = resolve_tts_engine(args.tts, args.speaker_wav)
     if engine == "indextts":
@@ -271,12 +282,12 @@ def main() -> int:
                 norm_cmd += ["--project-name", args.project_name]
             run(norm_cmd, cwd)
 
-        if args.background_music is not None:
+        if background_music is not None:
             bgm_cmd = cli_command(
                 "video-add-bgm",
                 "--project-root", str(args.project_root),
                 "--output-root", str(args.output_root),
-                "--background-music", str(args.background_music),
+                "--background-music", str(background_music),
                 "--music-volume-db", str(args.music_volume_db),
                 "--narration-volume", str(args.narration_volume),
                 # The full pipeline's output filename should stay predictable
