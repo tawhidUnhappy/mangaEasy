@@ -43,8 +43,122 @@ _PROJECT_ROOT = {
 
 # name -> (cli command, description, {property: schema}, [required], {property: flag spec})
 # Flag spec kinds: "value" (--flag VALUE), "flag" (--flag when true),
-# "no-flag" (--no-flag when false), "list" (--flag V1 V2 ...).
+# "no-flag" (--no-flag when false), "list" (--flag V1 V2 ...),
+# "repeat" (--flag V1 --flag V2 ..., for argparse action="append" flags).
 TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
+    "setup": (
+        "setup",
+        "One-command provisioning: core binaries (ffmpeg/uv/git-lfs) + AI tool envs + model "
+        "downloads, GPU-aware. VERY LONG-RUNNING on first run (tens of GB with a GPU). Safe to "
+        "re-run — updates/resumes instead of reinstalling. Set dry_run=true to preview the plan.",
+        {"all": {**_BOOL, "description": "Install every tool regardless of hardware."},
+         "minimal": {**_BOOL, "description": "Core binaries only; no AI tool envs."},
+         "skip": {"type": "array", "items": {"type": "string"},
+                  "description": "Tool names to skip, e.g. [\"z-image-turbo\"]."},
+         "dry_run": _BOOL},
+        [],
+        {"all": ("--all", "flag"), "minimal": ("--minimal", "flag"),
+         "skip": ("--skip", "repeat"), "dry_run": ("--dry-run", "flag")},
+    ),
+    "download": (
+        "download",
+        "Download chapters from MangaDex — politely (API spacing, 429 backoff, jittered delays) "
+        "and resumable. Pass the title URL directly; all=true grabs the whole series start to "
+        "end in English (LONG-RUNNING; already-complete chapters are skipped).",
+        {"url": {**_STR, "description": "MangaDex title URL or manga UUID."},
+         "name": {**_STR, "description": "Library folder name; derived from the title if omitted."},
+         "chapters": {"type": "array", "items": {"type": "string"},
+                      "description": "Specific chapters/ranges, e.g. [\"0-12\", \"14\"]."},
+         "all": {**_BOOL, "description": "Every chapter available in the language."},
+         "from_chapter": {**_NUM, "description": "With all: skip chapters below this number."},
+         "to_chapter": {**_NUM, "description": "With all: skip chapters above this number."},
+         "fresh": {**_BOOL, "description": "Bypass the local metadata cache."}},
+        [],
+        {"url": ("--url", "value"), "name": ("--name", "value"),
+         "chapters": ("--chapters", "list"), "all": ("--all", "flag"),
+         "from_chapter": ("--from", "value"), "to_chapter": ("--to", "value"),
+         "fresh": ("--fresh", "flag")},
+    ),
+    "style_detect": (
+        "style-detect",
+        "Detect webtoon (vertical strips -> webtoon_split) vs paged manga (-> page_split) from "
+        "the downloaded page dimensions. Returns a verdict plus sample image paths to confirm "
+        "visually before cropping.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list")},
+    ),
+    "webtoon_split": (
+        "webtoon-split",
+        "Crop webtoon items into panels (gutter detection + auto-split + gap rescue) and write "
+        "verify sheets. The result lists per-item suspects and verify_images — inspect those "
+        "images and clear every flag before narrating; fix misses via the overrides file.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
+         "overrides": {**_STR, "description": "JSON file with per-item split_at/merge fixes."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "work_dir": ("--work-dir", "value"), "overrides": ("--overrides", "value")},
+    ),
+    "page_split": (
+        "page-split",
+        "Crop paged manga into panels with MAGI v3 detection (needs install-tool magi-v3; "
+        "LONG-RUNNING) and write verify overlays. Inspect the result's verify_images and clear "
+        "every suspect before narrating.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
+         "overrides": {**_STR, "description": "JSON file with per-page box fixes."},
+         "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "work_dir": ("--work-dir", "value"), "overrides": ("--overrides", "value"),
+         "device": ("--device", "value")},
+    ),
+    "narration_check": (
+        "narration-check",
+        "Validate narration.json/intro.json structure per item: files parse, every entry's image "
+        "exists, every panel is covered, no empty narration. Run before generating audio. "
+        "(Semantic accuracy and speaker attribution still need an agent reading the panels.)",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list")},
+    ),
+    "thumbnail_compose": (
+        "thumbnail-compose",
+        "Compose a YouTube thumbnail: base art (e.g. best zimage variant) + bold stroked text "
+        "blocks + optional arrow + white inset border at 1280x720. Inspect the output image "
+        "before uploading.",
+        {"base": {**_STR, "description": "Absolute path to the base image."},
+         "output": {**_STR, "description": "Absolute output PNG path."},
+         "text": {"type": "array", "items": {"type": "string"},
+                  "description": "Quick mode: 1-3 short text blocks (3-5 punchy words each)."},
+         "spec": {**_STR, "description": "Full mode: path to a JSON spec (blocks/arrow/border)."}},
+        ["base", "output"],
+        {"base": ("--base", "value"), "output": ("--output", "value"),
+         "text": ("--text", "repeat"), "spec": ("--spec", "value")},
+    ),
+    "series_plan": (
+        "series-plan",
+        "Slice a project's items into fixed upload batches (12 per video by default), report "
+        "per-batch readiness and published state, and name the next batch to produce.",
+        {"project_root": _PROJECT_ROOT,
+         "batch_size": {**_INT, "description": "Items per video (default 12)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "batch_size": ("--batch-size", "value")},
+    ),
+    "series_mark_published": (
+        "series-mark-published",
+        "Record an uploaded batch in the project's publish.json (video id + timestamp) so "
+        "series_plan advances to the next window. Call after a successful youtube_upload.",
+        {"project_root": _PROJECT_ROOT,
+         "items": {"type": "array", "items": {"type": "string"},
+                   "description": "The batch's items, e.g. [\"01-12\"]."},
+         "video_id": {**_STR, "description": "YouTube video id returned by youtube_upload."},
+         "title": _STR},
+        ["project_root", "items", "video_id"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "video_id": ("--video-id", "value"), "title": ("--title", "value")},
+    ),
     "doctor": (
         "doctor",
         "Check this machine: ffmpeg/uv/git presence, GPU backend (cuda/mps/cpu), installed AI tools.",
@@ -227,7 +341,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 
 # Commands whose --json flag should be appended automatically.
 _JSON_COMMANDS = {"doctor", "where", "library-list", "video-check", "video-validate",
-                  "video-audio-audit", "youtube-status", "youtube-upload"}
+                  "video-audio-audit", "youtube-status", "youtube-upload",
+                  "style-detect", "narration-check", "series-plan"}
 
 
 def _build_args(tool: str, arguments: dict) -> list[str]:
@@ -251,6 +366,9 @@ def _build_args(tool: str, arguments: dict) -> list[str]:
         elif kind == "list":
             if value:
                 args.extend([flag, *[str(v) for v in value]])
+        elif kind == "repeat":
+            for v in value or []:
+                args.extend([flag, str(v)])
         else:  # value
             args.extend([flag, str(value)])
     if cli_name in _JSON_COMMANDS:

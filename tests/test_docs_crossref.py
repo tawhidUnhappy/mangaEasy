@@ -15,8 +15,12 @@ DOCS = [
     REPO / "docs" / "youtube.md",
     REPO / "docs" / "recap-video-playbook.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
+    REPO / "docs" / "setup.md",
+    REPO / "docs" / "thumbnail.md",
+    REPO / "docs" / "install.md",
     REPO / "START_HERE.md",
     REPO / "AGENTS.md",
+    REPO / ".claude" / "skills" / "manga-recap" / "SKILL.md",
 ]
 
 # Docs whose internal (relative) links are checked for existence. Scoped to
@@ -25,6 +29,7 @@ LINK_CHECKED_DOCS = [
     REPO / "START_HERE.md",
     REPO / "AGENTS.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
+    REPO / "docs" / "setup.md",
     REPO / "docs" / "history" / "reorg-plan.md",
     REPO / "docs" / "history" / "legacy-inventory.md",
 ]

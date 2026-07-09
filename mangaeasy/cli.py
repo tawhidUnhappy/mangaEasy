@@ -55,8 +55,11 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "commands":             ("mangaeasy.cli",                                  "commands_main","Setup",           "List every command, or emit the full machine-readable catalog (--json)."),
     "where":                ("mangaeasy.tools.external",                       "where_main",  "Setup",            "Show this install's resolved data/tool paths (--json). Run this first from scripts/AI agents."),
     "library-list":         ("mangaeasy.library_scan",                         "main",        "Setup",            "List projects and per-item readiness under a project root (--json)."),
+    "series-plan":          ("mangaeasy.series_plan",                          "plan_main",   "Setup",            "Slice a project into fixed upload batches (default 12/video) and name the next one (--json)."),
+    "series-mark-published":("mangaeasy.series_plan",                          "mark_main",   "Setup",            "Record an uploaded batch in publish.json so series-plan advances."),
     "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup",            "Run an MCP stdio server exposing mangaEasy as typed tools for AI assistants."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup",            "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
+    "setup":                ("mangaeasy.tools.setup",                          "main",        "Setup",            "One-command provisioning: core binaries + AI tool envs + models, GPU-aware (--all / --minimal)."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup",            "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
 
@@ -68,6 +71,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "video-join":           ("mangaeasy.video_pipeline.make_long_video",       "main",        "Video pipeline",   "Join item videos into one long video (optional BGM)."),
     "video-add-bgm":        ("mangaeasy.video_pipeline.add_long_video_bgm",    "main",        "Video pipeline",   "Mix background music into an already-joined long video, without rebuilding it from item clips."),
     "video-check":          ("mangaeasy.video_pipeline.check_items",           "main",        "Video pipeline",   "Validate item inputs (panels + narration.json)."),
+    "narration-check":      ("mangaeasy.video_pipeline.narration_check",       "main",        "Video pipeline",   "Validate narration.json/intro.json structure: coverage, dangling images, empty text (--json)."),
     "video-validate":       ("mangaeasy.video_pipeline.validate_generation",   "main",        "Video pipeline",   "Check generated audio/videos against the inputs."),
     "video-audio-audit":    ("mangaeasy.video_pipeline.audio_audit",          "main",        "Video pipeline",   "Verify every panel has valid, readable audio (catches corrupt/empty files) before rendering; --fix deletes bad ones for regeneration."),
     "video-fade-audio":     ("mangaeasy.video_pipeline.preprocess_audio_fades","main",        "Video pipeline",   "Apply fade in/out to item narration audio."),
@@ -93,7 +97,8 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "zimage":               ("mangaeasy.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
 
     # ── Manga chapter workflow: acquire & crop ────────────────────────────────
-    "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download a manga chapter from MangaDex."),
+    "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download manga chapters from MangaDex (--url + --all for a whole series; polite and resumable)."),
+    "style-detect":         ("mangaeasy.panels.style_detect",                  "main",        "Manga: acquire",   "Detect webtoon vs paged manga from page dimensions (--json) to pick the crop tool."),
     "gutter-split":         ("mangaeasy.panels.gutter",                        "main",        "Manga: acquire",   "Split pages along gutters into panels (low-level engine)."),
     "webtoon-split":        ("mangaeasy.panels.webtoon",                       "main",        "Manga: acquire",   "Split webtoon items into panels with auto-split, gap rescue and verify sheets."),
     "page-split":           ("mangaeasy.panels.page",                          "main",        "Manga: acquire",   "Split paged manga into panels with MAGI v3 detection and verify sheets."),
@@ -102,6 +107,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "to-pdf":               ("mangaeasy.images.pdf",                           "main",        "Manga: export",    "Export chapter images to a PDF."),
     "to-pdf-lossless":      ("mangaeasy.images.pdf_lossless",                  "main",        "Manga: export",    "Export images to a lossless PDF."),
     "convert-images":       ("mangaeasy.images.convert",                       "main",        "Manga: export",    "Convert / normalize image formats."),
+    "thumbnail-compose":    ("mangaeasy.images.thumbnail_compose",             "main",        "Manga: export",    "Compose a YouTube thumbnail: base art + stroked text blocks + border (1280x720)."),
     "watermark":            ("mangaeasy.images.watermark",                     "main",        "Manga: export",    "Apply a text watermark to images."),
     "ai-zip":               ("mangaeasy.images.ai_zip_cli",                    "main",        "Manga: export",    "Pack chapter panels into a labelled ZIP for AI context."),
 }

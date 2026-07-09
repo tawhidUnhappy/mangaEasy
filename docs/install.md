@@ -70,6 +70,19 @@ uv run pyinstaller packaging/mangaeasy.spec
 
 ## First-run setup
 
+One command (GPU-aware — details in [setup.md](setup.md)):
+
+```bash
+mangaeasy setup
+```
+
+It vendors the core binaries (ffmpeg/uv/git-lfs), then installs the AI tool
+envs + models that fit the machine: Kokoro TTS always; IndexTTS, MAGI v3,
+DeepSeek-OCR 2 and Z-Image Turbo when an NVIDIA GPU is present. `--minimal`,
+`--all`, `--skip <tool>`, `--dry-run` variants; safe to re-run (resumes).
+
+Prefer picking pieces yourself?
+
 ```bash
 mangaeasy doctor --json          # ffmpeg/git/GPU/tool status
 mangaeasy bootstrap-tools        # one-time ~100 MB: ffmpeg/ffprobe/uv/git-lfs

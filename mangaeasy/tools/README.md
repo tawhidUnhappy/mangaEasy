@@ -14,6 +14,7 @@ README is the code map.
 
 | File | Command | Role |
 |---|---|---|
+| [`setup.py`](setup.py) | `setup` | one-command provisioning: core binaries + GPU-aware tool selection (`plan_tools`) + installs + doctor summary; idempotent/resumable ([docs/setup.md](../../docs/setup.md)) |
 | [`install.py`](install.py) | `install-tool`, `doctor` | `TOOLS` registry (`ToolSpec` per tool) + installer; copies `adapter`/`extra_adapters` scripts from `assets/tools/` into each env |
 | [`external.py`](external.py) | `tools`, `where` | resolve an installed tool dir (`resolve_tool_dir`), build its subprocess env (`tool_env`), interpreter path (`python_command`), device/root resolution |
 | [`vendored.py`](vendored.py) | `bootstrap-tools` | vendor ffmpeg/uv/git-lfs into the install so users need nothing on PATH; `ensure_vendored_path()` runs at CLI startup |

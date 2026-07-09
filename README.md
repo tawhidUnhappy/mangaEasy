@@ -54,8 +54,14 @@ Usage:
 - **One command, many tools** — `mangaeasy <subcommand>`, discoverable via `--help`.
 - **Agent-native** — every command has a `--json` / machine-readable contract,
   and `mangaeasy mcp` exposes the same engine as typed MCP tools for an agent host.
-- **One-command AI tool install** — `mangaeasy install-tool index-tts` or
-  `mangaeasy install-tool deepseek-ocr2` builds isolated model environments for you.
+- **One-command setup** — `mangaeasy setup` provisions a fresh machine end to
+  end (core binaries, AI tool envs, model downloads), GPU-aware and resumable
+  ([docs/setup.md](docs/setup.md)); `mangaeasy install-tool <name>` installs
+  tools individually.
+- **Full-series acquisition** — `mangaeasy download --url <mangadex url> --all`
+  grabs a whole series politely (rate-limited, jittered, resumable), and
+  `series-plan` slices it into 12-chapter upload batches and tracks what's
+  published.
 - **General item-based video pipeline** — point it at numbered folders of images +
   `narration.json` and get per-item videos plus an optional joined long video.
 - **Isolated AI tools** — Kokoro / IndexTTS / MAGI / DeepSeek-OCR 2 / Z-Image Turbo run in their own `uv`
@@ -87,12 +93,12 @@ git clone https://github.com/tawhidUnhappy/mangaEasy.git && cd mangaEasy && uv s
 #    mangaeasy-windows.zip / mangaeasy-macos-arm64.zip / mangaeasy-linux.tar.gz
 ```
 
-Then grab the core binaries and whichever AI tools you want (each downloads on
-demand into the install's own self-contained data folder, never your home dir):
+Then provision everything in one go (downloads land in the install's own
+self-contained data folder, never your home dir):
 
 ```bash
-mangaeasy bootstrap-tools               # ffmpeg/ffprobe/uv/git-lfs
-mangaeasy install-tool kokoro-82m       # CPU TTS (add index-tts / magi-v3 / z-image-turbo as needed)
+mangaeasy setup      # core binaries + GPU-appropriate AI tools + models
+                     # (--minimal / --all / --skip <tool> — see docs/setup.md)
 ```
 
 GPU acceleration (NVIDIA CUDA, Apple Silicon) is auto-detected, with CPU
@@ -109,7 +115,11 @@ machine-readable discovery (`mangaeasy commands --json`, `where --json`,
 `library-list --json`), stable `MANGAEASY_RESULT`/`MANGAEASY_PROGRESS`
 output markers, exit codes, and copy-paste recipes. There's also a built-in
 MCP server: register `mangaeasy mcp` and the pipeline shows up as typed
-tools in any MCP-capable assistant.
+tools in any MCP-capable assistant. The full production workflow (MangaDex
+URL → narrated, thumbnailed, uploaded recap series in 12-chapter batches) is
+encoded as an agent skill in
+[.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) —
+Claude Code discovers it automatically when working in this repo.
 
 ---
 

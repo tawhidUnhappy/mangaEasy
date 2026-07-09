@@ -18,7 +18,14 @@ mangaeasy doctor --json      # machine readiness (ffmpeg, GPU, AI tools)
 
 No command prompts for input. `--json` commands print one JSON object;
 generation commands end with a `MANGAEASY_RESULT {"outputs": [...]}` line.
-An MCP server is available: `mangaeasy mcp` (stdio).
+An MCP server is available: `mangaeasy mcp` (stdio). Fresh machine?
+`mangaeasy setup` provisions everything in one command
+([docs/setup.md](docs/setup.md)).
+
+**Producing a recap series** (MangaDex URL → uploaded videos, 12 chapters per
+video): follow the skill at
+[.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) —
+Claude Code loads it automatically; other agents can read it as a runbook.
 
 Hard safety rules: never delete/rename inside `library/` source items; never
 touch `narration.backup.json`; clear generated output only via the

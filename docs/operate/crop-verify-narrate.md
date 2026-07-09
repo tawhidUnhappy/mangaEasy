@@ -26,8 +26,17 @@ Orient first with `mangaeasy where --json` and `mangaeasy doctor --json`.
 | **Vertical strip** — one endless scroll, panels separated by gutters (Korean/Chinese webtoons) | `mangaeasy webtoon-split` | gutter analysis (no GPU model) |
 | **Paged manga** — discrete pages, multiple panels per page (Japanese tankōbon, most scanlations) | `mangaeasy page-split` | MAGI v3 (needs `install-tool magi-v3`) |
 
-If unsure: open a few files in `download/`. Tall images many times taller than
-wide → webtoon. Roughly page-shaped images with panel grids → paged.
+Let the machine measure first:
+
+```bash
+mangaeasy style-detect --project-root library/<Project> --json
+```
+
+It reports a per-item and overall verdict (`webtoon` / `paged` / `uncertain`)
+from the page aspect ratios, plus `sample_images` to confirm visually — open
+2–3 of them before committing to a splitter. Tall images many times taller
+than wide → webtoon. Roughly page-shaped images with panel grids → paged.
+`uncertain` or mixed verdicts mean look at the actual pages and decide.
 
 ---
 

@@ -40,7 +40,9 @@ build by shelling out to the narrower commands, in this order:
 
 ## Validation / cleanup commands
 
-`video-check` ([check_items.py](check_items.py)), `video-validate`
+`video-check` ([check_items.py](check_items.py)), `narration-check`
+([narration_check.py](narration_check.py) — structural narration validation
+before audio: coverage, dangling images, empty text), `video-validate`
 ([validate_generation.py](validate_generation.py)), `video-audio-audit`
 ([audio_audit.py](audio_audit.py)), and the `video-clean-*` family (never touch
 `library/` sources; generated output is archived, not deleted).

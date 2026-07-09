@@ -12,6 +12,7 @@ critical crop→narrate→video path; they're helpers.
 | [`convert.py`](convert.py) | `convert-images` | normalize/convert image formats |
 | [`pdf.py`](pdf.py) | `to-pdf` | export chapter images to a PDF |
 | [`pdf_lossless.py`](pdf_lossless.py) | `to-pdf-lossless` | lossless PDF export |
+| [`thumbnail_compose.py`](thumbnail_compose.py) | `thumbnail-compose` | text furniture onto a thumbnail base: stroked blocks, optional arrow, inset border ([docs/thumbnail.md](../../docs/thumbnail.md)) |
 | [`watermark.py`](watermark.py) / [`watermark_util.py`](watermark_util.py) | `watermark` | burn a text watermark onto images |
 
 ## Entry points

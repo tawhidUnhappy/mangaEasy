@@ -17,7 +17,7 @@ script) into a narrated video, and can chain many chapters into one long
 "recap" video with background music, ready for YouTube.
 
 **mangaEasy is a CLI + MCP tool for LLM agents — there is no GUI.** The whole
-surface is the `mangaeasy` command (~42 subcommands, each with a machine-readable
+surface is the `mangaeasy` command (~50 subcommands, each with a machine-readable
 `--json` / marker contract) plus `mangaeasy mcp`, which exposes the same engine
 as typed MCP tools. A previous Electron desktop app and a set of Flask web
 editors were removed — see `docs/history/legacy-inventory.md`. New here?
@@ -359,6 +359,31 @@ points there). When changing CLI behaviour, keep these stable:
   entry to its `TOOLS` dict (schema + flag mapping) — no SDK, keep it
   dependency-free. `tests/test_docs_crossref.py` fails if docs mention
   commands that don't exist.
+
+## The agent-flow layer (added post-v1.3.1)
+
+A thin set of commands exists purely so an agent can run the whole
+URL→upload flow without hand-holding; their invariants:
+
+- `setup` (`tools/setup.py`) — chains `ensure_core_tools()` + GPU-aware
+  `install_tool()` calls. It must stay idempotent/resumable and must keep
+  going past individual tool failures (one flaky 33 GB download must not
+  waste the others' progress).
+- `download --url/--name/--all` — `--url` must keep working without any
+  config.json. The complete-chapter fast-skip in `_download_one_chapter()`
+  exists so an `--all` re-run doesn't cost one at-home API call per
+  already-downloaded chapter — keep it; MangaDex politeness is a feature.
+- `style-detect`, `narration-check`, `series-plan` — read-only `--json`
+  reporters. `narration-check` is the *structural* half of narration
+  verification only; don't grow it into semantic checking.
+- `series-plan`/`series-mark-published` own `library/<project>/publish.json`
+  (machine-managed, like manga.json). Batches are stable fixed windows over
+  the sorted item list — don't make them shift when items are added.
+- `thumbnail-compose` archives the previous output before overwriting,
+  like every other generation command.
+- The agent workflow itself lives in `.claude/skills/manga-recap/SKILL.md`
+  (auto-loaded by Claude Code; plain runbook for other agents). The docs
+  cross-reference test covers it — commands mentioned there must exist.
 
 ## YouTube integration (`mangaeasy/youtube/`)
 

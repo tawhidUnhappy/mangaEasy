@@ -66,19 +66,8 @@ config.system.json
 # Isolated dev tooling (e.g. portable Node.js) — not vendored, not global
 /.tools/
 
-# Electron desktop app — node_modules + build output, not the app's source
-desktop/node_modules/
-desktop/out/
-desktop/dist/
-
-# PyInstaller-built Python backend, copied in fresh by CI/bootstrap before
-# electron-builder runs — not source, rebuilt from packaging/mangaeasy.spec
-/desktop/resources/backend/
-
-# Editor / assistant local state
-.claude/
+# Editor / assistant local state — but the shipped agent skills are source
+.claude/*
+!.claude/skills/
 .idea/
 .vscode/
-
-# eslint cache
-desktop/.eslintcache

@@ -23,7 +23,7 @@ YouTube-safe:
 - Use two- or three-character tension: one shocked/flustered/blushing, one
   calm/smug/powered-up.
 - Do not put text, logos, or watermarks in the generated image; add those
-  afterward with PIL or an editor.
+  afterward with `mangaeasy thumbnail-compose`.
 
 Prompt shape:
 

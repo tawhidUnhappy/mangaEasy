@@ -71,6 +71,15 @@ macOS = `~/Library/Application Support/mangaEasy`; Linux =
 
 ## 2. First-run setup
 
+One command provisions everything (GPU-aware; see [setup.md](setup.md)):
+
+```bash
+mangaeasy setup                  # core binaries + AI tool envs + models
+                                 #   --minimal / --all / --skip <tool> / --dry-run
+```
+
+Or piece by piece:
+
 ```bash
 mangaeasy doctor --json          # ffmpeg/git/GPU/tool status
 mangaeasy bootstrap-tools        # one-time ~100 MB: ffmpeg/ffprobe/uv/git-lfs
@@ -153,14 +162,17 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   traceback) · `2` usage error (bad flags; argparse message on stderr).
 - **`--json` commands** print exactly one JSON object on stdout:
   `commands`, `where`, `doctor`, `tools`, `library-list`, `video-check`,
-  `video-validate`, `video-audio-audit`, `audio-takes-list`. Check the
+  `video-validate`, `video-audio-audit`, `audio-takes-list`,
+  `style-detect`, `narration-check`, `series-plan`. Check the
   `ok` field where present.
 - **Marker lines** inside human output (grep for them, ignore the rest):
   - `MANGAEASY_PROGRESS <n>/<total> [label]` — progress ticks.
   - `MANGAEASY_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
     successful generation command (`video`, `video-render`, `video-join`,
-    `video-add-bgm`, `video-normalize-audio`); tells you exactly what was
-    produced.
+    `video-add-bgm`, `video-normalize-audio`, `download`, `webtoon-split`,
+    `page-split`, `thumbnail-compose`, `setup`); tells you exactly what was
+    produced (the split commands also list per-item `verify_images` to
+    inspect).
 - Output is UTF-8 on every platform, including piped stdout on Windows.
 - Long-running commands stream plain log lines; `\r`-style progress
   redraws may appear when a TTY is attached — safe to ignore in pipes.
@@ -170,8 +182,10 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 Run `mangaeasy commands --json` for the always-current list and
 `mangaeasy <command> --help` for flags. Highlights per group:
 
-**Setup** — `where`, `commands`, `doctor`, `bootstrap-tools`,
-`install-tool <name>`, `tools`, `library-list`, `mcp`.
+**Setup** — `where`, `commands`, `doctor`, `setup` (one-command
+provisioning), `bootstrap-tools`, `install-tool <name>`, `tools`,
+`library-list`, `series-plan` / `series-mark-published` (fixed 12-per-video
+upload batches: what's next, what's published — see the recipe below), `mcp`.
 
 **External tools** — `index-tts`, `deepseek-ocr2`, `zimage` (Z-Image Turbo
 text-to-image: `mangaeasy zimage --prompt "..." --output out.png --width
@@ -187,15 +201,19 @@ the generated files; needs `install-tool z-image-turbo` once).
 `audio-takes-list`, `audio-takes-restore`.
 
 **Manga acquire & crop** — `download`
-(MangaDex; `--chapter N` overrides config, `--chapters 0-12 14 20.5`
-batch-downloads with one feed fetch, skipping chapters that don't exist and
-preferring the fullest version when several scanlations share a number),
-`webtoon-split` (vertical strips), `page-split` (paged manga, MAGI v3),
-`gutter-split` (low-level engine). The crop → verify → narrate loop is
-documented in [operate/crop-verify-narrate.md](operate/crop-verify-narrate.md).
+(MangaDex; `--url <title url>` needs no config file, `--all` grabs the whole
+series start to end — politely, resumably — `--chapter N` / `--chapters
+0-12 14 20.5` for specific ones, always preferring the fullest version when
+several scanlations share a number), `style-detect` (webtoon vs paged
+verdict + sample pages to eyeball), `webtoon-split` (vertical strips),
+`page-split` (paged manga, MAGI v3), `gutter-split` (low-level engine),
+`narration-check` (structural narration validation before audio). The
+crop → verify → narrate loop is documented in
+[operate/crop-verify-narrate.md](operate/crop-verify-narrate.md).
 
 **Image export & AI context** — `to-pdf`, `to-pdf-lossless`,
-`convert-images`, `watermark`, `ai-zip`.
+`convert-images`, `watermark`, `thumbnail-compose` (text furniture onto a
+thumbnail base — see [thumbnail.md](thumbnail.md)), `ai-zip`.
 
 ## 6. Recipes
 
@@ -205,6 +223,34 @@ Set once for readability (absolute paths recommended):
 ROOT=/abs/path/to/workspace          # any folder the user chose
 PROJ=$ROOT/library/myproject         # items live here: $PROJ/01, $PROJ/02, ...
 AUDIO=$ROOT/audio  OUT=$ROOT/output  WORK=$ROOT/work
+```
+
+### MangaDex URL → published recap series (the full loop)
+
+The end-to-end production flow — download → batch plan → crop+verify →
+narrate+verify → video → thumbnail → upload → next batch — is written as an
+agent skill: [`.claude/skills/manga-recap/SKILL.md`](../.claude/skills/manga-recap/SKILL.md)
+(auto-discovered by Claude Code in this repo; readable as a plain runbook by
+any agent). The short of it:
+
+```bash
+mangaeasy download --url "<mangadex url>" --all       # whole series, politely
+mangaeasy series-plan --project-root library/<P> --json   # → next batch (12 items)
+mangaeasy style-detect --project-root library/<P> --json  # webtoon or paged?
+mangaeasy webtoon-split --project-root library/<P> --item-range 01-12   # or page-split
+# inspect verify_images, clear every suspect, re-split with --overrides if needed
+# write narration.json per item, then:
+mangaeasy narration-check --project-root library/<P> --item-range 01-12 --json
+mangaeasy video --project-root library/<P> --audio-root audio --output-root output \
+    --item-range 01-12 --tts auto --build-long-video --normalize-audio \
+    --background-music <music>
+mangaeasy zimage --prompt-file thumb_prompt.txt --output thumb.png --count 4
+mangaeasy thumbnail-compose --base thumb_02.png --output final_thumb.png \
+    --text "3-5 PUNCHY WORDS"
+mangaeasy youtube-upload --video output/<P>/<P>_full.mp4 --title "..." \
+    --thumbnail final_thumb.png --json
+mangaeasy series-mark-published --project-root library/<P> --items 01-12 \
+    --video-id <id>
 ```
 
 ### Images folder → narrated video (one item)

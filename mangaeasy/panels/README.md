@@ -10,6 +10,7 @@ Start with the operator doc: [docs/operate/crop-verify-narrate.md](../../docs/op
 
 | File | Command | For | How |
 |---|---|---|---|
+| [`style_detect.py`](style_detect.py) | `style-detect` | choosing between the two | aspect-ratio heuristic over `download/` pages → `webtoon`/`paged`/`uncertain` verdict + sample images to confirm visually |
 | [`webtoon.py`](webtoon.py) | `webtoon-split` | vertical strips (webtoons) | stitch → gutter split → auto-split tall panels → rescue content gaps → verify sheets |
 | [`page.py`](page.py) | `page-split` | paged manga | MAGI v3 detect (once/chapter) → reading-order → crop → verify overlays |
 | [`gutter.py`](gutter.py) | `gutter-split` | low-level page/gutter split | the gutter engine `webtoon.py` builds on (`_recursive_ranges`, `collect_image_paths`, `stitch_images`) |

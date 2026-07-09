@@ -33,8 +33,9 @@ from urllib.parse import urlparse
 import requests
 
 from mangaeasy import __version__
-from mangaeasy.config import load_download_config
+from mangaeasy.config import CONFIG_FILE, load_download_config, load_system_config
 from mangaeasy.paths import manga_dir
+from mangaeasy.utils import emit_result
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
@@ -504,6 +505,18 @@ def _download_one_chapter(
             print("  Cache      : miss — will fetch from MangaDex")
     print("===========================\n")
 
+    # ── Fast skip: chapter already complete ────────────────────────────────
+    # Politeness matters most on `--all` re-runs over a long series: without
+    # this, every already-downloaded chapter still costs an at-home API call
+    # just to discover there is nothing to do.
+    if cache and cache.get("total") and output_dir.is_dir():
+        present = sum(1 for p in output_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
+        if present >= int(cache["total"]):
+            print(f"[INFO] Chapter {chapter_str} already complete "
+                  f"({present}/{cache['total']} pages) — skipped. Use --fresh to re-fetch.",
+                  flush=True)
+            return True
+
     # ── Chapter ID ─────────────────────────────────────────────────────────
     # Cache the UUID forever — it never changes for a given manga/chapter/lang.
     if cache and cache.get("chapter_id"):
@@ -570,10 +583,53 @@ def _download_one_chapter(
     return True
 
 
+def _chapter_sort_key(ch: str) -> tuple[float, str]:
+    """Numeric-first ordering for MangaDex chapter strings ("1", "3.5", …)."""
+    try:
+        return (float(ch), ch)
+    except ValueError:
+        return (float("inf"), ch)
+
+
+def _slugify_project_name(title: str) -> str:
+    """Filesystem-safe library folder name derived from a manga title."""
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", title).strip("_.")
+    return slug[:60] or "manga"
+
+
+def _resolve_dl_cfg(args) -> dict:
+    """Merged download settings; --url bypasses the config.json requirement."""
+    if args.url:
+        project = {}
+        if CONFIG_FILE.exists():
+            try:
+                project = json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("download") or {}
+            except Exception:
+                project = {}
+        merged = {**load_system_config().get("download_defaults", {}), **project}
+        merged["manga_id"] = args.url
+    else:
+        merged = load_download_config()
+    if args.name:
+        merged["name"] = args.name
+    return merged
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="mangaeasy download",
-        description="Download manga chapters from MangaDex.",
+        description="Download manga chapters from MangaDex — politely (API "
+                    "spacing, 429 backoff, jittered image delays, resumable).",
+    )
+    parser.add_argument(
+        "--url", metavar="URL_OR_UUID",
+        help="MangaDex title URL (or bare manga UUID). Overrides config.json, "
+             "so agents can download without editing any file.",
+    )
+    parser.add_argument(
+        "--name", metavar="PROJECT",
+        help="Library folder name (library/<PROJECT>/). With --url and no "
+             "--name, a safe name is derived from the manga's title.",
     )
     parser.add_argument(
         "--fresh", action="store_true",
@@ -590,18 +646,75 @@ def main() -> None:
              "e.g. --chapters 0-12 14 20.5. Missing chapters are skipped "
              "with a warning instead of aborting the batch.",
     )
+    parser.add_argument(
+        "--all", action="store_true",
+        help="Download every chapter available in the configured language "
+             "(start to end; best duplicate per chapter). Already-complete "
+             "chapters are skipped, so re-running resumes.",
+    )
+    parser.add_argument(
+        "--from", dest="from_chapter", metavar="N", type=float,
+        help="With --all: skip chapters numbered below N.",
+    )
+    parser.add_argument(
+        "--to", dest="to_chapter", metavar="N", type=float,
+        help="With --all: skip chapters numbered above N.",
+    )
     args = parser.parse_args()
-    if args.chapter and args.chapters:
-        parser.error("use either --chapter or --chapters, not both")
+    if sum(bool(x) for x in (args.chapter, args.chapters, args.all)) > 1:
+        parser.error("use only one of --chapter / --chapters / --all")
+    if (args.from_chapter is not None or args.to_chapter is not None) and not args.all:
+        parser.error("--from/--to only apply with --all")
 
-    dl_cfg = load_download_config()
+    dl_cfg = _resolve_dl_cfg(args)
 
     raw_id = str(dl_cfg.get("manga_id", "")).strip()
     if not raw_id:
-        print("[ERROR] 'manga_id' is missing in config.json download section")
+        print("[ERROR] 'manga_id' is missing in config.json download section"
+              " (or pass --url)")
         sys.exit(1)
 
-    if args.chapters:
+    manga_id = normalize_manga_id(raw_id)
+    lang     = dl_cfg.get("translated_language", "en")
+    sess     = _session()
+
+    # Derive the library folder name from the manga title when only a URL was
+    # given — one API call, cached in manga.json afterwards.
+    if not str(dl_cfg.get("name") or "").strip():
+        title = fetch_manga_title(sess, manga_id)
+        if not title:
+            print("[ERROR] could not fetch the manga title to derive a project "
+                  "name — pass --name explicitly")
+            sys.exit(1)
+        dl_cfg["name"] = _slugify_project_name(title)
+        print(f"[INFO] Project name: {dl_cfg['name']} (derived from title; "
+              f"override with --name)", flush=True)
+
+    # One feed fetch covers every chapter in a batch (and disambiguates
+    # duplicate scanlations by page count).
+    chapter_map: dict[str, dict] | None = None
+
+    if args.all:
+        chapter_map = fetch_chapter_map(sess, manga_id, lang)
+        if not chapter_map:
+            print(f"[ERROR] no chapters found for this manga in '{lang}'")
+            sys.exit(1)
+        chapters = sorted(chapter_map, key=_chapter_sort_key)
+        lo, hi = args.from_chapter, args.to_chapter
+        if lo is not None or hi is not None:
+            def _in_bounds(ch: str) -> bool:
+                try:
+                    num = float(ch)
+                except ValueError:
+                    return False  # non-numeric specials excluded from ranges
+                return (lo is None or num >= lo) and (hi is None or num <= hi)
+            chapters = [c for c in chapters if _in_bounds(c)]
+        print(f"[INFO] --all: {len(chapters)} chapter(s) in '{lang}' "
+              f"({chapters[0]} … {chapters[-1]})" if chapters else
+              "[INFO] --all: nothing in the requested range", flush=True)
+        if not chapters:
+            sys.exit(1)
+    elif args.chapters:
         chapters = _parse_chapter_tokens(args.chapters)
     elif args.chapter is not None:
         chapters = [str(args.chapter)]
@@ -609,18 +722,11 @@ def main() -> None:
         chapter = dl_cfg.get("chapter")
         if chapter is None:
             print("[ERROR] 'chapter' is missing in config.json download section"
-                  " (or pass --chapter / --chapters)")
+                  " (or pass --chapter / --chapters / --all)")
             sys.exit(1)
         chapters = [str(chapter)]
 
-    manga_id = normalize_manga_id(raw_id)
-    lang     = dl_cfg.get("translated_language", "en")
-    sess     = _session()
-
-    # One feed fetch covers every chapter in a batch (and disambiguates
-    # duplicate scanlations by page count).
-    chapter_map: dict[str, dict] | None = None
-    if len(chapters) > 1:
+    if chapter_map is None and len(chapters) > 1:
         chapter_map = fetch_chapter_map(sess, manga_id, lang)
 
     ok, missing, failed = [], [], []
@@ -651,6 +757,13 @@ def main() -> None:
             print(f"  not found  : {len(missing)} ({', '.join(missing)})")
         if failed:
             print(f"  incomplete : {len(failed)} ({', '.join(failed)}) — rerun to resume")
+    if not failed:
+        emit_result(
+            project=manga_dir(str(dl_cfg.get("name"))),
+            downloaded=ok,
+            missing=missing,
+            failed=failed,
+        )
     if failed:
         sys.exit(1)
 

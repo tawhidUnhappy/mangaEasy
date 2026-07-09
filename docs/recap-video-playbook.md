@@ -460,7 +460,8 @@ monetizable, not optional flavor):
   powered-up — the emotional contrast between the two *is* the hook.
 - Glossy anime/manhwa rendering, saturated blues and gold, dramatic
   low-angle or dutch-tilt camera. No in-image text/logo/watermark — that
-  gets added after, with PIL (below), where it can be positioned precisely.
+  gets added after, with `mangaeasy thumbnail-compose` (below), where it
+  can be positioned precisely.
 - Example prompt shape: `"glossy anime key art, [character A] blushing
   deeply with sparkling wide eyes and a flustered expression, form-fitting
   [outfit from the story], next to [character B] standing calm and
@@ -468,7 +469,10 @@ monetizable, not optional flavor):
   saturated cyan-blue sky, dramatic low-angle shot, highly detailed,
   cinematic anime lighting, no text"`.
 
-Then with PIL add the signature text/furniture:
+Then add the signature text/furniture with `mangaeasy thumbnail-compose`
+(quick mode: repeated `--text` flags; full placement control via `--spec`
+JSON — blocks/arrow/border; a custom PIL script is only needed for effects
+beyond it, e.g. speech-tails and radial glows):
 1–3 blocks of 1–4 words each — ALL-CAPS role labels + lowercase dialogue
 quips — in extra-bold rounded comic type (Luckiest Guy family), **yellow
 #FFE600 or white fills, black stroke ≈ 12% of font size**, in the top-left

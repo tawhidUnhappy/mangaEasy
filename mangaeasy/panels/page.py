@@ -229,6 +229,8 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         "pages": len(paths),
         "panels": total_panels,
         "suspects": suspects,
+        # The exact images an agent must open to clear the flags above.
+        "verify_images": sorted(str(p) for p in item_verify.glob(f"{item}_*.png")),
     }
 
 

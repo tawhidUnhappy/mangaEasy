@@ -13,10 +13,14 @@ music.
 **mangaEasy is a CLI + MCP tool built for LLM agents — there is no GUI.** The
 entire surface is:
 
-- **CLI** — a single `mangaeasy` command with ~42 subcommands, each with a
+- **CLI** — a single `mangaeasy` command with ~50 subcommands, each with a
   `--json` / machine-readable contract (see [docs/ai-guide.md](docs/ai-guide.md)).
 - **MCP server** — `mangaeasy mcp` exposes the same engine as typed tools for
   an agent host. Same backend, no extra surface.
+- **Agent skill** — [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md)
+  encodes the full MangaDex-URL → published-recap-series workflow; Claude Code
+  picks it up automatically in this repo, and any agent can follow it as a
+  runbook.
 
 Everything mangaEasy writes stays under one data folder — it is designed to be
 **self-contained** (models, tools, output all in-tree, nothing scattered on the
@@ -38,6 +42,8 @@ and the best place to start understanding the code:
 | I want to… | Read |
 |---|---|
 | Understand the whole thing (this) | **START_HERE.md** |
+| Set up a fresh machine in one command | [docs/setup.md](docs/setup.md) |
+| Produce a recap series as an agent (URL → uploads) | [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) |
 | Crop panels, verify them, write narration | [docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md) |
 | Produce a full recap video end-to-end | [docs/recap-video-playbook.md](docs/recap-video-playbook.md) |
 | Drive the CLI from a script/agent | [docs/ai-guide.md](docs/ai-guide.md) |
@@ -67,7 +73,7 @@ Grouped by pipeline stage:
 
 | Stage | Package | What it does |
 |---|---|---|
-| core | `mangaeasy/` (`cli.py`, `config.py`, `paths.py`, `runtime.py`, `library_scan.py`, `mcp_server.py`) | command dispatch, config, path resolution, the MCP server |
+| core | `mangaeasy/` (`cli.py`, `config.py`, `paths.py`, `runtime.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`) | command dispatch, config, path resolution, upload-batch planning, the MCP server |
 | acquire | [`download/`](mangaeasy/download/) | fetch chapters (MangaDex) |
 | acquire | [`panels/`](mangaeasy/panels/) | **crop**: `webtoon-split`, `page-split`, gutter/MAGI detection |
 | produce | [`video_pipeline/`](mangaeasy/video_pipeline/) | the video build: audio → render → join → BGM |
