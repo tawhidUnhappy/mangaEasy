@@ -195,6 +195,7 @@ class DeepSeekOCR2:
                     image_size=self.image_size,
                     crop_mode=self.crop,
                     save_results=False,
+                    eval_mode=True,
                 )
         if isinstance(result, str):
             return normalize_ocr_text(result)

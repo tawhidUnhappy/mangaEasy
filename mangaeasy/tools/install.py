@@ -130,7 +130,7 @@ TOOLS: dict[str, ToolSpec] = {
         env_deps=[
             "torch>=2.6.0",
             "torchvision>=0.21.0",
-            "transformers>=4.46.3,<4.57",
+            "transformers==4.46.3",
             "tokenizers>=0.20.3",
             "accelerate>=1.0.0",
             "safetensors>=0.4.0",
@@ -139,6 +139,8 @@ TOOLS: dict[str, ToolSpec] = {
             "einops>=0.8.0",
             "addict>=2.4.0",
             "easydict>=1.13",
+            "matplotlib>=3.8.0",
+            "tqdm>=4.66.0",
         ],
         verify_import="transformers",
         needs_gpu=True,

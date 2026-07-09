@@ -30,6 +30,7 @@ config.system.json
 /videos/
 /output_videos/
 /audio/
+/audio_faded/
 /output/
 /work/
 /audio_preprocessed/
