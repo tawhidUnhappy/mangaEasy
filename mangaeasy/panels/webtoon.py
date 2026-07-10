@@ -103,6 +103,24 @@ def rescue_gaps(
     return out, rescued
 
 
+def band_energy(raw_std: np.ndarray, half_band: int = 24) -> np.ndarray:
+    """Rolling max of per-row energy over a ±half_band window.
+
+    A cut row is only genuinely safe when it sits inside a *band* of quiet
+    rows the width of a real gutter — a single quiet row is often the white
+    interior of a large speech bubble, and cutting there slices the bubble
+    (a real production defect). Minimizing this measure places cuts at the
+    center of true gutters; where its minimum still exceeds the content
+    threshold, no gutter exists in the window at all and the cut must be
+    flagged for human/AI review instead of trusted.
+    """
+    if raw_std.size == 0:
+        return raw_std
+    pad = np.pad(raw_std, half_band, mode="edge")
+    windows = np.lib.stride_tricks.sliding_window_view(pad, 2 * half_band + 1)
+    return windows.max(axis=1)
+
+
 def auto_split_ranges(
     ranges: List[Range],
     energy: np.ndarray,
@@ -112,15 +130,23 @@ def auto_split_ranges(
     target_height: int = DEFAULT_TARGET_HEIGHT,
     min_segment: int = DEFAULT_MIN_SEGMENT,
     window: int = DEFAULT_CUT_WINDOW,
-) -> Tuple[List[Range], List[int]]:
-    """Split ranges taller than max_ratio * width at low-energy rows.
+    energy_threshold: float = DEFAULT_ENERGY_THRESHOLD,
+) -> Tuple[List[Range], List[int], List[str]]:
+    """Split ranges taller than max_ratio * width at quiet-band rows.
 
-    Cuts are placed near even split points but snapped to the quietest row
-    within +/-window, so they land in gutters/sky rather than through faces
-    or text. Returns (new_ranges, cut_row_ys) — cut rows feed the overlay.
+    Cuts are placed near even split points but snapped to the quietest
+    *band* within +/-window (see band_energy), so they land in real gutters
+    rather than through faces, text, or bubble interiors. When the best
+    available band still carries content-level energy the cut is forced —
+    it happens anyway (the panel is unusably tall otherwise) but is
+    reported in the third return value as ``"y=<row> e=<energy>"`` so the
+    verify pass knows exactly which cuts to eyeball on the strip overlay.
+
+    Returns (new_ranges, cut_row_ys, forced_cut_notes).
     """
     out: List[Range] = []
     cut_rows: List[int] = []
+    forced: List[str] = []
     for top, bottom in ranges:
         height = bottom - top
         if height <= max_ratio * width:
@@ -136,13 +162,15 @@ def auto_split_ranges(
             if lo >= hi:
                 continue
             y = lo + int(np.argmin(energy[lo:hi]))
+            if float(energy[y]) > energy_threshold:
+                forced.append(f"y={y} e={float(energy[y]):.0f}")
             cuts.append(y)
             prev = y
         segments = [top] + cuts + [bottom]
         for seg_top, seg_bottom in zip(segments, segments[1:], strict=False):
             out.append((seg_top, seg_bottom))
         cut_rows.extend(cuts)
-    return out, cut_rows
+    return out, cut_rows, forced
 
 
 def apply_range_overrides(
@@ -277,10 +305,17 @@ def write_strip_overlay(
     verify_dir: Path,
     cut_rows: Sequence[int] = (),
 ) -> None:
-    """Downscaled strip: panel boxes (green), auto-cuts (blue), drops (red)."""
+    """Downscaled strip: panel boxes (green), auto-cuts (blue), drops (red).
+
+    Every boundary is labeled with its ABSOLUTE stitched-strip y coordinate —
+    the same coordinate space ``split_at`` overrides and the ranges manifest
+    use — so a reviewer can turn "this cut is wrong" directly into a numeric
+    fix without estimating positions from a scaled image.
+    """
     font, _ = _load_fonts()
-    scale = 260 / combined.width
-    small = combined.resize((260, max(1, int(combined.height * scale))))
+    overlay_w = 420
+    scale = overlay_w / combined.width
+    small = combined.resize((overlay_w, max(1, int(combined.height * scale))))
     draw = ImageDraw.Draw(small, "RGBA")
     covered = [(int(t * scale), int(b * scale)) for t, b in ranges]
     last = 0
@@ -292,15 +327,62 @@ def write_strip_overlay(
     if last < small.height - 1:
         draw.rectangle([0, last, small.width, small.height], fill=(255, 0, 0, 90))
     for y in cut_rows:
-        draw.line([0, int(y * scale), small.width, int(y * scale)], fill=(0, 120, 255, 255), width=3)
-    for k, (top, _bottom) in enumerate(covered, 1):
-        draw.text((6, top + 3), str(k), fill=(0, 160, 255), font=font)
+        sy = int(y * scale)
+        draw.line([0, sy, small.width, sy], fill=(0, 120, 255, 255), width=3)
+        draw.text((small.width - 130, sy + 4), f"cut y={y}", fill=(0, 120, 255), font=font)
+    for k, ((top, _b), (raw_top, _rb)) in enumerate(zip(covered, ranges, strict=False), 1):
+        draw.text((6, top + 3), f"#{k} y={raw_top}", fill=(0, 160, 255), font=font)
+    # y ruler ticks every 2000 strip-pixels along the right edge.
+    for ry in range(0, combined.height, 2000):
+        sy = int(ry * scale)
+        draw.line([small.width - 14, sy, small.width, sy], fill=(255, 255, 0, 200), width=2)
+        draw.text((small.width - 100, max(0, sy - 30)), str(ry), fill=(255, 255, 0), font=font)
     tile_h = 3200
     n = 0
     for y in range(0, small.height, tile_h):
         n += 1
         small.crop((0, y, small.width, min(small.height, y + tile_h))).save(
             verify_dir / f"{item}_strip_{n}.png")
+
+
+def write_ranges_manifest(
+    item: str,
+    verify_dir: Path,
+    *,
+    strip_height: int,
+    ranges: List[Range],
+    prefix: str,
+    cut_rows: Sequence[int],
+    forced_cuts: Sequence[str],
+) -> Path:
+    """Machine-readable record of this run's final crops.
+
+    ``final[k].index`` is 1-based and matches both the saved panel filename
+    and the contact-sheet/overlay numbering. Override cheat-sheet (all
+    coordinates in stitched-strip pixels, same space as the overlay labels):
+
+    - add a missing cut:      "split_at": [y]
+    - undo a bad cut / fuse:  "merge": [[i, j]] with i, j = index-1 values
+      FROM A NO-OVERRIDE RUN (overrides apply last, so against the same
+      base run several merges can be listed together; re-running with the
+      overrides file reproduces the base + fixes deterministically).
+    """
+    manifest = {
+        "item": item,
+        "strip_height": strip_height,
+        "auto_cut_rows": list(cut_rows),
+        "forced_cuts": list(forced_cuts),
+        "merge_note": "merge indices are 0-based positions in `final` of a "
+                      "no-override run (i.e. panel number - 1)",
+        "final": [
+            {"index": i, "file": f"{prefix}{i:03d}.jpg",
+             "top": top, "bottom": bottom, "height": bottom - top}
+            for i, (top, bottom) in enumerate(ranges, 1)
+        ],
+    }
+    path = verify_dir / f"{item}_ranges.json"
+    path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -334,10 +416,11 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     ranges = _recursive_ranges(combined, cfg, args.device)
     energy, raw_std = row_energy(combined)
     ranges, rescued = rescue_gaps(ranges, raw_std, energy_threshold=args.energy_threshold)
-    ranges, cut_rows = auto_split_ranges(
-        ranges, energy, combined.width,
+    ranges, cut_rows, forced_cuts = auto_split_ranges(
+        ranges, band_energy(raw_std), combined.width,
         max_ratio=args.max_ratio, target_height=args.target_height,
         min_segment=args.min_segment, window=args.cut_window,
+        energy_threshold=args.energy_threshold,
     )
     ranges = apply_range_overrides(ranges, overrides.get(item), combined.height)
     if not ranges:
@@ -361,12 +444,17 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         ranges, raw_std, combined.height, energy_threshold=args.energy_threshold)
     write_contact_sheets(item, crops, verify_dir)
     write_strip_overlay(item, combined, ranges, verify_dir, cut_rows)
+    manifest = write_ranges_manifest(
+        item, verify_dir, strip_height=combined.height, ranges=ranges,
+        prefix=prefix, cut_rows=cut_rows, forced_cuts=forced_cuts,
+    )
 
     dropped = combined.height - sum(b - t for t, b in ranges)
     print(
         f"[{item}] pages={len(paths)} strip_h={combined.height} panels={len(ranges)} "
         f"dropped_rows={dropped} ({100 * dropped / combined.height:.1f}%) "
         f"suspects={suspects if suspects else 'none'} "
+        f"forced_cuts={forced_cuts if forced_cuts else 'none'} "
         f"rescued={rescued if rescued else 'none'} "
         f"content_drops={content_drops if content_drops else 'none'}"
         + (f" archived_previous={archived}" if archived else ""),
@@ -377,8 +465,12 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         "status": "ok",
         "panels": len(ranges),
         "suspects": suspects,
+        # Auto-split cuts that found no true gutter band — each slices
+        # through content by necessity; verify every one on the overlay.
+        "forced_cuts": forced_cuts,
         "rescued": rescued,
         "content_drops": content_drops,
+        "ranges_manifest": str(manifest),
         # The exact images an agent must open to clear the flags above.
         "verify_images": sorted(
             str(p) for pattern in (f"{item}_sheet_*.png", f"{item}_strip_*.png")

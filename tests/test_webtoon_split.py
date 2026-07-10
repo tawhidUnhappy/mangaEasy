@@ -10,6 +10,7 @@ import numpy as np
 from mangaeasy.panels.webtoon import (
     apply_range_overrides,
     auto_split_ranges,
+    band_energy,
     find_content_gaps,
     rescue_gaps,
 )
@@ -27,7 +28,7 @@ def flat_energy(height, value=5.0):
 
 def test_short_panels_pass_through_unsplit():
     energy = flat_energy(3000)
-    ranges, cuts = auto_split_ranges([(0, 1500)], energy, WIDTH)
+    ranges, cuts, _forced = auto_split_ranges([(0, 1500)], energy, WIDTH)
     assert ranges == [(0, 1500)]
     assert cuts == []
 
@@ -35,7 +36,7 @@ def test_short_panels_pass_through_unsplit():
 def test_mega_panel_gets_split():
     height = 6000  # 7.5x width, well over the 2.2 ratio
     energy = flat_energy(height)
-    ranges, cuts = auto_split_ranges([(0, height)], energy, WIDTH)
+    ranges, cuts, _forced = auto_split_ranges([(0, height)], energy, WIDTH)
     assert len(ranges) > 1
     assert len(cuts) == len(ranges) - 1
     # segments tile the original range exactly, in order
@@ -49,7 +50,7 @@ def test_cuts_snap_to_quiet_rows():
     energy = flat_energy(height, 50.0)
     energy[2100] = 0.0  # one obviously quiet row near the midpoint
     # target_height=2000 -> exactly one cut, searched within +/-380 of y=2000
-    ranges, cuts = auto_split_ranges([(0, height)], energy, WIDTH, target_height=2000)
+    ranges, cuts, _forced = auto_split_ranges([(0, height)], energy, WIDTH, target_height=2000)
     assert cuts == [2100]
     assert ranges == [(0, 2100), (2100, height)]
 
@@ -57,7 +58,7 @@ def test_cuts_snap_to_quiet_rows():
 def test_min_segment_respected():
     height = 4000
     energy = flat_energy(height)
-    _, cuts = auto_split_ranges([(0, height)], energy, WIDTH, min_segment=520)
+    _, cuts, _forced = auto_split_ranges([(0, height)], energy, WIDTH, min_segment=520)
     for cut in cuts:
         assert cut >= 520
         assert height - cut >= 520
@@ -150,3 +151,43 @@ def test_trailing_content_drop_reported():
 def test_quiet_edges_not_reported():
     raw = flat_energy(3000, 1.0)
     assert find_content_gaps([(100, 2900)], raw, 3000) == []
+
+
+# ---------------------------------------------------------------------------
+# band_energy + forced-cut flagging (the bubble-slice guard)
+# ---------------------------------------------------------------------------
+
+def test_band_energy_masks_single_quiet_rows():
+    raw = flat_energy(2000, 50.0)
+    raw[1000] = 0.0  # one quiet row (a bubble interior), no quiet band
+    band = band_energy(raw)
+    assert band[1000] == 50.0  # neighbours dominate: not a safe cut row
+
+
+def test_band_energy_preserves_true_gutters():
+    raw = flat_energy(2000, 50.0)
+    raw[900:1100] = 0.0  # a 200-row real gutter
+    band = band_energy(raw)
+    assert band[1000] == 0.0
+
+
+def test_forced_cut_flagged_when_no_gutter_band_exists():
+    height = 4000
+    raw = flat_energy(height, 50.0)
+    raw[2100] = 0.0  # bubble-interior row: quiet alone, loud as a band
+    band = band_energy(raw)
+    ranges, cuts, forced = auto_split_ranges(
+        [(0, height)], band, WIDTH, target_height=2000)
+    assert len(cuts) == 1
+    assert len(forced) == 1 and forced[0].startswith("y=")
+
+
+def test_no_forced_flag_when_cut_lands_in_real_gutter():
+    height = 4000
+    raw = flat_energy(height, 50.0)
+    raw[2050:2200] = 0.0  # a genuine gutter near the midpoint
+    band = band_energy(raw)
+    ranges, cuts, forced = auto_split_ranges(
+        [(0, height)], band, WIDTH, target_height=2000)
+    assert forced == []
+    assert 2050 <= cuts[0] <= 2200
