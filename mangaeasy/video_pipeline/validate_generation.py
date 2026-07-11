@@ -14,7 +14,7 @@ from mangaeasy.video_pipeline.common import (
     merge_item_selection,
     project_name,
 )
-from mangaeasy.video_pipeline.item_assets import load_narration
+from mangaeasy.video_pipeline.item_assets import frame_aligned_duration, load_narration
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -34,6 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-long", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--long-video", type=Path, default=None, help="Override the long video path to validate.")
     parser.add_argument("--duration-tolerance", type=float, default=3.0)
+    parser.add_argument("--fps", type=int, default=15,
+                        help="Render fps used for frame-aligned durations (must match "
+                             "video-render's --fps; default 15).")
     parser.add_argument(
         "--json",
         action="store_true",
@@ -122,7 +125,8 @@ def check_video_file(path: Path, args: argparse.Namespace, errors: list[str]) ->
     return float(data.get("format", {}).get("duration") or 0.0)
 
 
-def check_item(item_dir: Path, args: argparse.Namespace, totals: dict[str, int], errors: list[str]) -> float:
+def check_item(item_dir: Path, args: argparse.Namespace, totals: dict[str, int],
+               errors: list[str], warnings: list[str]) -> float:
     item_name = item_dir.name
     name = project_name(args.project_root, args.project_name)
     audio_dir = args.audio_root.resolve() / name / item_name
@@ -154,16 +158,36 @@ def check_item(item_dir: Path, args: argparse.Namespace, totals: dict[str, int],
         errors.append(f"[{item_name}] Some narration entries are missing image keys.")
     if len(set(narration_stems)) != len(narration_stems):
         errors.append(f"[{item_name}] Duplicate narration image stems.")
-    if set(narration_stems) != set(panels):
-        errors.append(f"[{item_name}] Narration and panel names do not match.")
-    if set(narration_stems) != set(audios):
-        errors.append(f"[{item_name}] Narration and panel-audio names do not match.")
+    # Narrated stems missing their panel or audio are real breakage; panels
+    # deliberately left out of narration (banners, junk slivers) are only
+    # worth a warning — the list doubles as the intentional-skip audit trail.
+    missing_panels = sorted(set(narration_stems) - set(panels))
+    if missing_panels:
+        errors.append(f"[{item_name}] Narration references missing panel image(s): "
+                      + ", ".join(missing_panels[:10]))
+    unnarrated = sorted(set(panels) - set(narration_stems))
+    if unnarrated:
+        warnings.append(f"[{item_name}] {len(unnarrated)} panel(s) not narrated "
+                        f"(intentional skips are normal): " + ", ".join(unnarrated[:10]))
+    missing_audio = sorted(set(narration_stems) - set(audios))
+    if missing_audio:
+        errors.append(f"[{item_name}] Narrated panel(s) missing audio: "
+                      + ", ".join(missing_audio[:10]))
+    extra_audio = sorted(set(audios) - set(narration_stems))
+    if extra_audio:
+        warnings.append(f"[{item_name}] {len(extra_audio)} audio file(s) without a "
+                        f"narration entry: " + ", ".join(extra_audio[:10]))
 
+    # The item WAV pads every segment to its frame-aligned visual duration
+    # (apad/atrim in build_item_narration_wav), so compare against the same
+    # frame-aligned sum — raw WAV sums drift ~1 frame per segment and sit
+    # right at the tolerance edge on long items.
     panel_audio_duration = 0.0
     for stem in narration_stems:
         audio_path = audios.get(stem)
         if audio_path:
-            panel_audio_duration += duration(audio_path)
+            visual, _frames = frame_aligned_duration(duration(audio_path), args.fps)
+            panel_audio_duration += visual
 
     if not item_wav.exists():
         errors.append(f"[{item_name}] Missing item narration WAV: {item_wav}")
@@ -213,10 +237,11 @@ def main() -> int:
 
     totals = {"panels": 0, "narration": 0, "panel_audio": 0, "item_wavs": 0, "item_videos": 0}
     errors: list[str] = []
+    warnings: list[str] = []
     long_expected_duration = 0.0
 
     for item_dir in items:
-        long_expected_duration += check_item(item_dir, args, totals, errors)
+        long_expected_duration += check_item(item_dir, args, totals, errors, warnings)
 
     expected_items = len(items)
     output_items_dir = args.output_root.resolve() / name / "items"
@@ -253,7 +278,8 @@ def main() -> int:
 
     if args.as_json:
         print(json.dumps(
-            {"items": expected_items, "totals": totals, "errors": errors, "ok": not errors},
+            {"items": expected_items, "totals": totals, "errors": errors,
+             "warnings": warnings, "ok": not errors},
             ensure_ascii=False,
         ))
         return 1 if errors else 0
@@ -266,13 +292,18 @@ def main() -> int:
     print(f"  item WAVs:      {totals['item_wavs']}")
     print(f"  item videos:    {totals['item_videos']}")
 
+    for warning in warnings:
+        print(f"  WARN: {warning}")
     if errors:
         print("\nVALIDATION FAILED")
         for error in errors:
             print(f"  ERROR: {error}")
         return 1
 
-    print("\nVALIDATION OK")
+    if warnings:
+        print(f"\nVALIDATION OK ({len(warnings)} warning(s))")
+    else:
+        print("\nVALIDATION OK")
     return 0
 
 

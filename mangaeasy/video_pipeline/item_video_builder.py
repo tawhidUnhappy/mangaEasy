@@ -325,6 +325,37 @@ def build_from_image_concat(chapter_dir: Path, assets: list[PanelAsset], work_di
         image_list.unlink(missing_ok=True)
 
 
+def stale_reason(output_mtime: float, inputs) -> str | None:
+    """Name of the newest input file modified after the render, if any.
+
+    A rendered item video must never silently survive changes to the panels,
+    narration or per-panel audio it was built from — that shipped a video
+    with six stale chapters once. Missing inputs are ignored here; input
+    *validation* is video-check's job, this is only a freshness gate.
+    """
+    newest_name, newest_mtime = None, output_mtime
+    for path in inputs:
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if mtime > newest_mtime:
+            newest_name, newest_mtime = path.name, mtime
+    return newest_name
+
+
+def _item_input_files(chapter_dir: Path, config: VideoBuildConfig):
+    yield chapter_dir / "narration.json"
+    yield chapter_dir / "intro.json"
+    panels = chapter_dir / "panels"
+    if panels.is_dir():
+        yield from panels.iterdir()
+    audio_dir = item_audio_dir(config.audio_root, config.project_root,
+                               config.project_name_override, chapter_dir)
+    if audio_dir.is_dir():
+        yield from audio_dir.glob("*.wav")
+
+
 def build_one_chapter(chapter_dir: Path, config: VideoBuildConfig) -> None:
     output_dir = item_output_dir(config)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -332,8 +363,13 @@ def build_one_chapter(chapter_dir: Path, config: VideoBuildConfig) -> None:
     output_path = output_dir / f"item_{chapter_dir.name}.mp4"
     if output_path.exists():
         if not config.overwrite:
-            print(f"[{chapter_dir.name}] exists, skipping: {output_path}", flush=True)
-            return
+            reason = stale_reason(output_path.stat().st_mtime,
+                                  _item_input_files(chapter_dir, config))
+            if reason is None:
+                print(f"[{chapter_dir.name}] up to date, skipping: {output_path}", flush=True)
+                return
+            print(f"[{chapter_dir.name}] inputs changed since last render "
+                  f"({reason} is newer) — re-rendering", flush=True)
         archived = archive_before_overwrite(output_path)
         if archived is not None:
             print(f"[{chapter_dir.name}] archived previous render to: {archived}", flush=True)

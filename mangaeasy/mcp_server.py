@@ -100,6 +100,33 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "work_dir": ("--work-dir", "value"), "overrides": ("--overrides", "value")},
     ),
+    "webtoon_cutcheck": (
+        "webtoon-cutcheck",
+        "Render full-resolution review windows around every forced auto-split cut and short "
+        "panel from webtoon-split's ranges manifests, montaged into sheets. Read EVERY sheet "
+        "and judge each flagged location on the art (FIX = cut through figure/speech bubble; "
+        "ACCEPT = background/effect art, banners, bordered thin panels) before narrating.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "work_dir": {**_STR, "description": "Work dir holding webtoon_verify manifests (default: work)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "work_dir": ("--work-dir", "value")},
+    ),
+    "panels_remap": (
+        "panels-remap",
+        "After re-running webtoon-split, map the archived old panels to the new crops and carry "
+        "narration + audio over (texts verbatim, WAVs copied/concatenated) instead of "
+        "re-narrating. Dry run by default; set apply=true once the report shows zero orphans. "
+        "Review every shift/merge panel with narration-review-sheets afterwards.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "audio_root": {**_STR, "description": "Audio root (default: audio)."},
+         "old_run": {**_STR, "description": "Archive run (e.g. run_0002) the narration was written against."},
+         "apply": {**_BOOL, "description": "Write narration.json + audio (default: dry-run report)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "audio_root": ("--audio-root", "value"), "old_run": ("--old-run", "value"),
+         "apply": ("--apply", "flag")},
+    ),
     "page_split": (
         "page-split",
         "Crop paged manga into panels with MAGI v3 detection (needs install-tool magi-v3; "
@@ -122,6 +149,32 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": _PROJECT_ROOT, "items": _ITEMS},
         ["project_root"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list")},
+    ),
+    "panel_transcript": (
+        "panel-transcript",
+        "OCR every panel into <item>/transcript.json with DeepSeek-OCR 2 (needs install-tool "
+        "deepseek-ocr2; LONG-RUNNING). Run BEFORE writing narration: the transcript grounds "
+        "dialogue paraphrase and speaker attribution, and narration-review-sheets shows it "
+        "next to each narration line during verification.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "force": {**_BOOL, "description": "Re-OCR panels that already have an ocr value."},
+         "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "force": ("--force", "flag"), "device": ("--device", "value")},
+    ),
+    "narration_review_sheets": (
+        "narration-review-sheets",
+        "Render sheets pairing every narration entry's panel image with the narration text and "
+        "the panel's OCR transcript. Read EVERY sheet and verify per panel: the line describes "
+        "THAT panel only, dialogue matches the OCR column, the speaker attribution is right, "
+        "and the line reads naturally aloud. This is the semantic half narration-check skips.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "only_images": {"type": "array", "items": {"type": "string"},
+                         "description": "Limit to these image names (e.g. panels-remap's review list)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "only_images": ("--only-images", "list")},
     ),
     "thumbnail_compose": (
         "thumbnail-compose",
@@ -294,6 +347,16 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"video": ("--video", "value"), "title": ("--title", "value"),
          "description": ("--description", "value"), "tags": ("--tags", "value"),
          "privacy": ("--privacy", "value")},
+    ),
+    "youtube_thumbnail": (
+        "youtube-thumbnail",
+        "Set/replace the thumbnail of an already-uploaded video — iterate on thumbnail art or "
+        "markup without re-uploading. Needs the same auth as youtube-upload and a verified "
+        "YouTube account for custom thumbnails.",
+        {"video_id": {**_STR, "description": "Video id, e.g. dQw4w9WgXcQ."},
+         "image": {**_STR, "description": "Absolute path to the PNG/JPG (max 2 MB)."}},
+        ["video_id", "image"],
+        {"video_id": ("--video-id", "value"), "image": ("--image", "value")},
     ),
     "bootstrap_tools": (
         "bootstrap-tools",

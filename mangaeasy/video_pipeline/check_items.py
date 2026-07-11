@@ -64,6 +64,11 @@ def files_by_stem(folder: Path, extensions: set[str]) -> dict[str, Path]:
     return result
 
 
+def is_speakable(text: str) -> bool:
+    """True if the narration text contains anything TTS can pronounce."""
+    return any(ch.isalnum() for ch in text or "")
+
+
 def check_item(item_dir: Path, args: argparse.Namespace, *, quiet: bool) -> dict:
     """Check one item; returns {item, counts, warnings} and (unless quiet)
     prints the same information as the human report."""
@@ -116,6 +121,19 @@ def check_item(item_dir: Path, args: argparse.Namespace, *, quiet: bool) -> dict
     duplicate_narration = sorted({stem for stem in narration_stems if narration_stems.count(stem) > 1})
     if duplicate_narration:
         warn("Duplicate narration image stems: " + ", ".join(duplicate_narration[:20]))
+
+    # Punctuation-only lines like "?!" give TTS nothing to say — the result is
+    # a ~0.03s WAV that video-audio-audit later flags as corrupt. Catch it
+    # here, before audio generation, so the text gets a real line instead.
+    unspeakable = sorted(
+        Path(entry.get("image", "")).stem
+        for entry in narration
+        if isinstance(entry, dict) and entry.get("image")
+        and not is_speakable(entry.get("narration", ""))
+    )
+    if unspeakable:
+        warn("Unspeakable narration text (no letters/digits — TTS will emit "
+             "near-empty audio): " + ", ".join(unspeakable[:20]))
 
     narration_set = set(narration_stems)
     panel_set = set(panels)

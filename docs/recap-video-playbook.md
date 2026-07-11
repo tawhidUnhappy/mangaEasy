@@ -84,23 +84,45 @@ verification images in `work/webtoon_verify/<Project>/`:
 - `NN_strip_K.png` — the downscaled strip with green panel boxes, blue
   auto-cut lines, and red dropped rows.
 
-**Clear every flag visually before writing narration.** Each item's report
-line prints `suspects` (unusually tall/short panels), `rescued` gaps, and
-`content_drops` (dropped rows that still look like content). Production-
-verified benign patterns: a thin `#3`-ish sliver near the top = scanlator /
-Tencent credit banner; a trailing drop of h≈765–1054 at the very end of a
-strip = "NOTICE: we're recruiting" promo block; thin bright slivers mid-
-chapter = SFX calligraphy (fine to skip in narration). Dialogue-bubble
-slices flagged as suspects are real content — keep them. When the automatic
-result is actually wrong, correct it per item with `--overrides`:
+**Clear every flag visually before writing narration — on full-resolution
+windows, not contact sheets.** A shipped recap had to be fully redone because
+its crops were judged on downscaled sheets (half panels, fused stuck-together
+panels, sliced speech bubbles). The pass that catches them:
+
+```bash
+mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-19
+```
+
+It reads the `<item>_ranges.json` manifests webtoon-split wrote and renders a
+±650 px full-res window around every forced auto-split cut and every short
+panel, montaged into sheets under `work/cutcheck/<Project>/`. Read every
+sheet; verdicts: **FIX** when a cut passes through a figure or speech bubble
+or a short panel is a bubble/SFX fragment (merge it toward its bubble-mate);
+**ACCEPT** for background/effect-art cuts, bordered thin scenery panels and
+scanlator banners (skip those in narration). Production-verified benign
+patterns: a thin `#3`-ish sliver near the top = scanlator credit banner; a
+trailing drop of h≈765–1054 = "we're recruiting" promo; thin bright slivers
+mid-chapter = SFX calligraphy.
+
+Collect every FIX into one `--overrides` file and re-run:
 
 ```json
 {"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}
 ```
 
-(`replace` swaps an item's whole range list; `merge` indices are 0-based
-inclusive; `split_at` values are stitched-strip y coordinates readable off
-the strip overlay.)
+- `merge [[i, j]]` = **0-based positions in the manifest's `final` list of a
+  no-override run** (panel number − 1; the manifest `index` field is 1-based).
+  Resolve indices by matching the defect's y against `top`/`bottom` in the
+  manifest — never by eye.
+- `split_at` = absolute stitched y, applied after merges; to reposition a bad
+  cut, merge across it then split at a y picked from the pixel data (blank
+  row run / hard edge). Fragments under 20 px are dropped automatically.
+- `replace` swaps an item's whole range list.
+
+Then re-run `webtoon-cutcheck` to confirm the fixed locations, and if
+narration already existed for the old numbering, carry it over with
+`panels-remap` (see `docs/operate/crop-verify-narrate.md`) instead of
+re-narrating.
 
 Webtoon panel naming is `ch{item}_{i:03d}.jpg` — narration.json keys on
 these filenames. Chapters from different scanlators differ in boilerplate:
@@ -267,6 +289,20 @@ you skimmed. While reading, note:
   risqué imagery, and the credits/scanlator page. List them; they are
   excluded in Phase 5, and they must never appear in the thumbnail.
 
+## Phase 4.5 — OCR the bubbles (`panel-transcript`)
+
+```bash
+mangaeasy install-tool deepseek-ocr2   # one-time
+mangaeasy panel-transcript --project-root library/<Project> --item-range 01-07
+```
+
+Writes `<item>/transcript.json` — every panel's bubble/caption text. Write
+narration from **panel image + transcript together**. Viewer feedback on a
+shipped recap that skipped this: wrong speaker attribution, lines that
+summarized several panels while one panel was on screen, paraphrases that
+drifted from what the character actually said. The transcript is also what
+`narration-review-sheets` shows next to each line in the verification pass.
+
 ## Phase 5 — Write `narration.json`
 
 Format (`library/<Project>/<item>/narration.json`):
@@ -274,6 +310,19 @@ Format (`library/<Project>/<item>/narration.json`):
 ```json
 [{"image": "01_04_01.png", "narration": "One sentence or three. Present tense."}]
 ```
+
+**Grounding rules (each traces to real viewer complaints):**
+
+- **One beat per panel** — the line covers what is visible in THAT panel.
+  Spread story summary across consecutive lines, never smear it over one
+  panel the viewer is staring at.
+- **Anchor paraphrase to the transcript** — reword for voice and pacing, but
+  the meaning must match that panel's OCR text; when the paraphrase reads
+  awkward, a trimmed quote is better.
+- **Attribute speakers from the panel** — who is on-panel, whose bubble
+  (tail) is it? Unsure → don't name the speaker, narrate around it.
+- **Punctuation-only lines are unspeakable** — `"?!"` becomes a ~0.03 s WAV;
+  give reaction panels a real line (`video-check` flags these).
 
 Structure that worked (96 entries ≈ 9–11 min depending on TTS):
 
@@ -316,6 +365,16 @@ are simply unused, and the pipeline renders only the panels named in
 parses, no two entries share an image stem, and every referenced image
 exists on disk. (After building, the warnings that do matter are
 audio-related — missing audio for a *referenced* entry; see Phase 7.)
+
+**Then run the semantic pass — this is not optional:**
+
+```bash
+mangaeasy narration-review-sheets --project-root library/<Project> --item-range 01-07
+```
+
+Read every sheet (panel + narration + OCR side by side) and verify the four
+grounding rules above per panel. Fix by editing `narration.json`, delete the
+affected WAVs, re-run audio generation (it fills only missing files).
 
 ## Phase 6 — Build the video
 
@@ -380,6 +439,11 @@ mangaeasy video --project-root library/<Project> --items 01 \
   fixed file first, verify, then `mangaeasy youtube-delete --video-id <id>
   --confirm` the old one.
 - Old takes are archived to `old/run_NNNN/`, never destroyed.
+- **After changing panels, narration or audio, pass `--overwrite-video`.**
+  The renderer now also detects stale item videos by input mtimes and
+  re-renders them ("inputs changed since last render"), but be explicit —
+  a silent skip-if-exists once joined six outdated chapters into a
+  "successful" build that was caught only by validate's duration check.
 - Run it in the background and poll/wait; IndexTTS for ~100 panels is a
   long job. If audio state is ever in doubt:
   `mangaeasy video-audio-audit --project-root library/<Project> --json`.
@@ -390,9 +454,11 @@ mangaeasy video --project-root library/<Project> --items 01 \
 mangaeasy video-validate --project-root library/<Project> --items 01 --json
 ```
 
-(When you deliberately narrate a subset of panels, the "narration and
-panel names do not match" error is expected — check the counts instead:
-narration == panel_audio, item_videos == 1.)
+Deliberately-unnarrated panels and orphan audio now surface as `warnings`
+(exit 0); anything in `errors` is real breakage — missing panels/audio for
+*referenced* entries, duration mismatches (the item-WAV expectation is
+frame-aligned; pass `--fps` if you rendered at a non-default rate), stream
+problems.
 
 Then verify the actual MP4:
 
@@ -471,15 +537,35 @@ monetizable, not optional flavor):
 
 Then add the signature text/furniture with `mangaeasy thumbnail-compose`
 (quick mode: repeated `--text` flags; full placement control via `--spec`
-JSON — blocks/arrow/border; a custom PIL script is only needed for effects
+JSON — blocks/arrows/border; a custom PIL script is only needed for effects
 beyond it, e.g. speech-tails and radial glows):
 1–3 blocks of 1–4 words each — ALL-CAPS role labels + lowercase dialogue
-quips — in extra-bold rounded comic type (Luckiest Guy family), **yellow
-#FFE600 or white fills, black stroke ≈ 12% of font size**, in the top-left
-and top-right zones; a solid triangle speech-tail from each block toward
-its speaker; optionally one chunky yellow black-outlined arrow to the
-reveal character and a white radial glow behind them; finish with a ~5 px
-white rounded-rect border inset ~3 px from the edge.
+quips — **yellow #FFE600 or white fills, black stroke ≈ 12% of font size**.
+**Make the markup read hand-placed, not programmatic** (viewer feedback on a
+shipped thumbnail: good art, but flat horizontal text + a thin line arrow
+felt unnatural next to the reference channels):
+
+- tilt the big hook block a few degrees (`"rotate": -3` … `-5`); keep small
+  corner tags straight;
+- arrows are **fat outlined block-arrows** (the default `"style": "block"`,
+  width ≈ 22–30) pointing at a character/object, not thin lines;
+- the built-in drop shadow (default on) separates text from busy art —
+  don't disable it on detailed backgrounds;
+- text may contain `\n` for stacked lines sharing one rotation.
+
+Example spec:
+
+```json
+{"blocks": [
+   {"text": "HE ATE\nHER SON?!", "x": 24, "y": 500, "size": 84, "rotate": -4},
+   {"text": "TIGER MOM", "x": 556, "y": 22, "size": 62},
+   {"text": "CH 1-7", "x": 28, "y": 22, "size": 44, "fill": "#FFFFFF"}],
+ "arrows": [{"from": [742, 108], "to": [818, 178], "width": 26}],
+ "border": true}
+```
+
+A live video's thumbnail can be replaced without re-uploading:
+`mangaeasy youtube-thumbnail --video-id <id> --image <png>`.
 
 **B. Panel collage (works with no image model).** Dramatic panel as
 background, scaled to width, blurred (GaussianBlur ~2.5), darkened

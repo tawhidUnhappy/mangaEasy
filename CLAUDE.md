@@ -375,7 +375,27 @@ URL→upload flow without hand-holding; their invariants:
   already-downloaded chapter — keep it; MangaDex politeness is a feature.
 - `style-detect`, `narration-check`, `series-plan` — read-only `--json`
   reporters. `narration-check` is the *structural* half of narration
-  verification only; don't grow it into semantic checking.
+  verification only; don't grow it into semantic checking — the semantic
+  half is `narration-review-sheets` (panel + narration + OCR sheets an
+  agent Reads), fed by `panel-transcript` (DeepSeek-OCR 2 over every panel
+  into `<item>/transcript.json`, BEFORE narration exists — it grounds
+  dialogue paraphrase and speaker attribution; born from viewer feedback:
+  wrong speakers, multi-panel summaries on one panel, paraphrase drift).
+- `webtoon-cutcheck` — full-resolution review windows around every forced
+  auto-split cut / short panel from the ranges manifests; the crop-QA pass
+  that replaced judging on downscaled contact sheets (which shipped sliced
+  bubbles once). `panels-remap` — after a re-crop, locates archived old
+  panels in the stitched strip and carries narration + WAVs to the new
+  numbering by interval overlap (dry-run by default; refuses `--apply` on
+  orphans). Neither regenerates TTS.
+- Item renders are freshness-gated: `build_one_chapter()` re-renders when
+  panels/narration/audio are newer than the existing item video
+  (`stale_reason()`); `--overwrite-video` still forces. Don't restore the
+  old unconditional skip-if-exists — it silently joined six stale chapters
+  into a "successful" build once. `video-validate` splits intentional
+  narration skips / orphan audio into `warnings` (exit 0) vs real breakage
+  in `errors`, and its item-WAV duration expectation is frame-aligned
+  (matching `build_item_narration_wav`'s apad/atrim) — keep both.
 - `series-plan`/`series-mark-published` own `library/<project>/publish.json`
   (machine-managed, like manga.json). Batches are stable fixed windows over
   the sorted item list — don't make them shift when items are added.

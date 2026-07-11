@@ -73,29 +73,62 @@ mangaeasy webtoon-split --project-root library/<Project> --item-range 01-12
 
 **The crop double-verify loop** (details: `docs/operate/crop-verify-narrate.md`):
 the result lists per-item `suspects` / `content_drops` and the exact
-`verify_images`. Open every verify sheet and clear every flag — a red gap
-that still shows art or dialogue is a miss. Fix with an overrides file
-(`{"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}`) and re-run the
-split (previous panels are archived, not lost). Do not proceed to narration
-with unresolved suspects.
+`verify_images`. For webtoons, then run the full-resolution pass — judging
+crops on downscaled sheets alone has shipped sliced bubbles before:
 
-## 4. Write narration, then verify it
+```bash
+mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-12
+```
 
-Read each item's panels in order (use `ai-zip` for a labelled bundle, or
-`deepseek-ocr2` to add `ocr` text fields) and write
-`library/<Project>/<item>/narration.json`:
-`[{"image": "<panel file>", "narration": "..."}]` — style rules in
+Read EVERY sheet it writes; FIX any cut through a figure/speech bubble and
+any bubble/SFX-fragment short panel via an overrides file
+(`{"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}` — merge indices
+are 0-based positions in the ranges manifest's `final` list of a no-override
+run; resolve them by matching the defect's y in `<item>_ranges.json`, never
+by eye). ACCEPT background/effect-art cuts, bordered thin scenery, scanlator
+banners. Re-run the split, then re-run cutcheck to confirm. Do not proceed
+to narration with unresolved suspects.
+
+**Re-cropping after narration exists?** Never re-narrate: `mangaeasy
+panels-remap --project-root library/<Project> --item-range 01-12` (dry run,
+then `--apply`) carries narration texts and WAVs to the new numbering, then
+review its `shift`/`merge` list with `narration-review-sheets
+--only-images ...` and rebuild with `mangaeasy video --overwrite-video`.
+
+## 4. Write narration grounded in transcripts, then verify it
+
+First OCR every panel (needs `install-tool deepseek-ocr2`):
+
+```bash
+mangaeasy panel-transcript --project-root library/<Project> --item-range 01-12
+```
+
+Then write `library/<Project>/<item>/narration.json`
+(`[{"image": "<panel file>", "narration": "..."}]`) from **panel image +
+transcript together** — style rules in
 `mangaeasy/assets/prompts/narration.md`. Optional `intro.json` (same shape)
-gives chapter 01 a cold-open hook reel.
+gives chapter 01 a cold-open hook reel. Grounding rules (each traces to real
+viewer complaints about a shipped recap):
+
+- **one beat per panel** — the line describes THAT panel, never a summary of
+  several panels smeared over one image;
+- **paraphrase anchored to the transcript** — reword freely, but the meaning
+  must match the panel's actual bubble text;
+- **speakers attributed from the panel** (who is on-panel, whose bubble
+  tail) — if unsure, narrate without naming;
+- **no punctuation-only lines** (`"?!"` → near-empty TTS audio; video-check
+  flags these as unspeakable).
 
 Verify in two passes:
 
 1. **Structural** — `mangaeasy narration-check --project-root
    library/<Project> --item-range 01-12 --json` must pass: full panel
    coverage, no dangling images, no empty text.
-2. **Semantic** — re-read each panel against its narration: is the summary
-   faithful, and is every line of dialogue attributed to the correct
-   speaker? Fix and re-check before generating audio.
+2. **Semantic** — `mangaeasy narration-review-sheets --project-root
+   library/<Project> --item-range 01-12`, then Read EVERY sheet (panel +
+   narration + OCR side by side) and check the grounding rules above.
+   Fix narration.json, delete the affected WAVs, re-check before/after
+   generating audio.
 
 ## 5. Audio → render → join → music
 
@@ -110,8 +143,13 @@ mangaeasy video --project-root library/<Project> --audio-root audio \
 speaker WAV are available, otherwise Kokoro. Music is mixed low under the
 narration by design — conditioned, loudness-aligned, side-chain ducked at
 `--music-volume-db` −22 dB default (keep within −18…−24; narration is
-normalized to −14 LUFS first). After the run:
-`mangaeasy video-validate --project-root library/<Project> ... --json`.
+normalized to −14 LUFS first). **Rebuilding after any panel/narration/audio
+change: pass `--overwrite-video`** (stale item videos are also mtime-detected
+now, but be explicit — a silent skip once shipped six outdated chapters).
+After the run:
+`mangaeasy video-validate --project-root library/<Project> ... --json` —
+`warnings` (unnarrated panels, orphan audio) are informational; anything in
+`errors` blocks upload.
 Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
 
 ## 6. Thumbnail (1280×720)
@@ -126,9 +164,14 @@ Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
    shocking fact from the batch:
    `mangaeasy thumbnail-compose --base thumb_03.png --output final_thumb.png
    --text "HE ATE A GOD?!" --text "CH 1-12"`
-   (full control via `--spec` JSON: positions, sizes, arrow, border).
+   (full control via `--spec` JSON: blocks/arrows/border). Make the markup
+   read hand-placed: tilt the big hook block (`"rotate": -3…-5`), use the
+   default fat outlined block-arrows (width ≈ 22–30) instead of thin lines,
+   keep the drop shadow on.
 4. **Open the final image at full size** and check text overlap, edges, and
    anything that could read as explicit — fix and re-compose if needed.
+5. Iterating after upload? `mangaeasy youtube-thumbnail --video-id <id>
+   --image final_thumb.png` swaps the live thumbnail without re-uploading.
 
 ## 7. Title, description, upload
 

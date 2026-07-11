@@ -59,15 +59,30 @@ content — e.g. "ONE HOUR LATER…" captions — are attached to the next panel
   - `NN_strip_K.png` — downscaled strip: **green** = kept panel, **blue** =
     auto-cut line, **red** = dropped rows.
 
+Alongside the crops it writes `work/webtoon_verify/<Project>/<item>_ranges.json`
+— the **ranges manifest**: every final panel's `top`/`bottom` in stitched-strip
+coordinates plus the `forced_cuts` list (auto-split cuts whose quiet band was
+suspiciously energetic — the prime suspects for sliced bubbles).
+
 Correct a bad item with `--overrides` (JSON keyed by item name):
 
 ```json
 {"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}
 ```
 
-`replace` swaps an item's whole range list; `merge` indices are 0-based
-inclusive; `split_at` values are stitched-strip y-coordinates read off the
-strip overlay.
+- `merge [[i, j]]` indices are **0-based positions in the `final` list of a
+  no-override run** (= panel number − 1; the manifest's own `index` field is
+  1-based, crop file numbers are position + 1). Never derive them by eye —
+  find the panel whose `top`/`bottom` matches the defect's y in the manifest
+  and compute from its list position. Merges are applied in reverse-sorted
+  order, so several against the same base run compose safely.
+- `split_at` values are absolute stitched-strip y-coordinates, applied
+  **after** merges. To reposition a bad cut: merge across it, then `split_at`
+  the correct y. Pick that y from the pixel data (a blank-row run or a hard
+  panel edge), not from a scaled screenshot — estimates routinely land on
+  faces. A `(top, y)` fragment shorter than 20 px is dropped automatically,
+  which is the clean way to shave a junk sliver off a repositioned cut.
+- `replace` swaps an item's whole range list.
 
 Implementation: [mangaeasy/panels/webtoon.py](../../mangaeasy/panels/webtoon.py).
 
@@ -120,7 +135,33 @@ MAGI env pins live in [the magi-v3 notes](../../CLAUDE.md) and are baked into
 
 ## Step 2 — Verify **every** crop (the non-negotiable step)
 
-Open the verification images and check, per page/strip:
+For webtoons, start with the **cutcheck pass** — it exists because judging
+crops on downscaled contact sheets shipped a video with half panels, fused
+panels and sliced speech bubbles that all had to be redone:
+
+```bash
+mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-07
+```
+
+It renders a full-resolution window (±650 px of context) around **every
+forced cut and every short panel** from the ranges manifests, montaged into
+review sheets under `work/cutcheck/<Project>/`. Read every sheet and give
+each flagged location a verdict on the actual art:
+
+- **FIX** (add a `merge`, or a merge + repositioned `split_at`): the cut
+  passes through a figure or a speech bubble; a short panel is a bubble/SFX
+  fragment whose art continues into a neighbour (merge it toward its
+  bubble-mate — direction matters).
+- **ACCEPT**: cuts through pure background or effect art, bordered thin
+  scenery panels, scanlator promo banners (those get skipped in narration
+  instead).
+
+Collect all fixes into one overrides file, re-run `webtoon-split`, then re-run
+`webtoon-cutcheck` and confirm the fixed locations are clean. If narration
+already exists for the old crops, do **not** re-narrate — see
+"Re-cropping after narration exists" below.
+
+Then check the standard verification images, per page/strip:
 
 1. **Coverage** — every panel has a box; nothing important is in a dropped
    (red) region. On webtoons, a red gap that still shows art/text is a miss —
@@ -142,6 +183,27 @@ flagged as suspects are real content — keep them.**
 Wrong crops poison everything downstream: you would write narration against
 images the viewer never sees correctly. Spend the time here.
 
+### Re-cropping after narration exists (`panels-remap`)
+
+Re-running a splitter renumbers every panel, orphaning `narration.json` and
+the per-panel WAVs. Never re-narrate to fix that:
+
+```bash
+mangaeasy panels-remap --project-root library/<Project> --item-range 01-07   # dry run
+mangaeasy panels-remap --project-root library/<Project> --item-range 01-07 --apply
+```
+
+It locates each archived old panel's span in the stitched strip, maps old →
+new panels by interval overlap (survives merges, splits and shifted
+boundaries), then carries narration texts verbatim and copies/concatenates
+the WAVs into the new numbering. Hook/CTA physical copies are restored too.
+Refuse to `--apply` while the dry run reports orphans or bad locates; pass
+`--old-run` explicitly if the item was re-cropped more than once (the
+narration must match that archive). Afterwards, review every `shift`/`merge`
+panel with `narration-review-sheets --only-images ...` and rebuild with
+`mangaeasy video --overwrite-video` (stale item videos are also auto-detected
+now, but be explicit).
+
 ---
 
 ## Step 3 — See the images and read the chapter
@@ -158,6 +220,23 @@ beats; you can't hook a viewer on a story you skimmed. While reading, note:
 
 ---
 
+## Step 3.5 — Transcribe the bubbles first (`panel-transcript`)
+
+```bash
+mangaeasy install-tool deepseek-ocr2   # one-time
+mangaeasy panel-transcript --project-root library/<Project> --item-range 01-07
+```
+
+This OCRs every panel into `<item>/transcript.json`. Write narration **from
+panel image + transcript together** — it is the difference between narration
+that lands and narration that reads wrong. Real viewer feedback on a shipped
+recap: speakers misattributed, lines that summarized several panels smeared
+over one, paraphrases that drifted from what the character actually said.
+All three are symptoms of narrating from memory of a 500-panel read-through
+instead of from the panel's actual text.
+
+---
+
 ## Step 4 — Write `narration.json`
 
 One object per panel you narrate, keyed by the crop's **filename**:
@@ -167,6 +246,23 @@ One object per panel you narrate, keyed by the crop's **filename**:
   {"image": "01_004_01.jpg", "narration": "One to three present-tense sentences."}
 ]
 ```
+
+**Per-panel grounding rules** (each one traces back to shipped-video
+feedback):
+
+- **One beat per panel.** The line describes what is visible in THAT panel
+  only. Story summary belongs across consecutive panels' lines, never inside
+  one panel's line while the viewer stares at a different image.
+- **Anchor dialogue to the transcript.** Paraphrase freely for voice and
+  pacing, but the meaning must match the OCR text of that panel's bubbles;
+  when a paraphrase reads awkward, quoting the bubble (trimmed) is better.
+- **Attribute speakers from the panel, not from memory.** Who is on-panel?
+  Whose bubble is it (tail direction)? If the speaker isn't visible or
+  certain, narrate the line without naming ("someone snarls from the
+  crowd...") rather than guessing.
+- **Say it aloud.** TTS reads exactly what you write — punctuation-only
+  entries like `"?!"` produce a ~0.03 s WAV (`video-check` flags these as
+  "unspeakable"); give reaction panels a real line.
 
 Rules that hold across the pipeline:
 
@@ -200,8 +296,26 @@ mangaeasy video-check --project-root library/<Project> --items 01 --json
 
 When you deliberately narrate a subset, `video-check` returns `"ok": false`
 with "Narration count does not match panel count" — **that is expected**. What
-actually matters: the JSON parses, no two entries share an image stem, and
-every referenced image exists on disk.
+actually matters: the JSON parses, no two entries share an image stem, every
+referenced image exists on disk, and there are **no "unspeakable narration
+text" warnings** (those become corrupt near-empty WAVs).
+
+## Step 5 — Verify the narration semantically (`narration-review-sheets`)
+
+`narration-check` proves structure; it deliberately does not prove the words
+are right. That pass is:
+
+```bash
+mangaeasy narration-review-sheets --project-root library/<Project> --item-range 01-07
+```
+
+Each sheet pairs a panel image with the narration line that will be spoken
+over it and the panel's OCR transcript. Read **every** sheet and check the
+four grounding rules above (this-panel-only, dialogue matches OCR, speaker
+right, reads naturally aloud). Fix by editing `narration.json`, delete the
+affected WAVs, and re-run audio generation — it only regenerates missing
+files. After a `panels-remap`, `--only-images` with the remap review list
+narrows the pass to the panels that actually changed.
 
 ---
 
@@ -215,6 +329,10 @@ the video** (audio → render → join → BGM → thumbnail → upload).
 
 | Command | Role | Source |
 |---|---|---|
-| `webtoon-split` | crop vertical strips + verify sheets | [panels/webtoon.py](../../mangaeasy/panels/webtoon.py) |
+| `webtoon-split` | crop vertical strips + verify sheets + ranges manifest | [panels/webtoon.py](../../mangaeasy/panels/webtoon.py) |
+| `webtoon-cutcheck` | full-res review windows for every forced cut / short panel | [panels/cutcheck.py](../../mangaeasy/panels/cutcheck.py) |
+| `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mangaeasy/panels/remap.py) |
 | `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mangaeasy/panels/page.py) |
-| `video-check` | validate item inputs before building | [video_pipeline/check_items.py](../../mangaeasy/video_pipeline/check_items.py) |
+| `panel-transcript` | OCR every panel to ground narration/speakers | [ocr/panel_transcript.py](../../mangaeasy/ocr/panel_transcript.py) |
+| `narration-review-sheets` | panel + narration + OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mangaeasy/video_pipeline/narration_sheets.py) |
+| `video-check` | validate item inputs before building (incl. unspeakable text) | [video_pipeline/check_items.py](../../mangaeasy/video_pipeline/check_items.py) |

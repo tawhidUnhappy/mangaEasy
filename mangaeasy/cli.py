@@ -72,6 +72,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "video-add-bgm":        ("mangaeasy.video_pipeline.add_long_video_bgm",    "main",        "Video pipeline",   "Mix background music into an already-joined long video, without rebuilding it from item clips."),
     "video-check":          ("mangaeasy.video_pipeline.check_items",           "main",        "Video pipeline",   "Validate item inputs (panels + narration.json)."),
     "narration-check":      ("mangaeasy.video_pipeline.narration_check",       "main",        "Video pipeline",   "Validate narration.json/intro.json structure: coverage, dangling images, empty text (--json)."),
+    "narration-review-sheets": ("mangaeasy.video_pipeline.narration_sheets",   "main",        "Video pipeline",   "Render panel + narration + OCR sheets for semantic and speaker verification."),
     "video-validate":       ("mangaeasy.video_pipeline.validate_generation",   "main",        "Video pipeline",   "Check generated audio/videos against the inputs."),
     "video-audio-audit":    ("mangaeasy.video_pipeline.audio_audit",          "main",        "Video pipeline",   "Verify every panel has valid, readable audio (catches corrupt/empty files) before rendering; --fix deletes bad ones for regeneration."),
     "video-fade-audio":     ("mangaeasy.video_pipeline.preprocess_audio_fades","main",        "Video pipeline",   "Apply fade in/out to item narration audio."),
@@ -89,6 +90,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "youtube-logout":       ("mangaeasy.youtube.auth",                         "logout_main", "YouTube",          "Disconnect the YouTube account (delete the stored token)."),
     "youtube-upload":       ("mangaeasy.youtube.upload",                       "main",        "YouTube",          "Upload a video to the connected channel (resumable; default privacy: private)."),
     "youtube-delete":       ("mangaeasy.youtube.delete",                       "main",        "YouTube",          "Delete a video from the connected channel (two-step: requires --confirm)."),
+    "youtube-thumbnail":    ("mangaeasy.youtube.thumbnail",                    "main",        "YouTube",          "Set/replace the thumbnail of an already-uploaded video (no re-upload needed)."),
 
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image) resolve."),
@@ -101,7 +103,10 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "style-detect":         ("mangaeasy.panels.style_detect",                  "main",        "Manga: acquire",   "Detect webtoon vs paged manga from page dimensions (--json) to pick the crop tool."),
     "gutter-split":         ("mangaeasy.panels.gutter",                        "main",        "Manga: acquire",   "Split pages along gutters into panels (low-level engine)."),
     "webtoon-split":        ("mangaeasy.panels.webtoon",                       "main",        "Manga: acquire",   "Split webtoon items into panels with auto-split, gap rescue and verify sheets."),
+    "webtoon-cutcheck":     ("mangaeasy.panels.cutcheck",                      "main",        "Manga: acquire",   "Render full-res review windows around every forced cut / short panel (crop QA)."),
+    "panels-remap":         ("mangaeasy.panels.remap",                         "main",        "Manga: acquire",   "After a re-crop, carry narration + audio from the archived old panels to the new ones."),
     "page-split":           ("mangaeasy.panels.page",                          "main",        "Manga: acquire",   "Split paged manga into panels with MAGI v3 detection and verify sheets."),
+    "panel-transcript":     ("mangaeasy.ocr.panel_transcript",                 "main",        "Manga: acquire",   "OCR every panel into <item>/transcript.json (grounds narration + speaker attribution)."),
 
     # ── Image export & AI context ─────────────────────────────────────────────
     "to-pdf":               ("mangaeasy.images.pdf",                           "main",        "Manga: export",    "Export chapter images to a PDF."),
