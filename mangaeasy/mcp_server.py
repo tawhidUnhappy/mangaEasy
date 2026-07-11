@@ -112,6 +112,28 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "work_dir": ("--work-dir", "value")},
     ),
+    "webtoon_override": (
+        "webtoon-override",
+        "Add merge/split fixes to a webtoon-split overrides file with indices resolved from "
+        "the ranges manifest — never compute merge indices by hand. merge_at_cut undoes a bad "
+        "auto-split cut at stitched y; merge_panels fuses current panels 'A,B' (1-based sheet "
+        "numbers); split_at forces a cut at y. Re-run webtoon-split with the file after.",
+        {"file": {**_STR, "description": "Overrides JSON to create/extend."},
+         "project_root": _PROJECT_ROOT,
+         "item": {**_STR, "description": "Item the fixes apply to, e.g. '01'."},
+         "merge_at_cut": {"type": "array", "items": {"type": "string"},
+                          "description": "Stitched y values of bad cuts to undo."},
+         "merge_panels": {"type": "array", "items": {"type": "string"},
+                          "description": "Panel pairs to fuse, each 'A,B' (1-based)."},
+         "split_at": {"type": "array", "items": {"type": "string"},
+                      "description": "Stitched y values to force cuts at."},
+         "show": {**_BOOL, "description": "Print the resolved overrides file."}},
+        ["file", "project_root"],
+        {"file": ("--file", "value"), "project_root": ("--project-root", "value"),
+         "item": ("--item", "value"), "merge_at_cut": ("--merge-at-cut", "repeat"),
+         "merge_panels": ("--merge-panels", "repeat"), "split_at": ("--split-at", "repeat"),
+         "show": ("--show", "flag")},
+    ),
     "panels_remap": (
         "panels-remap",
         "After re-running webtoon-split, map the archived old panels to the new crops and carry "
@@ -163,6 +185,26 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "force": ("--force", "flag"), "device": ("--device", "value")},
     ),
+    "narration_edit": (
+        "narration-edit",
+        "Upsert/delete/list narration.json (or intro.json) entries without hand-editing "
+        "JSON. set_json takes a JSON array [{\"image\", \"narration\"}] inline; new images "
+        "are inserted in name-sorted (reading) order; prune_audio deletes the WAVs of "
+        "changed entries so the next audio run regenerates exactly those.",
+        {"project_root": _PROJECT_ROOT,
+         "item": {**_STR, "description": "Item folder, e.g. '01'."},
+         "set_json": {**_STR, "description": "JSON array of entries to upsert."},
+         "delete": {"type": "array", "items": {"type": "string"},
+                    "description": "Image filenames whose entries to remove."},
+         "intro": {**_BOOL, "description": "Edit intro.json instead of narration.json."},
+         "prune_audio": {**_BOOL, "description": "Delete stale WAVs of changed entries."},
+         "list": {**_BOOL, "description": "Print entries after any edits."}},
+        ["project_root", "item"],
+        {"project_root": ("--project-root", "value"), "item": ("--item", "value"),
+         "set_json": ("--set-json", "value"), "delete": ("--delete", "repeat"),
+         "intro": ("--intro", "flag"), "prune_audio": ("--prune-audio", "flag"),
+         "list": ("--list", "flag")},
+    ),
     "narration_review_sheets": (
         "narration-review-sheets",
         "Render sheets pairing every narration entry's panel image with the narration text and "
@@ -179,16 +221,20 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "thumbnail_compose": (
         "thumbnail-compose",
         "Compose a YouTube thumbnail: base art (e.g. best zimage variant) + bold stroked text "
-        "blocks + optional arrow + white inset border at 1280x720. Inspect the output image "
+        "blocks (rotate/shadow supported) + fat outlined block-arrows + white inset border at "
+        "1280x720. Prefer spec_json (inline, no file). Tilt the big hook block a few degrees "
+        "and keep arrows chunky so the markup reads hand-placed. Inspect the output image "
         "before uploading.",
         {"base": {**_STR, "description": "Absolute path to the base image."},
          "output": {**_STR, "description": "Absolute output PNG path."},
          "text": {"type": "array", "items": {"type": "string"},
                   "description": "Quick mode: 1-3 short text blocks (3-5 punchy words each)."},
-         "spec": {**_STR, "description": "Full mode: path to a JSON spec (blocks/arrow/border)."}},
+         "spec_json": {**_STR, "description": "Full mode inline: JSON spec (blocks/arrows/border)."},
+         "spec": {**_STR, "description": "Full mode: path to a JSON spec file."}},
         ["base", "output"],
         {"base": ("--base", "value"), "output": ("--output", "value"),
-         "text": ("--text", "repeat"), "spec": ("--spec", "value")},
+         "text": ("--text", "repeat"), "spec_json": ("--spec-json", "value"),
+         "spec": ("--spec", "value")},
     ),
     "series_plan": (
         "series-plan",

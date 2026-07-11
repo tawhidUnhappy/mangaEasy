@@ -64,25 +64,41 @@ Alongside the crops it writes `work/webtoon_verify/<Project>/<item>_ranges.json`
 coordinates plus the `forced_cuts` list (auto-split cuts whose quiet band was
 suspiciously energetic — the prime suspects for sliced bubbles).
 
-Correct a bad item with `--overrides` (JSON keyed by item name):
+Correct a bad item by **building the overrides file with `webtoon-override`**
+— it resolves every index against the manifest, so nobody computes merge
+indices by hand (doing that by eye shipped one-off merges twice):
 
-```json
-{"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}
+```bash
+# undo the bad auto-split cut at stitched y=31099 (from a cutcheck label):
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 01 --merge-at-cut 31099
+
+# fuse the panels labeled #29 and #30 on the current sheets:
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 01 --merge-panels 29,30
+
+# reposition a bad cut: merge across it, then force the right y:
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 02 \
+    --merge-at-cut 42186 --split-at 42394
+
+mangaeasy webtoon-split --project-root library/<Project> --items 01 02 \
+    --overrides work/overrides.json
 ```
 
-- `merge [[i, j]]` indices are **0-based positions in the `final` list of a
-  no-override run** (= panel number − 1; the manifest's own `index` field is
-  1-based, crop file numbers are position + 1). Never derive them by eye —
-  find the panel whose `top`/`bottom` matches the defect's y in the manifest
-  and compute from its list position. Merges are applied in reverse-sorted
-  order, so several against the same base run compose safely.
+Semantics under the hood (what the tool writes):
+
+- `merge [[i, j]]` indices are **0-based positions in the manifest's `base`
+  list** — the post-autosplit, pre-override list, stable across override
+  iterations, so fixes accumulate in one file and re-running reproduces
+  base + fixes deterministically. Merges apply in reverse-sorted order.
 - `split_at` values are absolute stitched-strip y-coordinates, applied
-  **after** merges. To reposition a bad cut: merge across it, then `split_at`
-  the correct y. Pick that y from the pixel data (a blank-row run or a hard
-  panel edge), not from a scaled screenshot — estimates routinely land on
-  faces. A `(top, y)` fragment shorter than 20 px is dropped automatically,
-  which is the clean way to shave a junk sliver off a repositioned cut.
-- `replace` swaps an item's whole range list.
+  **after** merges. Pick the y from the pixel data (a blank-row run or a
+  hard panel edge), not from a scaled screenshot — estimates routinely land
+  on faces. A `(top, y)` fragment shorter than 20 px is dropped
+  automatically, which is the clean way to shave a junk sliver off a
+  repositioned cut.
+- `replace` swaps an item's whole range list (hand-edit only).
 
 Implementation: [mangaeasy/panels/webtoon.py](../../mangaeasy/panels/webtoon.py).
 
@@ -312,10 +328,21 @@ mangaeasy narration-review-sheets --project-root library/<Project> --item-range 
 Each sheet pairs a panel image with the narration line that will be spoken
 over it and the panel's OCR transcript. Read **every** sheet and check the
 four grounding rules above (this-panel-only, dialogue matches OCR, speaker
-right, reads naturally aloud). Fix by editing `narration.json`, delete the
-affected WAVs, and re-run audio generation — it only regenerates missing
-files. After a `panels-remap`, `--only-images` with the remap review list
-narrows the pass to the panels that actually changed.
+right, reads naturally aloud). Fix each bad line with one command — no JSON
+editing, and the stale WAV is pruned so the next audio run regenerates it:
+
+```bash
+mangaeasy narration-edit --project-root library/<Project> --item 01 \
+    --set ch01_005.jpg "Something ancient stirs inside the light." \
+    --prune-audio
+```
+
+(`--delete IMAGE` removes an entry; `--list` prints them; `--intro` targets
+`intro.json`; `--batch file.json` / `--set-json '[...]'` upsert in bulk —
+new images land at their name-sorted reading position automatically, and
+every write re-checks speakability and image existence.) After a
+`panels-remap`, `--only-images` with the remap review list narrows the
+review pass to the panels that actually changed.
 
 ---
 
@@ -331,6 +358,8 @@ the video** (audio → render → join → BGM → thumbnail → upload).
 |---|---|---|
 | `webtoon-split` | crop vertical strips + verify sheets + ranges manifest | [panels/webtoon.py](../../mangaeasy/panels/webtoon.py) |
 | `webtoon-cutcheck` | full-res review windows for every forced cut / short panel | [panels/cutcheck.py](../../mangaeasy/panels/cutcheck.py) |
+| `webtoon-override` | build the overrides file with auto-resolved indices | [panels/overrides_tool.py](../../mangaeasy/panels/overrides_tool.py) |
+| `narration-edit` | upsert/delete narration lines + prune stale WAVs | [video_pipeline/narration_edit.py](../../mangaeasy/video_pipeline/narration_edit.py) |
 | `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mangaeasy/panels/remap.py) |
 | `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mangaeasy/panels/page.py) |
 | `panel-transcript` | OCR every panel to ground narration/speakers | [ocr/panel_transcript.py](../../mangaeasy/ocr/panel_transcript.py) |

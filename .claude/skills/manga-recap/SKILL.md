@@ -81,13 +81,20 @@ mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-12
 ```
 
 Read EVERY sheet it writes; FIX any cut through a figure/speech bubble and
-any bubble/SFX-fragment short panel via an overrides file
-(`{"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}` — merge indices
-are 0-based positions in the ranges manifest's `final` list of a no-override
-run; resolve them by matching the defect's y in `<item>_ranges.json`, never
-by eye). ACCEPT background/effect-art cuts, bordered thin scenery, scanlator
-banners. Re-run the split, then re-run cutcheck to confirm. Do not proceed
-to narration with unresolved suspects.
+any bubble/SFX-fragment short panel by adding the fix with `webtoon-override`
+(never compute merge indices by hand — it resolves them from the manifest):
+
+```bash
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 07 --merge-at-cut 23140
+# fuse sheet panels #4..#5:            --item 12 --merge-panels 4,5
+# reposition a bad cut:                --merge-at-cut 42186 --split-at 42394
+```
+
+ACCEPT background/effect-art cuts, bordered thin scenery, scanlator
+banners. Re-run the split with `--overrides work/overrides.json`, then
+re-run cutcheck to confirm. Do not proceed to narration with unresolved
+suspects.
 
 **Re-cropping after narration exists?** Never re-narrate: `mangaeasy
 panels-remap --project-root library/<Project> --item-range 01-12` (dry run,
@@ -127,8 +134,11 @@ Verify in two passes:
 2. **Semantic** — `mangaeasy narration-review-sheets --project-root
    library/<Project> --item-range 01-12`, then Read EVERY sheet (panel +
    narration + OCR side by side) and check the grounding rules above.
-   Fix narration.json, delete the affected WAVs, re-check before/after
-   generating audio.
+   Fix each bad line with one command (stale WAV pruned automatically):
+   `mangaeasy narration-edit --project-root library/<Project> --item 01
+   --set <image> "<new line>" --prune-audio`. Use `--delete <image>`,
+   `--list`, `--intro`, or `--set-json '[...]'` for bulk edits — no
+   hand-editing of narration.json needed.
 
 ## 5. Audio → render → join → music
 

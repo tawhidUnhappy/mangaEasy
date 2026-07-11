@@ -388,6 +388,14 @@ URL→upload flow without hand-holding; their invariants:
   panels in the stitched strip and carries narration + WAVs to the new
   numbering by interval overlap (dry-run by default; refuses `--apply` on
   orphans). Neither regenerates TTS.
+- Agents edit data through the CLI, not by hand-editing JSON:
+  `webtoon-override` builds the overrides file (merge indices resolved from
+  the manifest's `base` list — the no-override range list webtoon-split now
+  records precisely so fixes stay valid across override iterations; indices
+  computed by eye shipped one-off merges twice), and `narration-edit`
+  upserts/deletes narration/intro entries (name-sorted insertion,
+  speakability + image checks on every write, `--prune-audio` deletes the
+  stale WAVs). Keep new agent-facing state editable through a command.
 - Item renders are freshness-gated: `build_one_chapter()` re-renders when
   panels/narration/audio are newer than the existing item video
   (`stale_reason()`); `--overwrite-video` still forces. Don't restore the

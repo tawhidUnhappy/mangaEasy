@@ -173,7 +173,10 @@ def main() -> int:
                         help="Quick mode: one text block (repeatable, stacked top-left, "
                              "alternating yellow/white). Keep each to 3-5 punchy words.")
     parser.add_argument("--spec", type=Path, default=None,
-                        help="Full mode: JSON spec with blocks/arrow/border (see module help).")
+                        help="Full mode: JSON spec file with blocks/arrows/border (see module help).")
+    parser.add_argument("--spec-json", default=None, metavar="JSON",
+                        help="Full mode without a file: the spec JSON as one CLI argument "
+                             "(wins over --spec).")
     parser.add_argument("--width", type=int, default=DEFAULT_SIZE[0])
     parser.add_argument("--height", type=int, default=DEFAULT_SIZE[1])
     parser.add_argument("--font", default=None, help="Path to a .ttf to use for all blocks.")
@@ -184,17 +187,19 @@ def main() -> int:
     if not args.base.is_file():
         print(f"ERROR: base image not found: {args.base}", file=sys.stderr)
         return 1
-    if not args.text and not args.spec:
-        print("ERROR: provide --text (repeatable) or --spec", file=sys.stderr)
+    if not args.text and not args.spec and not args.spec_json:
+        print("ERROR: provide --text (repeatable), --spec, or --spec-json", file=sys.stderr)
         return 2
 
     spec: dict = {}
-    if args.spec is not None:
-        try:
+    try:
+        if args.spec_json is not None:
+            spec = json.loads(args.spec_json)
+        elif args.spec is not None:
             spec = json.loads(args.spec.read_text(encoding="utf-8-sig"))
-        except Exception as exc:
-            print(f"ERROR: invalid spec JSON: {exc}", file=sys.stderr)
-            return 2
+    except Exception as exc:
+        print(f"ERROR: invalid spec JSON: {exc}", file=sys.stderr)
+        return 2
 
     size = (args.width, args.height)
     canvas = cover_canvas(Image.open(args.base), size).convert("RGBA")

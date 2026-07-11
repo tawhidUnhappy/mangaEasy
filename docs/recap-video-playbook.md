@@ -104,20 +104,24 @@ patterns: a thin `#3`-ish sliver near the top = scanlator credit banner; a
 trailing drop of h≈765–1054 = "we're recruiting" promo; thin bright slivers
 mid-chapter = SFX calligraphy.
 
-Collect every FIX into one `--overrides` file and re-run:
+Collect every FIX into one overrides file with `webtoon-override` — it
+resolves all indices against the manifest, so never compute them by hand:
 
-```json
-{"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}
+```bash
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 07 --merge-at-cut 23140
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 12 --merge-panels 5,6
+# reposition a bad cut = merge across it + force the right y:
+mangaeasy webtoon-override --file work/overrides.json \
+    --project-root library/<Project> --item 02 --merge-at-cut 42186 --split-at 42394
 ```
 
-- `merge [[i, j]]` = **0-based positions in the manifest's `final` list of a
-  no-override run** (panel number − 1; the manifest `index` field is 1-based).
-  Resolve indices by matching the defect's y against `top`/`bottom` in the
-  manifest — never by eye.
-- `split_at` = absolute stitched y, applied after merges; to reposition a bad
-  cut, merge across it then split at a y picked from the pixel data (blank
-  row run / hard edge). Fragments under 20 px are dropped automatically.
-- `replace` swaps an item's whole range list.
+(Under the hood: `merge [[i, j]]` = 0-based positions in the manifest's
+`base` list — stable across override iterations; `split_at` = absolute
+stitched y applied after merges, fragments under 20 px dropped; pick split
+y-values from pixel data, not scaled screenshots. `--show` prints the file
+resolved against the manifests.)
 
 Then re-run `webtoon-cutcheck` to confirm the fixed locations, and if
 narration already existed for the old numbering, carry it over with
@@ -373,8 +377,13 @@ mangaeasy narration-review-sheets --project-root library/<Project> --item-range 
 ```
 
 Read every sheet (panel + narration + OCR side by side) and verify the four
-grounding rules above per panel. Fix by editing `narration.json`, delete the
-affected WAVs, re-run audio generation (it fills only missing files).
+grounding rules above per panel. Fix each bad line in one command (no JSON
+editing; the stale WAV is pruned so the next audio run regenerates it):
+
+```bash
+mangaeasy narration-edit --project-root library/<Project> --item 01 \
+    --set ch01_042.jpg "Rewritten line." --prune-audio
+```
 
 ## Phase 6 — Build the video
 

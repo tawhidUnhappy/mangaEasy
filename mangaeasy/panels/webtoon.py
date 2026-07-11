@@ -351,6 +351,8 @@ def write_ranges_manifest(
     *,
     strip_height: int,
     ranges: List[Range],
+    base_ranges: List[Range],
+    overrides_applied: bool,
     prefix: str,
     cut_rows: Sequence[int],
     forced_cuts: Sequence[str],
@@ -362,22 +364,35 @@ def write_ranges_manifest(
     coordinates in stitched-strip pixels, same space as the overlay labels):
 
     - add a missing cut:      "split_at": [y]
-    - undo a bad cut / fuse:  "merge": [[i, j]] with i, j = index-1 values
-      FROM A NO-OVERRIDE RUN (overrides apply last, so against the same
-      base run several merges can be listed together; re-running with the
-      overrides file reproduces the base + fixes deterministically).
+    - undo a bad cut / fuse:  "merge": [[i, j]] with i, j = 0-based positions
+      in ``base`` (the no-override list — stable across override iterations,
+      so several fixes can accumulate in one overrides file and re-running
+      reproduces base + fixes deterministically).
+
+    Don't compute merge indices by hand — ``mangaeasy webtoon-override``
+    resolves cut-y values and final panel numbers against this manifest.
     """
     manifest = {
         "item": item,
         "strip_height": strip_height,
+        "prefix": prefix,
+        "overrides_applied": overrides_applied,
         "auto_cut_rows": list(cut_rows),
         "forced_cuts": list(forced_cuts),
-        "merge_note": "merge indices are 0-based positions in `final` of a "
-                      "no-override run (i.e. panel number - 1)",
+        "merge_note": "merge indices are 0-based positions in `base` (the "
+                      "no-override list, i.e. base panel number - 1); use "
+                      "`mangaeasy webtoon-override` to compute them",
         "final": [
             {"index": i, "file": f"{prefix}{i:03d}.jpg",
              "top": top, "bottom": bottom, "height": bottom - top}
             for i, (top, bottom) in enumerate(ranges, 1)
+        ],
+        # The post-autosplit, pre-override list merge indices refer to. On a
+        # no-override run this equals `final`; after overrides it is the
+        # stable base every additional fix must be computed against.
+        "base": [
+            {"index": i, "top": top, "bottom": bottom, "height": bottom - top}
+            for i, (top, bottom) in enumerate(base_ranges, 1)
         ],
     }
     path = verify_dir / f"{item}_ranges.json"
@@ -422,7 +437,9 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         min_segment=args.min_segment, window=args.cut_window,
         energy_threshold=args.energy_threshold,
     )
-    ranges = apply_range_overrides(ranges, overrides.get(item), combined.height)
+    base_ranges = list(ranges)
+    item_overrides = overrides.get(item)
+    ranges = apply_range_overrides(ranges, item_overrides, combined.height)
     if not ranges:
         print(f"[{item}] ERROR: no panel ranges detected", flush=True)
         return {"item": item, "status": "error"}
@@ -446,6 +463,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     write_strip_overlay(item, combined, ranges, verify_dir, cut_rows)
     manifest = write_ranges_manifest(
         item, verify_dir, strip_height=combined.height, ranges=ranges,
+        base_ranges=base_ranges, overrides_applied=bool(item_overrides),
         prefix=prefix, cut_rows=cut_rows, forced_cuts=forced_cuts,
     )
 
