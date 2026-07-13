@@ -4,7 +4,10 @@
 before audio generation: files parse, every entry references a panel image
 that exists, every panel image has an entry, and no narration is empty. It
 covers ``intro.json`` too (checked separately, since its errors need fixing
-in a different file).
+in a different file) — and flags any panel listed in *both* ``intro.json`` and
+``narration.json``, because the intro is prepended at render time so such a
+panel plays twice (the cold-open replays a beat that then shows again
+in-context).
 
 This is the machine half of narration verification. The semantic half — is
 the narration faithful to the panels, is dialogue attributed to the right
@@ -23,12 +26,12 @@ from pathlib import Path
 _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 
 
-def _check_entries(entries, panels_dir: Path, label: str, problems: list[str],
-                   covered: set[str]) -> int:
-    """Validate one file's entry list; records referenced images in *covered*."""
+def _check_entries(entries, panels_dir: Path, label: str, problems: list[str]) -> list[str]:
+    """Validate one file's entry list; return the images it references, in order."""
+    images: list[str] = []
     if not isinstance(entries, list):
         problems.append(f"{label}: must be a JSON array")
-        return 0
+        return images
     for idx, entry in enumerate(entries):
         where = f"{label}[{idx}]"
         if not isinstance(entry, dict):
@@ -39,21 +42,21 @@ def _check_entries(entries, panels_dir: Path, label: str, problems: list[str],
         if not isinstance(image, str) or not image:
             problems.append(f"{where}: missing/empty 'image'")
         else:
-            covered.add(image)
+            images.append(image)
             if not (panels_dir / image).is_file():
                 problems.append(f"{where}: image '{image}' not found in panels/")
         if not isinstance(narration, str) or not narration.strip():
             problems.append(f"{where}: missing/empty 'narration'"
                             + (f" (image '{image}')" if isinstance(image, str) else ""))
-    return len(entries)
+    return images
 
 
 def check_item(item_dir: Path) -> dict:
     """Structural report for one item; 'problems' empty means clean."""
     panels_dir = item_dir / "panels"
     problems: list[str] = []
-    covered: set[str] = set()
-    entry_count = 0
+    narration_images: list[str] = []
+    intro_images: list[str] = []
 
     narration_path = item_dir / "narration.json"
     if not narration_path.is_file():
@@ -61,7 +64,7 @@ def check_item(item_dir: Path) -> dict:
     else:
         try:
             data = json.loads(narration_path.read_text(encoding="utf-8-sig"))
-            entry_count += _check_entries(data, panels_dir, "narration.json", problems, covered)
+            narration_images = _check_entries(data, panels_dir, "narration.json", problems)
         except Exception as exc:
             problems.append(f"narration.json: invalid JSON ({exc})")
 
@@ -69,10 +72,25 @@ def check_item(item_dir: Path) -> dict:
     if intro_path.is_file():
         try:
             data = json.loads(intro_path.read_text(encoding="utf-8-sig"))
-            entry_count += _check_entries(data, panels_dir, "intro.json", problems, covered)
+            intro_images = _check_entries(data, panels_dir, "intro.json", problems)
         except Exception as exc:
             problems.append(f"intro.json: invalid JSON ({exc})")
 
+    # intro.json is prepended before narration.json at render time, so any
+    # panel listed in both plays twice — a cold-open that silently replays a
+    # beat that then shows again in-context. Almost always an authoring slip;
+    # the cold open should use panels the chapter's narration.json omits.
+    narration_set = set(narration_images)
+    overlap = [img for img in dict.fromkeys(intro_images) if img in narration_set]
+    if overlap:
+        problems.append(
+            f"{len(overlap)} panel(s) are in both intro.json and narration.json and "
+            "will render twice (the cold-open replays them; give the intro panels the "
+            "chapter's narration.json does not use): "
+            + ", ".join(overlap[:5]) + ("…" if len(overlap) > 5 else ""))
+
+    entry_count = len(narration_images) + len(intro_images)
+    covered = narration_set | set(intro_images)
     uncovered: list[str] = []
     if panels_dir.is_dir():
         panel_names = sorted(p.name for p in panels_dir.iterdir()

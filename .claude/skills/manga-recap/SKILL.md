@@ -127,8 +127,13 @@ Then write `library/<Project>/<item>/narration.json`
 (`[{"image": "<panel file>", "narration": "..."}]`) from **panel image +
 transcript together** — style rules in
 `mangaeasy/assets/prompts/narration.md`. Optional `intro.json` (same shape)
-gives chapter 01 a cold-open hook reel. Grounding rules (each traces to real
-viewer complaints about a shipped recap):
+gives chapter 01 a cold-open hook reel — it is **prepended** before that
+chapter's `narration.json`, so its panels must be ones the chapter's
+`narration.json` does **not** also use, or they play twice (the cold-open
+replays a beat, then it shows again in-context — a viewer-reported "why is the
+start repeating?"). Either give the intro its own distinct panels, or drop
+those panels from `narration.json`; `narration-check` now fails on the overlap.
+Grounding rules (each traces to real viewer complaints about a shipped recap):
 
 - **one beat per panel** — the line describes THAT panel, never a summary of
   several panels smeared over one image;

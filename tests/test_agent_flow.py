@@ -103,6 +103,21 @@ def test_narration_check_intro_json_is_covered_separately(item):
     assert check_item(item)["ok"]  # intro entries count toward coverage
 
 
+def test_narration_check_flags_intro_narration_overlap(item):
+    # A cold-open panel that also appears in narration.json plays twice —
+    # the intro is prepended, then the same panel shows again in-context.
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "one"},
+        {"image": "b.jpg", "narration": "two"},
+    ]))
+    (item / "intro.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "cold open"},
+    ]))
+    report = check_item(item)
+    assert not report["ok"]
+    assert any("both intro.json and narration.json" in p for p in report["problems"])
+
+
 # ── series batching ─────────────────────────────────────────────────────────
 
 def _make_project(tmp_path, items, narrated):

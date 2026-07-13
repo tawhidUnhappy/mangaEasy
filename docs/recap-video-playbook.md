@@ -352,6 +352,15 @@ Structure that worked (96 entries ≈ 9–11 min depending on TTS):
 
 Rules learned in production:
 
+- **The cold-open replays whatever panels it shows.** `intro.json` is
+  prepended before the chapter's `narration.json`, so if a panel file appears
+  in both, the viewer sees it in the hook and then *again* in-context — the
+  "why does the start repeat?" complaint. If you do **not** want that replay,
+  give the intro panels the chapter's `narration.json` does not use (or drop
+  those panels from `narration.json`). `narration-check` now fails when the
+  same panel file is in both. (An intentional teaser-then-payoff replay is the
+  one case you'd keep it — pair it with the renamed-copy trick below so at
+  least the two showings get their own audio.)
 - **Audio is keyed by image stem.** If the hook (or the CTA) reuses a story
   panel, the two entries would share one WAV. Make renamed *physical copies*
   and reference those: hook panels into a page-`00` namespace
