@@ -9,7 +9,7 @@ from mangaeasy.video_pipeline.common import project_name
 from mangaeasy.video_pipeline.ffmpeg_tools import probe_duration
 
 
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS  # noqa: F401  (single home: common.py)
 
 
 @dataclass(frozen=True)

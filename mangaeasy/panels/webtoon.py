@@ -529,6 +529,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--energy-threshold", type=float, default=DEFAULT_ENERGY_THRESHOLD)
     parser.add_argument("--overrides", type=Path, default=None,
                         help="JSON keyed by item name with replace/merge/split_at corrections.")
+    parser.add_argument("--respect-claims", action="store_true",
+                        help="Abort (exit 1) if another live agent's workboard claim covers any "
+                             "selected item at this stage (see docs/multi-agent.md).")
+    parser.add_argument("--agent", default=None,
+                        help="This agent's identity for --respect-claims "
+                             "(default: $MANGAEASY_AGENT or user@host).")
     return parser.parse_args()
 
 
@@ -536,6 +542,11 @@ def main() -> int:
     from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
 
     args = parse_args()
+    if args.respect_claims:
+        from mangaeasy.workboard import respect_claims_gate
+
+        if not respect_claims_gate(args.project_root, args.items, args.item_range, ("crop",), args.agent):
+            return 1
     project_root = args.project_root.resolve()
     selection = merge_item_selection(args.items, args.item_range)
     selected = item_dirs(project_root, selection)

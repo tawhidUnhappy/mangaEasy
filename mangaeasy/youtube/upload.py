@@ -51,6 +51,8 @@ def parse_args() -> argparse.Namespace:
                              "YouTube account for custom thumbnails).")
     parser.add_argument("--made-for-kids", action="store_true",
                         help="Declare the video as made for kids (default: not made for kids).")
+    parser.add_argument("--skip-verify", action="store_true",
+                        help="Skip the pre-upload token/channel probe (1 quota unit).")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="Also print one final JSON object on stdout.")
     return parser.parse_args()
@@ -219,9 +221,20 @@ def main() -> int:
     if args.description_file is not None:
         description = args.description_file.read_text(encoding="utf-8-sig")
 
-    from mangaeasy.youtube.auth import load_credentials
+    from mangaeasy.youtube.auth import _fetch_channel, load_credentials
 
-    creds = load_credentials()
+    # Fail here, in seconds, with the fix in hand — never minutes into a
+    # multi-hundred-MB upload. Refreshing the token is what surfaces an
+    # expired/revoked grant, so catch it instead of tracebacking.
+    try:
+        creds = load_credentials()
+    except Exception as exc:  # noqa: BLE001 — any auth failure gets the same actionable message
+        print(
+            f"ERROR: stored YouTube token is invalid or was revoked ({exc}).\n"
+            "Re-run `mangaeasy youtube-auth` (interactive browser consent), then retry this upload.",
+            file=sys.stderr,
+        )
+        return 1
     if creds is None:
         print(
             "ERROR: no YouTube account connected.\n"
@@ -229,6 +242,18 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    if not args.skip_verify:
+        try:
+            channel = _fetch_channel(creds)
+            if channel.get("title"):
+                print(f"Connected as {channel['title']}.", flush=True)
+        except Exception as exc:  # noqa: BLE001 — pre-flight only; --skip-verify bypasses
+            print(
+                f"ERROR: YouTube API not reachable with this token ({exc}).\n"
+                "Check `mangaeasy youtube-status --verify`; pass --skip-verify to try anyway.",
+                file=sys.stderr,
+            )
+            return 1
 
     metadata = build_metadata(
         args.title, description, parse_tags(args.tags), args.category,

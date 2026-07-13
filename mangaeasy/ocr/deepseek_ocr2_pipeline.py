@@ -14,6 +14,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from mangaeasy.ocr.ocr_clean import clean_ocr_text
+
 MODEL_ID = "deepseek-ai/DeepSeek-OCR-2"
 DEFAULT_PROMPT = "<image>\nFree OCR."
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -234,7 +236,7 @@ def process_file(path: Path, engine: DeepSeekOCR2, *, force: bool, only_images: 
     written = 0
     for item_index, image_path in pending:
         try:
-            entries[item_index]["ocr"] = engine.ocr(image_path)
+            entries[item_index]["ocr"] = clean_ocr_text(engine.ocr(image_path))
             written += 1
             print(f"[deepseek-ocr2] {image_path.name}: ok", flush=True)
         except Exception as exc:

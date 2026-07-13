@@ -93,8 +93,6 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
     # 2. Narration structure (dangling images, empty text, intro overlap...).
     report = check_item(item_dir)
     for problem in report["problems"]:
-        if "no narration entry" in problem:
-            continue  # uncovered panels are reported as review info below
         add("error", "narration:structure", problem,
             f"mangaeasy narration-edit --project-root {root_arg} --item {item} --list  "
             f"(then fix the entry with --set/--delete --prune-audio)")
@@ -223,10 +221,10 @@ def qa_main() -> int:
 
 # ── work-artifacts: what already exists and how to reuse it ─────────────────
 
-def _dir_entry(path: Path, reuse: str, pattern: str = "*") -> dict | None:
+def _dir_entry(path: Path, reuse: str, pattern: str = "*", recursive: bool = True) -> dict | None:
     if not path.is_dir():
         return None
-    files = [p for p in path.rglob(pattern) if p.is_file()]
+    files = [p for p in (path.rglob(pattern) if recursive else path.glob(pattern)) if p.is_file()]
     if not files:
         return None
     return {"path": str(path), "files": len(files),
@@ -257,7 +255,10 @@ def artifacts_main() -> int:
         "item_videos": _dir_entry(
             args.output_root / name / "items",
             "final per-item renders — video-join reuses them as-is; `video --skip-audio` re-renders only stale ones",
-            "*.mp4"),
+            "*.mp4", recursive=False),
+        "item_video_archive": _dir_entry(
+            args.output_root / name / "items" / "old",
+            "archived earlier item renders (old/run_NNNN) — restorable by copying back"),
         "long_videos": _dir_entry(
             args.output_root / name,
             "joined long videos (timestamped, never clobbered) — video-add-bgm/video-normalize-audio "

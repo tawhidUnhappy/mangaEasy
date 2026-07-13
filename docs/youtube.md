@@ -110,3 +110,14 @@ stopped, and large files upload in chunks with progress.
 | Disconnected after a week | Consent screen left in "Testing" — set it to "In production" and reconnect |
 | Thumbnail warning after upload | Custom thumbnails need a phone-verified YouTube account (youtube.com/verify) |
 | 403 "insufficient authentication scopes" on delete/update | Token predates full video management — reconnect once: `mangaeasy youtube-auth` |
+
+## Listing uploads / finding a video id
+
+`mangaeasy youtube-list [--limit N] [--json]` prints the channel's uploads
+(id, date, privacy, title) — the ids that `youtube-delete` and
+`youtube-thumbnail` need when replacing a bad take.
+
+`youtube-upload` now verifies the stored token with a 1-quota-unit channel
+probe *before* starting the (multi-hundred-MB) upload, so an expired/revoked
+token fails in seconds with the fix in hand instead of mid-transfer. Pass
+`--skip-verify` to bypass the probe.

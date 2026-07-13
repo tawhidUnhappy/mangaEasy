@@ -151,6 +151,12 @@ def parse_args() -> argparse.Namespace:
                          help="Run this many TTS worker processes in parallel during audio "
                               "generation, each loading its own model copy. Multiplies VRAM use "
                               "by this count -- only raise it if the GPU has headroom.")
+    parser.add_argument("--respect-claims", action="store_true",
+                        help="Abort (exit 1) if another live agent's workboard claim covers any "
+                             "selected item at this stage (see docs/multi-agent.md).")
+    parser.add_argument("--agent", default=None,
+                        help="This agent's identity for --respect-claims "
+                             "(default: $MANGAEASY_AGENT or user@host).")
     return parser.parse_args()
 
 
@@ -161,6 +167,11 @@ def run(command: list[str], cwd: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    if args.respect_claims:
+        from mangaeasy.workboard import respect_claims_gate
+
+        if not respect_claims_gate(args.project_root, args.items, args.item_range, ("audio", "render",), args.agent):
+            return 1
     cwd = Path.cwd()
     selected_items = merge_item_selection(args.items, args.item_range)
     background_music = None if args.no_background_music else (args.background_music or default_background_music())

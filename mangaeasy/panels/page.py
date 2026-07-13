@@ -189,6 +189,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
 
     crops: List[Tuple[int, Image.Image]] = []
     suspects: List[str] = []
+    full_page_boxes: List[str] = []
     total_panels = 0
     crop_index = 0
     for page_no, page_path in enumerate(paths, 1):
@@ -203,7 +204,12 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         elif len(boxes) == 1 and override is None:
             b = boxes[0]
             if (b["x2"] - b["x1"]) * (b["y2"] - b["y1"]) >= FULL_PAGE_AREA_FRAC * W * H:
-                suspects.append(f"{page_path.name} full-page-box")
+                # Informational, NOT a suspect: one box covering the page is
+                # the normal shape of splash art, chapter titles, and credits
+                # pages. Flagging it fired on 11/11 chapters of a real
+                # production (100% benign) — alarm fatigue that buried the
+                # suspects an agent actually must act on.
+                full_page_boxes.append(f"{page_path.name} full-page-box")
 
         for panel_no, b in enumerate(boxes, 1):
             crop = img.crop((b["x1"], b["y1"], b["x2"], b["y2"]))
@@ -220,6 +226,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     print(
         f"[{item}] pages={len(paths)} panels={total_panels} "
         f"suspects={suspects if suspects else 'none'}"
+        + (f" full_page_boxes={len(full_page_boxes)}" if full_page_boxes else "")
         + (f" archived_previous={archived}" if archived else ""),
         flush=True,
     )
@@ -229,6 +236,9 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         "pages": len(paths),
         "panels": total_panels,
         "suspects": suspects,
+        # Single-box full pages (splash art / titles / credits) — expected,
+        # listed for completeness; the verify sheets confirm at a glance.
+        "full_page_boxes": full_page_boxes,
         # The exact images an agent must open to clear the flags above.
         "verify_images": sorted(str(p) for p in item_verify.glob(f"{item}_*.png")),
     }
@@ -264,6 +274,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--overrides", type=Path, default=None,
                         help="JSON keyed by item -> {page filename: [[x1,y1,x2,y2], ...]} "
                              "that fully replace MAGI's boxes for that page.")
+    parser.add_argument("--respect-claims", action="store_true",
+                        help="Abort (exit 1) if another live agent's workboard claim covers any "
+                             "selected item at this stage (see docs/multi-agent.md).")
+    parser.add_argument("--agent", default=None,
+                        help="This agent's identity for --respect-claims "
+                             "(default: $MANGAEASY_AGENT or user@host).")
     return parser.parse_args(argv)
 
 
@@ -271,6 +287,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
 
     args = parse_args(argv)
+    if args.respect_claims:
+        from mangaeasy.workboard import respect_claims_gate
+
+        if not respect_claims_gate(args.project_root, args.items, args.item_range, ("crop",), args.agent):
+            return 1
     project_root = args.project_root.resolve()
     selection = merge_item_selection(args.items, args.item_range)
     selected = item_dirs(project_root, selection)

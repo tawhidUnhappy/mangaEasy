@@ -45,3 +45,27 @@ def test_version_is_in_sync_with_pyproject():
     with pyproject.open("rb") as f:
         version = tomllib.load(f)["project"]["version"]
     assert mangaeasy.__version__ == version
+
+
+def test_never_picks_a_before_normalize_backup(tmp_path):
+    project = tmp_path / "myproj"
+    project.mkdir()
+    real = project / "myproj_full_20250101-120000.mp4"
+    real.write_bytes(b"a")
+    backup = project / "myproj_full_20250101-120000.before_normalize.mp4"
+    backup.write_bytes(b"b")
+    os.utime(real, (1_000_000, 1_000_000))
+    os.utime(backup, (2_000_000, 2_000_000))  # newer, must still lose
+    assert find_latest_long_video(tmp_path, "myproj") == real
+
+
+def test_timestamped_join_outranks_touched_legacy_file(tmp_path):
+    project = tmp_path / "myproj"
+    project.mkdir()
+    legacy = project / "myproj_full.mp4"
+    legacy.write_bytes(b"a")
+    stamped = project / "myproj_full_20250101-120000.mp4"
+    stamped.write_bytes(b"b")
+    os.utime(stamped, (1_000_000, 1_000_000))
+    os.utime(legacy, (2_000_000, 2_000_000))  # touched later, must still lose
+    assert find_latest_long_video(tmp_path, "myproj") == stamped

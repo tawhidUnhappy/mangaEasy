@@ -7,7 +7,7 @@ from pathlib import Path
 
 from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
-from mangaeasy.video_pipeline.common import item_dirs, item_number, merge_item_selection, project_name
+from mangaeasy.video_pipeline.common import item_dirs, item_number, item_value, merge_item_selection, project_name
 from mangaeasy.video_pipeline.ffmpeg_tools import (
     choose_h264_encoder,
     h264_encoder_args,
@@ -17,7 +17,7 @@ from mangaeasy.video_pipeline.ffmpeg_tools import (
 )
 
 
-ITEM_VIDEO_RE = re.compile(r"^(?:item|chapter)_(\d+)\.mp4$", re.IGNORECASE)
+ITEM_VIDEO_RE = re.compile(r"^(?:item|chapter)_(\d+(?:\.\d+)?)\.mp4$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -78,42 +78,51 @@ def input_dir(config: LongVideoConfig) -> Path:
     return legacy if legacy.exists() and not current.exists() else current
 
 
-def discover_chapters(folder: Path) -> dict[int, Path]:
-    chapters = {}
+def discover_chapters(folder: Path) -> dict[str, Path]:
+    """Rendered item videos keyed by their item NAME ("01", "9.5", ...).
+
+    Keys are names, not parsed integers: split/extra chapters (2.1, 9.5) are
+    real rendered items and used to vanish here silently — an integer-only
+    regex skipped them and the join shipped without them."""
+    chapters: dict[str, Path] = {}
     for path in list(folder.glob("item_*.mp4")) + list(folder.glob("chapter_*.mp4")):
         match = ITEM_VIDEO_RE.match(path.name)
         if match:
-            chapters[int(match.group(1))] = path
+            chapters[match.group(1)] = path
     return chapters
 
 
-def selected_range(config: LongVideoConfig, chapters: dict[int, Path]) -> tuple[int, int]:
+def selected_range(config: LongVideoConfig, chapters: dict[str, Path]) -> tuple[int, int]:
     selected = merge_item_selection(config.items, config.item_range)
     if selected:
         return min(item_number(chapter) for chapter in selected), max(item_number(chapter) for chapter in selected)
-    return item_number(config.start), item_number(config.end) if config.end else max(chapters)
+    if config.end:
+        return item_number(config.start), item_number(config.end)
+    return item_number(config.start), int(max(item_value(name) for name in chapters))
 
 
-def included_chapters(chapters: dict[int, Path], start: int, end: int, allow_gaps: bool) -> tuple[list[int], list[int]]:
-    """Item numbers to join across ``[start, end]``, plus the gap numbers.
+def included_chapters(chapters: dict[str, Path], start: int, end: int, allow_gaps: bool) -> tuple[list[str], list[int]]:
+    """Item names to join across ``[start, end]``, plus the integer gaps.
 
-    Strict (default): every number in the range is expected, so the caller
-    treats any gap as a fatal missing render. With ``allow_gaps`` the join is
-    limited to the item videos that actually exist (sorted), and the gap
-    numbers are returned only so the caller can report what it skipped.
-    """
-    gaps = [n for n in range(start, end + 1) if n not in chapters]
-    if allow_gaps:
-        return sorted(n for n in chapters if start <= n <= end), gaps
-    return list(range(start, end + 1)), gaps
+    Every item video whose numeric VALUE falls inside the range is included,
+    in value order — so decimal chapters (2.1, 9.5) ride along automatically.
+    Contiguity is checked on integers only: a missing 9.5 can't be known
+    about, but a missing 09 is either a failed render (fatal by default) or a
+    genuine source gap (``allow_gaps`` skips it with a warning)."""
+    values = {name: item_value(name) for name in chapters}
+    covered = {int(v) for v in values.values() if v == int(v)}
+    gaps = [n for n in range(start, end + 1) if n not in covered]
+    included = sorted((name for name, v in values.items() if start <= v <= end),
+                      key=lambda name: (values[name], name))
+    return included, gaps
 
 
-def chapter_narration_files(narration_dir: Path, numbers: list[int]) -> list[Path]:
+def chapter_narration_files(narration_dir: Path, names: list[str]) -> list[Path]:
     files: list[Path] = []
-    for number in numbers:
-        path = narration_dir / f"item_{number:02d}_narration.wav"
+    for name in names:
+        path = narration_dir / f"item_{name}_narration.wav"
         if not path.exists():
-            legacy = narration_dir / f"chapter_{number:02d}_narration.wav"
+            legacy = narration_dir / f"chapter_{name}_narration.wav"
             path = legacy if legacy.exists() else path
         if not path.exists():
             raise FileNotFoundError(f"Missing item narration WAV: {path}")
@@ -194,7 +203,7 @@ def validate_config(config: LongVideoConfig) -> None:
         raise ValueError("Narration volume must be non-negative.")
 
 
-def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], numbers: list[int]) -> None:
+def validate_items_strict(config: LongVideoConfig, chapters: dict[str, Path], names: list[str]) -> None:
     """Check every item's panels, narration entries, audio, and rendered video.
 
     The long video cannot be missing or mismatched content for any item it
@@ -209,9 +218,9 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], nu
     audio_root = config.audio_root.resolve() if config.audio_root else None
     problems: list[str] = []
 
-    for number in numbers:
-        label = f"item {number:02d}"
-        found = item_dirs(config.project_root, [f"{number:02d}"])
+    for name in names:
+        label = f"item {name}"
+        found = item_dirs(config.project_root, [name])
         if not found:
             problems.append(f"{label}: no project item folder found")
             continue
@@ -249,7 +258,7 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], nu
             if missing_audio:
                 problems.append(f"{label}: missing audio for {', '.join(missing_audio[:10])}")
 
-        if number not in chapters:
+        if name not in chapters:
             problems.append(f"{label}: missing rendered item video")
 
     if problems:
@@ -274,7 +283,7 @@ def build_long_video(config: LongVideoConfig) -> Path:
     if not chapters:
         raise FileNotFoundError(f"No item_*.mp4 files found in {input_dir(config)}")
     start, end = selected_range(config, chapters)
-    numbers, gaps = included_chapters(chapters, start, end, config.allow_gaps)
+    names, gaps = included_chapters(chapters, start, end, config.allow_gaps)
     if gaps and not config.allow_gaps:
         raise FileNotFoundError(
             "Missing item videos: " + ", ".join(f"{n:02d}" for n in gaps)
@@ -285,14 +294,14 @@ def build_long_video(config: LongVideoConfig) -> Path:
     if gaps:
         print(
             "[long-video] --allow-gaps: joining "
-            + ", ".join(f"{n:02d}" for n in numbers)
+            + ", ".join(names)
             + "; skipping absent chapter(s) "
             + ", ".join(f"{n:02d}" for n in gaps),
             flush=True,
         )
-    validate_items_strict(config, chapters, numbers)
+    validate_items_strict(config, chapters, names)
 
-    selected = [chapters[n] for n in numbers]
+    selected = [chapters[n] for n in names]
     for path in selected:
         validate_video_stream(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -303,7 +312,7 @@ def build_long_video(config: LongVideoConfig) -> Path:
     full_narration = None
     if config.narration_dir is not None:
         full_narration = build_full_narration_wav(
-            chapter_narration_files(config.narration_dir.resolve(), numbers),
+            chapter_narration_files(config.narration_dir.resolve(), names),
             work_dir,
             out_path.name,
         )

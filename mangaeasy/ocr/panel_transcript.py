@@ -75,6 +75,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
     parser.add_argument("--seed-only", action="store_true",
                         help="Only (re)write the transcript skeletons; skip the OCR run.")
+    parser.add_argument("--respect-claims", action="store_true",
+                        help="Abort (exit 1) if another live agent's workboard claim covers any "
+                             "selected item at this stage (see docs/multi-agent.md).")
+    parser.add_argument("--agent", default=None,
+                        help="This agent's identity for --respect-claims "
+                             "(default: $MANGAEASY_AGENT or user@host).")
     return parser.parse_args()
 
 
@@ -82,6 +88,11 @@ def main() -> int:
     from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
 
     args = parse_args()
+    if args.respect_claims:
+        from mangaeasy.workboard import respect_claims_gate
+
+        if not respect_claims_gate(args.project_root, args.items, args.item_range, ("transcribe",), args.agent):
+            return 1
     project_root = args.project_root.resolve()
     selected = item_dirs(project_root, merge_item_selection(args.items, args.item_range))
     if not selected:

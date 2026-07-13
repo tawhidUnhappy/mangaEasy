@@ -92,12 +92,20 @@ def check_item(item_dir: Path) -> dict:
     entry_count = len(narration_images) + len(intro_images)
     covered = narration_set | set(intro_images)
     uncovered: list[str] = []
+    warnings: list[str] = []
     if panels_dir.is_dir():
         panel_names = sorted(p.name for p in panels_dir.iterdir()
                              if p.suffix.lower() in _IMAGE_EXTS)
         uncovered = [name for name in panel_names if name not in covered]
         if uncovered:
-            problems.append(f"{len(uncovered)} panel image(s) have no narration entry: "
+            # A warning, not a problem: skipping credits/banner/SFX panels is
+            # the documented correct workflow (the renderer only shows
+            # narrated panels). This used to be a problem -> ok:false, which
+            # failed every correctly-produced project and sent agents chasing
+            # phantom errors. Confirm via narration-review-sheets that none
+            # of these is a story panel.
+            warnings.append(f"{len(uncovered)} panel image(s) have no narration entry "
+                            "(fine for credits/banners/SFX; confirm none is a story panel): "
                             + ", ".join(uncovered[:5])
                             + ("…" if len(uncovered) > 5 else ""))
     else:
@@ -108,6 +116,7 @@ def check_item(item_dir: Path) -> dict:
         "entries": entry_count,
         "uncovered_panels": uncovered,
         "problems": problems,
+        "warnings": warnings,
         "ok": not problems,
     }
 
@@ -118,9 +127,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         prog="mangaeasy narration-check",
         description="Validate narration.json/intro.json structure per item: "
-                    "parseable, every entry's image exists, every panel is "
-                    "covered, no empty narration. Semantic review (accuracy, "
-                    "speaker attribution) remains an agent's reading job.",
+                    "parseable, every entry's image exists, no empty narration, "
+                    "no intro/narration overlap. Panels without an entry are a "
+                    "WARNING (skipping credits/banners is correct), never a "
+                    "failure. Semantic review (accuracy, speaker attribution) "
+                    "remains an agent's reading job.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT,
                         help="Project folder containing item subfolders (library/<name>).")
@@ -152,6 +163,8 @@ def main() -> int:
         print(f"  [{status}] {r['item']}: {r['entries']} entries")
         for problem in r["problems"]:
             print(f"         - {problem}")
+        for warning in r.get("warnings", []):
+            print(f"         ~ warning: {warning}")
     print("\nAll clean." if ok else "\nFix the problems above, then re-run.")
     return 0 if ok else 1
 

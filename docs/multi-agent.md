@@ -46,6 +46,11 @@ Then loop:
 4. **Verify with the QA loop** (below), release your claims, repeat from
    `work-status --next`.
 
+Claims are advisory by default. When you want them *enforced*, the heavy
+commands (`video`, `page-split`, `webtoon-split`, `panel-transcript`) accept
+`--respect-claims [--agent me]`: they abort with exit 1 — naming the holder —
+if another live agent's claim covers any selected item at that stage.
+
 Project-level stages (`join`, `thumbnail`, `upload`) are single-agent by
 nature — claim them without `--item`:
 `mangaeasy work-claim --project-root library/<P> --stage join --agent me`.

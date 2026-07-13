@@ -13,6 +13,11 @@ DEFAULT_OUTPUT_ROOT = Path(os.environ.get("OUTPUT_ROOT", "output"))
 DEFAULT_WORK_DIR = Path(os.environ.get("WORK_DIR", "work"))
 DEFAULT_KOKORO_ROOT = Path(os.environ.get("KOKORO_ROOT", "kokoro-82m"))
 
+# The one home for media-extension sets — modules used to keep drifting
+# private copies (one even counted .gif as a panel; the renderer doesn't).
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".m4a", ".aac"}
+
 def project_name(project_root: Path, override: str | None = None) -> str:
     return override or project_root.resolve().name
 
@@ -22,6 +27,19 @@ def item_number(value: str) -> int:
     if not match:
         raise ValueError(f"Could not find a number in: {value}")
     return int(match.group(0))
+
+
+def item_value(value: str) -> float:
+    """The item's full numeric value: "02" -> 2.0, "2.1" -> 2.1, "9.5" -> 9.5.
+
+    Selection, sorting, and join discovery all compare THIS, never
+    ``item_number`` — the first-integer parse made "2.1" collide with "02"
+    (``--items 02`` used to select 2.1/2.2 too, and split chapters silently
+    shadowed their integer sibling)."""
+    match = re.search(r"\d+(?:\.\d+)?", value)
+    if not match:
+        raise ValueError(f"Could not find a number in: {value}")
+    return float(match.group(0))
 
 
 def _format_item(number: int, width: int) -> str:
@@ -69,9 +87,9 @@ def merge_item_selection(items: list[str] | None, item_range: str | None) -> lis
     return expand_item_tokens(tokens)
 
 
-def _sort_key(path: Path) -> tuple[int, int, str]:
+def _sort_key(path: Path) -> tuple[int, float, str]:
     has_number = any(ch.isdigit() for ch in path.name)
-    number = item_number(path.name) if has_number else 10**9
+    number = item_value(path.name) if has_number else float(10**9)
     return (0 if has_number else 1, number, path.name.lower())
 
 
@@ -151,10 +169,16 @@ def find_latest_long_video(output_root: Path, name: str) -> Path | None:
     candidates = [
         path for path in project_dir.glob(f"{name}_full*.mp4")
         if path.is_file() and "_bgm_" not in path.name
+        and ".before_normalize" not in path.name
     ]
     if not candidates:
         return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+    # Timestamped joins (name_full_<stamp>.mp4) are the current format; a
+    # bare legacy name_full.mp4 from an old run must never shadow them just
+    # because something touched its mtime.
+    timestamped = [p for p in candidates if re.fullmatch(rf"{re.escape(name)}_full_[\d-]+\.mp4", p.name)]
+    pool = timestamped or candidates
+    return max(pool, key=lambda path: path.stat().st_mtime)
 
 
 def item_dirs(root: Path, selected: list[str] | None = None) -> list[Path]:
@@ -168,11 +192,14 @@ def item_dirs(root: Path, selected: list[str] | None = None) -> list[Path]:
     expanded = expand_item_tokens(selected)
     if expanded:
         wanted_names = {name.strip() for name in expanded}
-        wanted_numbers = {item_number(name) for name in expanded if any(ch.isdigit() for ch in name)}
+        # Match by exact name or exact numeric VALUE ("05" selects 05 or 5,
+        # never 5.5) — split chapters like 2.1 must be named explicitly
+        # (`--items 2.1`); an integer token never drags decimals along.
+        wanted_values = {item_value(name) for name in expanded if any(ch.isdigit() for ch in name)}
         candidates = [
             path
             for path in candidates
             if path.name in wanted_names
-            or (any(ch.isdigit() for ch in path.name) and item_number(path.name) in wanted_numbers)
+            or (any(ch.isdigit() for ch in path.name) and item_value(path.name) in wanted_values)
         ]
     return sorted(candidates, key=_sort_key)

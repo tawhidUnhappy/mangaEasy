@@ -20,7 +20,7 @@ Your task is to create narration completely from scratch for the provided manga 
 - Never describe events that have not happened yet.
 - Only narrate what is visible or clearly implied in the current panel.
 - Maintain story accuracy at all times.
-- This is a Chinese manga, so read panels from left to right and top to bottom.
+- Panels arrive already cropped and ordered in reading sequence by the toolkit. When a single crop contains several bubbles, follow the source's direction (Japanese manga: right-to-left, top-to-bottom; webtoons/manhua: left-to-right).
 - Read all speech bubbles, narration boxes, sound effects, expressions, background details, and panel transitions carefully.
 - The narration must be written entirely from scratch, not rewritten from existing text.
 - Write like a professional viral YouTube manga recap narrator.
@@ -57,11 +57,11 @@ Your task is to create narration completely from scratch for the provided manga 
 
 ## Panel Information
 
-- I will provide the manga panels.
-- Each panel has a watermark in the bottom-left corner with the panel ID in this format:
+- I will provide the manga panels, one cropped image per entry.
+- Panel filenames identify chapter, page, and panel:
 
 ```text
-{chapter}_{page}_{panel}.png
+{chapter}_{page}_{panel}.jpg    (e.g. 01_005_03.jpg)
 ```
 
 ---

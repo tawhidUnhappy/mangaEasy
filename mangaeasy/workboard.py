@@ -491,6 +491,32 @@ def claim_main() -> int:
     return 0 if acquired else 1
 
 
+def respect_claims_gate(project_root: Path, items: list[str] | None, item_range: str | None,
+                        stages: tuple[str, ...], agent: str | None = None) -> bool:
+    """Opt-in enforcement for heavy commands (``--respect-claims``).
+
+    True = clear to proceed. False = another live agent holds a claim on one
+    of the selected (item, stage) pairs; the holder is printed so the caller
+    can abort with exit 1. Claims stay advisory by default — this gate only
+    runs when a command passes ``--respect-claims`` — so single-agent flows
+    never pay for coordination they don't use.
+    """
+    agent = agent or default_agent()
+    try:
+        names = {d.name for d in item_dirs(project_root, merge_item_selection(items, item_range))}
+    except OSError:
+        return True  # unreadable project root fails later with its own error
+    conflicts = [
+        c for c in active_claims(project_root)
+        if not c["expired"] and c.get("kind") == "item" and c.get("agent") != agent
+        and c.get("stage") in stages and c.get("item") in names
+    ]
+    for c in conflicts:
+        print(f"[respect-claims] BUSY: {c['item']}:{c['stage']} is held by {c['agent']} "
+              f"until {c['expires_at']} — pick another task (see work-status --next).", flush=True)
+    return not conflicts
+
+
 # ── work-note: shared append-only notebook ───────────────────────────────────
 
 def add_note(project_root: Path, *, agent: str, topic: str, text: str) -> dict:

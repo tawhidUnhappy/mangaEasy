@@ -174,3 +174,20 @@ def test_emotion_field_contract():
     assert indextts_kwargs(None) == {}
     kwargs = indextts_kwargs("cold, menacing", 0.5)
     assert kwargs == {"emo_text": "cold, menacing", "use_emo_text": True, "emo_alpha": 0.5}
+
+
+def test_respect_claims_gate_blocks_only_live_foreign_claims(tmp_path):
+    from mangaeasy.workboard import respect_claims_gate
+
+    root = tmp_path / "proj"
+    make_item(root, "05")
+    # own claim never blocks
+    acquire_claim(root, agent="me", ttl_minutes=60, item="05", stage="crop")
+    assert respect_claims_gate(root, ["05"], None, ("crop",), agent="me")
+    # a live foreign claim blocks
+    assert not respect_claims_gate(root, ["05"], None, ("crop",), agent="other")
+    # different stage does not block
+    assert respect_claims_gate(root, ["05"], None, ("audio",), agent="other")
+    # unselected item does not block
+    make_item(root, "06")
+    assert respect_claims_gate(root, ["06"], None, ("crop",), agent="other")

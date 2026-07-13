@@ -89,8 +89,22 @@ def test_narration_check_flags_all_defect_classes(item):
     ]))                                              # b.jpg uncovered
     report = check_item(item)
     assert not report["ok"]
+    # Uncovered panels are a WARNING, not a problem: skipping credits/banner
+    # panels is the documented correct workflow, and treating them as errors
+    # used to fail every correctly-produced project.
     assert report["uncovered_panels"] == ["b.jpg"]
-    assert len(report["problems"]) == 3
+    assert len(report["warnings"]) == 1
+    assert len(report["problems"]) == 2
+
+
+def test_narration_check_uncovered_alone_still_passes(item):
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "one"},
+    ]))                                              # b.jpg uncovered only
+    report = check_item(item)
+    assert report["ok"]
+    assert report["uncovered_panels"] == ["b.jpg"]
+    assert report["warnings"] and not report["problems"]
 
 
 def test_narration_check_intro_json_is_covered_separately(item):

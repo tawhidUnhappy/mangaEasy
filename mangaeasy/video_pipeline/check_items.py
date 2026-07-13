@@ -14,8 +14,8 @@ from mangaeasy.video_pipeline.common import (
 from mangaeasy.video_pipeline.item_assets import load_narration
 
 
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
-AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".m4a", ".aac"}
+# Re-exported from common (the single home) — long-standing importers keep working.
+from mangaeasy.video_pipeline.common import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS  # noqa: F401
 
 
 def parse_args() -> argparse.Namespace:

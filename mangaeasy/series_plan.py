@@ -50,9 +50,10 @@ def item_readiness(item_dir: Path) -> dict:
     """What this item has so far (source panels + narration only — generated
     audio/video live under separate roots; use video-validate for those)."""
     panels_dir = item_dir / "panels"
+    from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS
+
     panels = (
-        sum(1 for p in panels_dir.iterdir()
-            if p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"})
+        sum(1 for p in panels_dir.iterdir() if p.suffix.lower() in IMAGE_EXTENSIONS)
         if panels_dir.is_dir() else 0
     )
     downloads = item_dir / "download"

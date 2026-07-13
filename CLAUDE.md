@@ -17,7 +17,7 @@ script) into a narrated video, and can chain many chapters into one long
 "recap" video with background music, ready for YouTube.
 
 **mangaEasy is a CLI + MCP tool for LLM agents — there is no GUI.** The whole
-surface is the `mangaeasy` command (~50 subcommands, each with a machine-readable
+surface is the `mangaeasy` command (~60 subcommands, each with a machine-readable
 `--json` / marker contract) plus `mangaeasy mcp`, which exposes the same engine
 as typed MCP tools. A previous Electron desktop app and a set of Flask web
 editors were removed — see `docs/history/legacy-inventory.md`. New here?

@@ -161,14 +161,13 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 Verify in two passes:
 
 1. **Structural** — `mangaeasy narration-check --project-root
-   library/<Project> --item-range 01-12 --json`: no dangling images, no empty
-   text. It also lists panels with no narration entry as "uncovered" — that is
-   only an error for *story* panels. Deliberately leaving the credits/title
-   banners, scanlator pages, SFX-only frames, and duplicate reaction beats out
-   of narration.json is correct: the renderer builds the video **only** from
-   narrated panels, so an uncovered non-story panel simply never appears.
-   Confirm the uncovered list is exactly those skips, not a real story beat you
-   forgot.
+   library/<Project> --item-range 01-12 --json` must pass (`ok:true`): no
+   dangling images, no empty text, no intro/narration overlap. Panels with no
+   narration entry are reported as **warnings**, not failures — deliberately
+   skipping credits/title banners, scanlator pages, SFX-only frames, and
+   duplicate reaction beats is correct (the renderer builds the video **only**
+   from narrated panels). Confirm the uncovered list is exactly those skips,
+   not a story beat you forgot.
 2. **Semantic** — `mangaeasy narration-review-sheets --project-root
    library/<Project> --item-range 01-12`, then Read EVERY sheet (panel +
    narration + OCR side by side) and check the grounding rules above.

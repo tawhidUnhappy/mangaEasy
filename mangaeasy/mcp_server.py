@@ -405,6 +405,14 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "description": ("--description", "value"), "tags": ("--tags", "value"),
          "privacy": ("--privacy", "value")},
     ),
+    "youtube_list": (
+        "youtube-list",
+        "List the connected channel's uploads (video id, title, privacy, published date) — "
+        "the IDs youtube_delete/youtube_thumbnail need. ~2 quota units.",
+        {"limit": {**_INT, "description": "Maximum videos to return (default 25)."}},
+        [],
+        {"limit": ("--limit", "value")},
+    ),
     "youtube_thumbnail": (
         "youtube-thumbnail",
         "Set/replace the thumbnail of an already-uploaded video — iterate on thumbnail art or "
@@ -527,7 +535,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 _JSON_COMMANDS = {"doctor", "where", "library-list", "video-check", "video-validate",
                   "video-audio-audit", "youtube-status", "youtube-upload",
                   "style-detect", "narration-check", "series-plan",
-                  "work-status", "work-claim", "work-note", "work-qa", "work-artifacts"}
+                  "work-status", "work-claim", "work-note", "work-qa", "work-artifacts",
+                  "youtube-list"}
 
 
 def _build_args(tool: str, arguments: dict) -> list[str]:
