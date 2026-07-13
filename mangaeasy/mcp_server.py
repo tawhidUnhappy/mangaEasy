@@ -439,6 +439,70 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "force": ("--force", "flag"), "device": ("--device", "value")},
     ),
+    "work_status": (
+        "work-status",
+        "Multi-agent dashboard + resume command: per-item pipeline stage derived from the "
+        "filesystem, active claims, recent shared notes; next=true returns only the unclaimed "
+        "actionable tasks. Run first in every session.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "next": {**_BOOL, "description": "Only the unclaimed actionable tasks."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "next": ("--next", "flag")},
+    ),
+    "work_claim": (
+        "work-claim",
+        "Atomically claim an item+stage (or a shared resource like 'gpu') with a TTL lease so "
+        "concurrent agents never duplicate work. Non-zero result text means it is held by "
+        "another live agent — pick a different task.",
+        {"project_root": _PROJECT_ROOT,
+         "item": {**_STR, "description": "Item folder, e.g. 05 (omit for --resource)."},
+         "stage": {"type": "string", "enum": ["download", "crop", "transcribe", "narrate",
+                                              "audio", "render", "join", "thumbnail", "upload"]},
+         "resource": {**_STR, "description": "Shared resource name, e.g. gpu."},
+         "agent": _STR, "ttl_minutes": _INT,
+         "release": {**_BOOL, "description": "Release instead of acquire."},
+         "renew": {**_BOOL, "description": "Extend an existing own claim."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "item": ("--item", "value"),
+         "stage": ("--stage", "value"), "resource": ("--resource", "value"),
+         "agent": ("--agent", "value"), "ttl_minutes": ("--ttl-minutes", "value"),
+         "release": ("--release", "flag"), "renew": ("--renew", "flag")},
+    ),
+    "work_note": (
+        "work-note",
+        "Shared append-only project notebook for agent handoff (character names, speaker "
+        "conventions, tone decisions, warnings). Omit 'add' to read.",
+        {"project_root": _PROJECT_ROOT,
+         "add": {**_STR, "description": "Note text to append."},
+         "topic": {**_STR, "description": "characters / speakers / tone / decisions / warnings."},
+         "agent": _STR, "limit": _INT},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "add": ("--add", "value"),
+         "topic": ("--topic", "value"), "agent": ("--agent", "value"),
+         "limit": ("--limit", "value")},
+    ),
+    "work_qa": (
+        "work-qa",
+        "Aggregated machine-checkable QA gate over generated crops/narration/audio/renders. "
+        "Each problem includes the exact fix command — loop qa->fix->qa until ok=true. "
+        "review-severity items point at sheets that need a vision pass.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "errors_only": {**_BOOL, "description": "Hide review/info items."},
+         "max_problems": {**_INT, "description": "Cap list for small context windows (default 25)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "errors_only": ("--errors-only", "flag"), "max_problems": ("--max-problems", "value")},
+    ),
+    "work_artifacts": (
+        "work-artifacts",
+        "Inventory of reusable generated artifacts (item renders, long-video takes, audio takes, "
+        "transcripts, QA sheets, cached music beds) with a reuse hint each — check before "
+        "regenerating anything expensive.",
+        {"project_root": _PROJECT_ROOT},
+        ["project_root"],
+        {"project_root": ("--project-root", "value")},
+    ),
     "generate_image": (
         "zimage",
         "Generate images with Z-Image Turbo (text-to-image). LONG-RUNNING on first call "
@@ -462,7 +526,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 # Commands whose --json flag should be appended automatically.
 _JSON_COMMANDS = {"doctor", "where", "library-list", "video-check", "video-validate",
                   "video-audio-audit", "youtube-status", "youtube-upload",
-                  "style-detect", "narration-check", "series-plan"}
+                  "style-detect", "narration-check", "series-plan",
+                  "work-status", "work-claim", "work-note", "work-qa", "work-artifacts"}
 
 
 def _build_args(tool: str, arguments: dict) -> list[str]:

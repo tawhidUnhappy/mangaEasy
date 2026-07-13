@@ -64,6 +64,13 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup",            "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
 
+    # ── Multi-agent coordination (see docs/multi-agent.md) ────────────────────
+    "work-status":          ("mangaeasy.workboard",                            "status_main", "Multi-agent",      "Per-item pipeline stage from the filesystem + claims + notes; --next lists unclaimed actionable tasks (the resume command)."),
+    "work-claim":           ("mangaeasy.workboard",                            "claim_main",  "Multi-agent",      "Atomically claim an item+stage or a shared --resource (e.g. gpu) with a TTL lease so agents never collide."),
+    "work-note":            ("mangaeasy.workboard",                            "note_main",   "Multi-agent",      "Append/read the project's shared notebook (characters, speakers, tone, decisions) for agent handoff."),
+    "work-qa":              ("mangaeasy.qa_loop",                              "qa_main",     "Multi-agent",      "Aggregated QA gate over crops/narration/audio/renders; every problem carries its fix command — loop until exit 0."),
+    "work-artifacts":       ("mangaeasy.qa_loop",                              "artifacts_main", "Multi-agent",   "Inventory of reusable generated artifacts (renders, audio takes, transcripts, sheets, music beds) with reuse hints."),
+
     # ── General item-based video pipeline (the recommended workflow) ──────────
     "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
     "video-audio":          ("mangaeasy.video_pipeline.generate_audio",        "main",        "Video pipeline",   "Generate per-item narration audio with Kokoro TTS."),

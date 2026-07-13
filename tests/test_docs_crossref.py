@@ -16,6 +16,7 @@ DOCS = [
     REPO / "docs" / "recap-video-playbook.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
     REPO / "docs" / "setup.md",
+    REPO / "docs" / "multi-agent.md",
     REPO / "docs" / "thumbnail.md",
     REPO / "docs" / "install.md",
     REPO / "START_HERE.md",
@@ -27,6 +28,7 @@ DOCS = [
 # the navigation set this reorg controls; widen as older docs are audited.
 LINK_CHECKED_DOCS = [
     REPO / "START_HERE.md",
+    REPO / "docs" / "multi-agent.md",
     REPO / "AGENTS.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
     REPO / "docs" / "setup.md",

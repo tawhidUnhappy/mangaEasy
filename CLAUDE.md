@@ -290,6 +290,31 @@ interactive prompts).
   while the GPU is still working through the rest — no need to block the whole
   batch on the slowest tool.
 
+## Multi-agent coordination, QA loops, and artifact reuse
+
+`mangaeasy/workboard.py` + `mangaeasy/qa_loop.py` (docs: `docs/multi-agent.md`)
+let several agents share one project and let any agent resume cold:
+
+- State lives in `library/<project>/.workboard/` (dot-dir — `item_dirs`
+  ignores it): `claims/*.json` TTL leases + `notes.jsonl` shared notebook.
+- `work-status` derives per-item stage **from the filesystem only** (never
+  from records an agent left), so it survives dead agents; `--next` = the
+  unclaimed actionable tasks. `work-claim` acquires via `O_CREAT|O_EXCL`
+  (atomic on Windows + network shares); expired leases are taken over.
+  Claims are advisory — pipeline commands do not enforce them.
+- `work-qa` aggregates the machine-checkable gates (structure, speakability,
+  emotion lint, audio coverage/size, render freshness) into problems that
+  each carry a literal `fix` command — exit 1 while dirty, 0 when clean —
+  so a small model can loop qa→fix→qa. Vision-only checks surface as
+  `review` items pointing at sheet files; they never block the loop.
+- `work-artifacts` inventories reusable generated output (renders, audio
+  takes, transcripts, cached music beds) with reuse hints.
+- **Emotion-aware TTS**: narration entries may carry `"emotion"` (validated
+  by `mangaeasy/audio/emotion.py`); `tts_pipeline.py` maps it to IndexTTS2
+  `emo_text`/`emo_alpha` kwargs with a TypeError fallback for older builds.
+  Keep `emotion.py` import-light (no torch/indextts) — QA and tests import
+  it outside the TTS env.
+
 ## Pre-flight validation tools
 
 - `video-check` — validates item inputs exist (panels + narration.json)

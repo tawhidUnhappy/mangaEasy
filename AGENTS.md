@@ -24,6 +24,11 @@ machine? Follow the agent runbook in [docs/setup.md](docs/setup.md):
 smoke-test` (renders and verifies a tiny real video — proof the env works,
 not just that its parts are installed).
 
+**Several agents on one project / resuming after interruption**: follow
+[docs/multi-agent.md](docs/multi-agent.md) — `work-status` (resume), `work-claim`
+(don't collide), `work-note` (share story facts), `work-qa` (fix-until-clean loop),
+`work-artifacts` (reuse instead of regenerate).
+
 **Producing a recap series** (MangaDex URL → uploaded videos, 12 chapters per
 video): follow the skill at
 [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) —

@@ -37,7 +37,16 @@ foreground the quick `--json`/validation commands.
 ```bash
 mangaeasy where --json      # install paths + version
 mangaeasy doctor --json     # ffmpeg/GPU/tool readiness
+mangaeasy work-status --project-root library/<Project> --json   # resuming? exact per-item stage
 ```
+
+Resuming a project, or working alongside other agents? Follow
+`docs/multi-agent.md`: `work-status --next` names the unclaimed actionable
+tasks, `work-claim` leases an item+stage (and `--resource gpu` serializes the
+GPU model tools), `work-note` shares character names/speaker conventions
+between narrators, and `mangaeasy work-qa` is the fix-until-clean gate — loop
+`work-qa → apply the listed fix → work-qa` until exit 0. `work-artifacts`
+lists what already exists for reuse before you regenerate anything.
 
 Fresh clone/machine? Follow the agent runbook in `docs/setup.md`:
 `uv sync` → `mangaeasy setup` (GPU-aware; `--all` / `--minimal` /
@@ -142,7 +151,12 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 - **speakers attributed from the panel** (who is on-panel, whose bubble
   tail) — if unsure, narrate without naming;
 - **no punctuation-only lines** (`"?!"` → near-empty TTS audio; video-check
-  flags these as unspeakable).
+  flags these as unspeakable);
+- **optional `"emotion"` field** on the few lines that earn it (reveals,
+  battle cries, tearful goodbyes): a 1–3 word phrase like `"tense"` or
+  `"cold, menacing"` that IndexTTS2 blends into the voice — vocabulary and
+  rules in `mangaeasy/assets/prompts/narration.md`; most lines stay neutral
+  (no field).
 
 Verify in two passes:
 

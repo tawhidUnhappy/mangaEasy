@@ -34,6 +34,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true",
                         help="Delete the most recently generated audio file plus the previous 5 before "
                              "generating, in case the last run was interrupted mid-write.")
+    parser.add_argument("--emo-alpha", type=float, default=None,
+                        help="Strength of per-entry 'emotion' fields in narration.json (IndexTTS2 "
+                             "emo_text blending; default 0.6, 0 disables).")
+    parser.add_argument("--no-emotion", action="store_true",
+                        help="Ignore narration 'emotion' fields (plain neutral delivery).")
     parser.add_argument("--gpu-workers", type=int, default=1,
                          help="Run this many IndexTTS2 worker processes in parallel, each loading "
                               "its own model copy and handling a separate slice of item folders. "
@@ -82,6 +87,10 @@ def main() -> int:
             cmd.append("--overwrite")
         if args.resume:
             cmd.append("--resume")
+        if args.emo_alpha is not None:
+            cmd += ["--emo-alpha", str(args.emo_alpha)]
+        if args.no_emotion:
+            cmd.append("--no-emotion")
         return cmd
 
     print(f"[tool:index-tts] {tool_dir}", flush=True)
