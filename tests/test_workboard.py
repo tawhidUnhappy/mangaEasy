@@ -71,6 +71,22 @@ def test_stage_derivation_walks_the_pipeline(tmp_path):
     assert status["next_stage"] is None and not status["render_stale"]
 
 
+def test_textless_ocr_entry_counts_as_processed(tmp_path):
+    root = tmp_path / "proj"
+    item = make_item(root, panels=1, ocr=False, narration=False)
+    args = ("proj", tmp_path / "audio", tmp_path / "out")
+
+    # OCR cleanup deliberately stores an empty string for art-only panels.
+    # The key's presence distinguishes this from an unprocessed seed entry.
+    (item / "transcript.json").write_text(
+        json.dumps([{"image": "01_000_01.png", "ocr": ""}]),
+        encoding="utf-8",
+    )
+    status = item_status(item, *args)
+    assert status["transcript"] == {"filled": 1, "total": 1}
+    assert status["next_stage"] == "narrate"
+
+
 def test_stale_render_detected_after_narration_edit(tmp_path):
     import os
 

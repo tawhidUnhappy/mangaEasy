@@ -55,7 +55,10 @@ def seed_transcript(item_dir: Path) -> tuple[Path, int, int]:
 
 def coverage(path: Path) -> tuple[int, int]:
     entries = json.loads(path.read_text(encoding="utf-8-sig"))
-    done = sum(1 for e in entries if (e.get("ocr") or "").strip())
+    # DeepSeek intentionally writes ``ocr: ""`` for textless panels.  The
+    # presence of the key means the panel was processed; a seeded skeleton has
+    # no key yet.
+    done = sum(1 for e in entries if isinstance(e, dict) and "ocr" in e)
     return done, len(entries)
 
 

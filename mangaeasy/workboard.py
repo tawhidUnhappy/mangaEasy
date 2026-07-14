@@ -109,7 +109,11 @@ def _count_images(folder: Path) -> int:
 
 
 def _transcript_progress(item_dir: Path) -> tuple[int, int]:
-    """(filled, total) OCR entries; (0, 0) when transcript.json is absent."""
+    """(processed, total) OCR entries; (0, 0) when transcript.json is absent.
+
+    An empty ``ocr`` value is a valid processed result for a textless panel.
+    Seeded-but-unprocessed entries are distinguished by having no ``ocr`` key.
+    """
     path = item_dir / "transcript.json"
     if not path.is_file():
         return 0, 0
@@ -119,7 +123,7 @@ def _transcript_progress(item_dir: Path) -> tuple[int, int]:
         return 0, 0
     if not isinstance(data, list):
         return 0, 0
-    filled = sum(1 for e in data if isinstance(e, dict) and e.get("ocr"))
+    filled = sum(1 for e in data if isinstance(e, dict) and "ocr" in e)
     return filled, len(data)
 
 

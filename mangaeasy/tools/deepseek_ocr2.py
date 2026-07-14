@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from pathlib import Path
 
@@ -75,6 +76,18 @@ def main() -> int:
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
+    # The OCR worker runs under the tool's isolated Python environment, while
+    # the worker script imports the small cleaning helpers from this checkout.
+    # A source checkout is not installed into that isolated environment, so
+    # make the repository package importable explicitly.  Preserve any
+    # caller-provided PYTHONPATH for packaged/embedded deployments.
+    package_root = str(Path(__file__).resolve().parents[2])
+    inherited_pythonpath = env.get("PYTHONPATH", "").strip()
+    env["PYTHONPATH"] = (
+        package_root
+        if not inherited_pythonpath
+        else package_root + os.pathsep + inherited_pythonpath
+    )
 
     print(f"[tool:deepseek-ocr2] {tool_dir}", flush=True)
     return subprocess.run(

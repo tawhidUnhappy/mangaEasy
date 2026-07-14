@@ -218,7 +218,10 @@ def process_file(path: Path, engine: DeepSeekOCR2, *, force: bool, only_images: 
         if only_images and image_name not in only_images and image_key not in only_images:
             skipped += 1
             continue
-        if entry.get("ocr") and not force:
+        # An empty OCR value is the valid result for a textless panel.  Only
+        # entries without the key are pending unless the caller requests a
+        # forced re-run.
+        if "ocr" in entry and not force:
             skipped += 1
             continue
         image_path = resolve_image(path, image_name)
