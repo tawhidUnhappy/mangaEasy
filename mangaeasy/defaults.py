@@ -7,11 +7,13 @@ from pathlib import Path
 
 from mangaeasy.config import PROJECT_ROOT, SYSTEM_CONFIG_FILE
 
-DEFAULT_BACKGROUND_MUSIC = Path("music/Thapin_by_the_sea.wav")
+DEFAULT_BACKGROUND_MUSIC = Path(r"D:\bgm\tapionBySea.wav")
+DEFAULT_BACKGROUND_MUSIC_DIR = Path(r"D:\bgm")
 DEFAULT_SPEAKER_WAV = Path("vocal/manga_vocal2.wav")
 DEFAULT_MUSIC_VOLUME_DB = -26.0
 DEFAULT_NARRATION_VOLUME = 1.2
 DEFAULT_TTS_ENGINE = "auto"
+_MUSIC_EXTS = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
 
 def _system_config() -> dict:
@@ -26,6 +28,16 @@ def _system_config() -> dict:
 def project_path(value: str | Path) -> Path:
     path = Path(value)
     return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def _pick_music_file(path: Path) -> Path | None:
+    if path.is_file():
+        return path
+    if path.is_dir():
+        for candidate in sorted(path.iterdir()):
+            if candidate.is_file() and candidate.suffix.lower() in _MUSIC_EXTS:
+                return candidate
+    return None
 
 
 def default_speaker_wav() -> Path:
@@ -49,6 +61,27 @@ def default_music_volume_db() -> float:
 
 def configured_background_music() -> Path:
     cfg = _system_config().get("bgm", {})
+    explicit = cfg.get("file") or cfg.get("path")
+    directory = cfg.get("directory") or cfg.get("dir")
+
+    if explicit:
+        chosen = _pick_music_file(project_path(explicit))
+        if chosen is not None:
+            return chosen
+
+    if directory:
+        chosen = _pick_music_file(project_path(directory))
+        if chosen is not None:
+            return chosen
+
+    chosen = _pick_music_file(DEFAULT_BACKGROUND_MUSIC)
+    if chosen is not None:
+        return chosen
+
+    chosen = _pick_music_file(DEFAULT_BACKGROUND_MUSIC_DIR)
+    if chosen is not None:
+        return chosen
+
     return project_path(cfg.get("file") or DEFAULT_BACKGROUND_MUSIC)
 
 

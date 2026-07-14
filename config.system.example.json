@@ -6,7 +6,8 @@
     "download_delay": 0.5
   },
   "bgm": {
-    "file": "music/Thapin_by_the_sea.wav",
+    "directory": "D:\\bgm",
+    "file": "D:\\bgm\\tapionBySea.wav",
     "volume_db": -26
   },
   "video": {

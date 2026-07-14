@@ -421,3 +421,9 @@ descriptions of the long tools say so explicitly.
 | GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MANGAEASY_UNSAFE_GPU_WORKERS` |
 | Slow first model run | models downloading to the data folder | expected once; offline afterwards |
 | `unknown command` | typo | the error suggests near-matches; see `mangaeasy commands` |
+
+Background music can live in `D:\bgm`. In `config.system.json`, set
+`bgm.directory` to `D:\bgm` to make that folder the music pool, and keep
+`bgm.file` pointed at the default track `D:\bgm\tapionBySea.wav`.
+The assistant can choose any other file from that folder by passing
+`--background-music` or by changing `bgm.file` for a specific run.
