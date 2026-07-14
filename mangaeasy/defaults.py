@@ -9,7 +9,8 @@ from mangaeasy.config import PROJECT_ROOT, SYSTEM_CONFIG_FILE
 
 DEFAULT_BACKGROUND_MUSIC = Path("music/Thapin_by_the_sea.wav")
 DEFAULT_SPEAKER_WAV = Path("vocal/manga_vocal2.wav")
-DEFAULT_MUSIC_VOLUME_DB = -22.0
+DEFAULT_MUSIC_VOLUME_DB = -26.0
+DEFAULT_NARRATION_VOLUME = 1.2
 DEFAULT_TTS_ENGINE = "auto"
 
 

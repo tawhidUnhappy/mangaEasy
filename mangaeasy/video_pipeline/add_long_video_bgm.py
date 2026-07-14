@@ -5,7 +5,11 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from mangaeasy.defaults import configured_background_music, default_music_volume_db
+from mangaeasy.defaults import (
+    configured_background_music,
+    default_music_volume_db,
+    DEFAULT_NARRATION_VOLUME,
+)
 from mangaeasy.utils import archive_before_overwrite, emit_result
 from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
@@ -46,8 +50,8 @@ def parse_args() -> argparse.Namespace:
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-normalized to the narration's -14 LUFS reference first (see "
                              "--no-music-loudnorm), so this value is a true LU separation regardless of how hot "
-                             "the source track was mastered. Default -22 is the recommendation for dense, "
-                             "wall-to-wall narration (recaps); -18 to -20 suits sparser voiceover, -25 is the "
+                             "the source track was mastered. Default -26 is the recommendation for dense, "
+                             "wall-to-wall narration (recaps); -20 to -22 suits sparser voiceover, -28 is the "
                              "'inaudible on phone speakers' floor.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Skip measuring the music's integrated loudness and aligning it to the -14 LUFS "
@@ -62,7 +66,10 @@ def parse_args() -> argparse.Namespace:
                         help="Gently dip the music in the 2-5 kHz speech-intelligibility band so it masks the "
                              "voice less (part of bed conditioning). On by default; --no-eq-carve keeps the "
                              "music's full spectrum.")
-    parser.add_argument("--narration-volume", type=float, default=1.0)
+    parser.add_argument("--narration-volume", type=float, default=DEFAULT_NARRATION_VOLUME,
+                        help="Narration gain before mixing. Use this to bring the voice a bit forward "
+                             "without changing the relative music offset. Default 1.2 is the recommended "
+                             "slight lift for recap-style mixes.")
     parser.add_argument("--duck", action=argparse.BooleanOptionalAction, default=True,
                         help="Sidechain-duck the music under the narration: the bed automatically dips a few dB "
                              "whenever the voice is present and breathes back up in the pauses — the standard "

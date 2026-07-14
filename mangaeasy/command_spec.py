@@ -352,7 +352,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Writes a new timestamped file unless replace=true.",
         {"project_root": _PROJECT_ROOT, "output_root": _STR,
          "background_music": {**_STR, "description": "Absolute path to the music file."},
-         "music_volume_db": {**_NUM, "description": "Music loudness in dB, negative = quieter (default -22)."},
+         "music_volume_db": {**_NUM, "description": "Music loudness in dB, negative = quieter (default -26)."},
          "project_name": _STR, "replace": _BOOL},
         ["project_root", "output_root", "background_music"],
         {"project_root": ("--project-root", "value"), "output_root": ("--output-root", "value"),

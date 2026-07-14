@@ -141,7 +141,7 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
-  `--music-volume-db -22`. The value is how far the music sits *below the
+  `--music-volume-db -26`. The value is how far the music sits *below the
   narration*: mixing never attenuates the narration track, so a long video
   normalized to −14 LUFS stays at −14 LUFS after `video-add-bgm`. The music
   stem is loudness-aligned to the same −14 LUFS reference before the offset
@@ -309,7 +309,7 @@ mangaeasy video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT
 
 ```bash
 mangaeasy video-add-bgm --project-root "$PROJ" --output-root "$OUT" \
-    --background-music /abs/path/other.mp3 --music-volume-db -22
+    --background-music /abs/path/other.mp3 --music-volume-db -26
 # writes a NEW timestamped *_bgm_* file; the clean join is untouched
 ```
 

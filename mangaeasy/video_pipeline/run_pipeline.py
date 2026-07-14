@@ -4,7 +4,12 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from mangaeasy.defaults import default_background_music, default_music_volume_db, default_tts_engine
+from mangaeasy.defaults import (
+    DEFAULT_NARRATION_VOLUME,
+    default_background_music,
+    default_music_volume_db,
+    default_tts_engine,
+)
 from mangaeasy.runtime import cli_command
 from mangaeasy.tools.hardware import has_nvidia_gpu
 from mangaeasy.utils import emit_result
@@ -120,7 +125,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-aligned to the narration's -14 LUFS reference first, so this is "
-                             "a true LU separation; default -22 suits dense recap narration, -18 to -20 sparser "
+                             "a true LU separation; default -26 suits dense recap narration, -20 to -22 sparser "
                              "voiceover.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Apply --music-volume-db to the raw music file without aligning its loudness "
@@ -130,7 +135,7 @@ def parse_args() -> argparse.Namespace:
                              "narration (on by default; --no-condition-bed applies only the flat dB offset).")
     parser.add_argument("--eq-carve", action=argparse.BooleanOptionalAction, default=True,
                         help="Dip the music in the 2-5 kHz vocal band so it masks the voice less (on by default).")
-    parser.add_argument("--narration-volume", type=float, default=1.0)
+    parser.add_argument("--narration-volume", type=float, default=DEFAULT_NARRATION_VOLUME)
     parser.add_argument("--duck", action=argparse.BooleanOptionalAction, default=True,
                         help="Sidechain-duck the music under the narration so it dips when the voice is present "
                              "and breathes back up in the pauses (on by default; --no-duck holds it flat).")
