@@ -214,7 +214,10 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[str, Path], na
     image breaks rendering outright, while a bad narration entry only affects
     that one audio line.
     """
-    name = project_name(config.project_root, config.project_name_override)
+    # NOT `name` — the loop below binds `name` to each item number, and the
+    # audio path once silently became <audio-root>/<item>/<item>, flagging
+    # every WAV as missing and stopping real builds.
+    project = project_name(config.project_root, config.project_name_override)
     audio_root = config.audio_root.resolve() if config.audio_root else None
     problems: list[str] = []
 
@@ -253,7 +256,7 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[str, Path], na
             problems.append(f"{label}: empty narration text for {', '.join(missing_text[:10])}")
 
         if audio_root is not None:
-            audios = files_by_stem(audio_root / name / item_dir.name, AUDIO_EXTENSIONS)
+            audios = files_by_stem(audio_root / project / item_dir.name, AUDIO_EXTENSIONS)
             missing_audio = sorted(set(narration_stems) - set(audios))
             if missing_audio:
                 problems.append(f"{label}: missing audio for {', '.join(missing_audio[:10])}")
