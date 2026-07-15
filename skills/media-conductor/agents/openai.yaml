@@ -1,0 +1,4 @@
+interface:
+  display_name: "MediaConductor"
+  short_description: "Create and publish AI media workflows"
+  default_prompt: "Use $media-conductor to create and publish a video in the appropriate isolated mode."

@@ -23,7 +23,9 @@ import sys
 import time
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import emit_result
+from mangaeasy.youtube import store
 
 UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/youtube/v3/videos"
 THUMBNAIL_ENDPOINT = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
@@ -33,8 +35,27 @@ MAX_RETRIES = 8
 PRIVACY_CHOICES = ("private", "unlisted", "public")
 
 
+class YouTubeAPIError(RuntimeError):
+    """YouTube response error retaining only status plus sanitized message."""
+
+    def __init__(self, status_code: int, body: str):
+        self.status_code = status_code
+        self.reason = ""
+        try:
+            errors = (json.loads(body).get("error") or {}).get("errors") or []
+            if errors:
+                self.reason = errors[0].get("reason") or ""
+        except ValueError:
+            pass
+        super().__init__(friendly_api_error(status_code, body))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Upload a video to the connected YouTube channel.")
+    parser.add_argument("--profile", type=store.validate_profile, default=store.DEFAULT_PROFILE,
+                        metavar="NAME", help="YouTube account profile (default: default).")
+    parser.add_argument("--no-auto-auth", action="store_false", dest="auto_auth", default=True,
+                        help="Do not open browser consent automatically if authorization is needed.")
     parser.add_argument("--video", type=Path, required=True, help="Video file to upload (mp4 etc.).")
     parser.add_argument("--title", required=True, help="Video title (max 100 chars).")
     parser.add_argument("--description", default="", help="Video description text.")
@@ -51,6 +72,8 @@ def parse_args() -> argparse.Namespace:
                              "YouTube account for custom thumbnails).")
     parser.add_argument("--made-for-kids", action="store_true",
                         help="Declare the video as made for kids (default: not made for kids).")
+    parser.add_argument("--contains-synthetic-media", action="store_true",
+                        help="Disclose realistic altered/synthetic content (required for AI-generated music/video when applicable).")
     parser.add_argument("--skip-verify", action="store_true",
                         help="Skip the pre-upload token/channel probe (1 quota unit).")
     parser.add_argument("--json", action="store_true", dest="as_json",
@@ -59,13 +82,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_metadata(title: str, description: str, tags: list[str], category: str,
-                   privacy: str, made_for_kids: bool) -> dict:
+                   privacy: str, made_for_kids: bool,
+                   contains_synthetic_media: bool = False) -> dict:
     snippet: dict = {"title": title, "description": description, "categoryId": category}
     if tags:
         snippet["tags"] = tags
+    status = {"privacyStatus": privacy, "selfDeclaredMadeForKids": made_for_kids}
+    if contains_synthetic_media:
+        status["containsSyntheticMedia"] = True
     return {
         "snippet": snippet,
-        "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": made_for_kids},
+        "status": status,
     }
 
 
@@ -93,7 +120,7 @@ def friendly_api_error(status_code: int, body: str) -> str:
         "quotaExceeded": "Daily YouTube API quota exhausted (one upload costs 1,600 of the default "
                          "10,000 units — about 6 uploads/day). Try again after midnight Pacific time.",
         "uploadLimitExceeded": "This channel hit YouTube's upload limit for now. Try again later.",
-        "authError": "Authorization expired or was revoked — run: mangaeasy youtube-auth",
+        "authError": f"Authorization expired or was revoked - run: {CLI_NAME} youtube-auth",
         "forbidden": "YouTube refused the request — check the channel is active and the API is enabled.",
         "invalidTitle": "YouTube rejected the title (empty, too long, or invalid characters).",
     }
@@ -123,7 +150,7 @@ def _start_session(session, metadata: dict, total: int) -> str:
         timeout=60,
     )
     if response.status_code != 200:
-        raise RuntimeError(friendly_api_error(response.status_code, response.text))
+        raise YouTubeAPIError(response.status_code, response.text)
     location = response.headers.get("Location")
     if not location:
         raise RuntimeError("YouTube did not return an upload session URL.")
@@ -142,7 +169,7 @@ def _committed_offset(session, upload_url: str, total: int) -> int:
         return 0
     if response.status_code in (200, 201):
         return total
-    raise RuntimeError(friendly_api_error(response.status_code, response.text))
+    raise YouTubeAPIError(response.status_code, response.text)
 
 
 def _upload_file(session, upload_url: str, video: Path) -> dict:
@@ -177,19 +204,19 @@ def _upload_file(session, upload_url: str, video: Path) -> dict:
             elif response.status_code in (500, 502, 503, 504):
                 retries += 1
                 if retries > MAX_RETRIES:
-                    raise RuntimeError(friendly_api_error(response.status_code, response.text))
+                    raise YouTubeAPIError(response.status_code, response.text)
                 time.sleep(min(2 ** retries, 60))
                 offset = _committed_offset(session, upload_url, total)
                 continue
             else:
-                raise RuntimeError(friendly_api_error(response.status_code, response.text))
+                raise YouTubeAPIError(response.status_code, response.text)
 
             print(f"MANGAEASY_PROGRESS {offset}/{total} uploading", flush=True)
     # Loop ended without a 200/201 — ask the session for the final state.
     response = session.put(upload_url, headers={"Content-Range": f"bytes */{total}"}, timeout=60)
     if response.status_code in (200, 201):
         return response.json()
-    raise RuntimeError(friendly_api_error(response.status_code, response.text))
+    raise YouTubeAPIError(response.status_code, response.text)
 
 
 def _set_thumbnail(session, video_id: str, thumbnail: Path) -> None:
@@ -203,7 +230,7 @@ def _set_thumbnail(session, video_id: str, thumbnail: Path) -> None:
         timeout=120,
     )
     if response.status_code != 200:
-        print(f"[warn] thumbnail not set: {friendly_api_error(response.status_code, response.text)}")
+        raise YouTubeAPIError(response.status_code, response.text)
 
 
 def main() -> int:
@@ -221,43 +248,90 @@ def main() -> int:
     if args.description_file is not None:
         description = args.description_file.read_text(encoding="utf-8-sig")
 
-    from mangaeasy.youtube.auth import _fetch_channel, load_credentials
+    from mangaeasy.youtube.auth import (
+        YouTubeAuthorizationError,
+        _fetch_channel,
+        ensure_credentials,
+        reauthorize_after_api_error,
+    )
+
+    profile = args.profile
+    snapshot = store.status_snapshot(profile)
+    channel = {
+        "id": snapshot.get("channel_id"),
+        "title": snapshot.get("channel_title"),
+    }
 
     # Fail here, in seconds, with the fix in hand — never minutes into a
     # multi-hundred-MB upload. Refreshing the token is what surfaces an
     # expired/revoked grant, so catch it instead of tracebacking.
     try:
-        creds = load_credentials()
-    except Exception as exc:  # noqa: BLE001 — any auth failure gets the same actionable message
+        creds = ensure_credentials(profile, auto_auth=args.auto_auth)
+    except YouTubeAuthorizationError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except Exception:  # noqa: BLE001 - never echo credential/refresh exception contents
         print(
-            f"ERROR: stored YouTube token is invalid or was revoked ({exc}).\n"
-            "Re-run `mangaeasy youtube-auth` (interactive browser consent), then retry this upload.",
+            "ERROR: stored YouTube token is invalid or was revoked.\n"
+            f"Run `{CLI_NAME} youtube-auth --profile {profile}` or remove --no-auto-auth.",
             file=sys.stderr,
         )
         return 1
     if creds is None:
         print(
-            "ERROR: no YouTube account connected.\n"
-            "Run `mangaeasy youtube-auth` first (see docs/youtube.md for the one-time setup).",
+            f"ERROR: YouTube profile '{profile}' is not connected and automatic "
+            "authorization is disabled.\n"
+            f"Run `{CLI_NAME} youtube-auth --profile {profile}` or omit --no-auto-auth.",
             file=sys.stderr,
         )
         return 1
     if not args.skip_verify:
         try:
             channel = _fetch_channel(creds)
+        except Exception as api_error:
+            try:
+                replacement = reauthorize_after_api_error(
+                    profile, api_error, auto_auth=args.auto_auth
+                )
+            except YouTubeAuthorizationError as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                return 1
+            if replacement is None:
+                print(
+                    "ERROR: YouTube API is not reachable with this token.\n"
+                    f"Check `{CLI_NAME} youtube-status --profile {profile} --verify`; "
+                    "pass --skip-verify to try anyway.",
+                    file=sys.stderr,
+                )
+                return 1
+            creds = replacement
+            try:
+                channel = _fetch_channel(creds)
+            except Exception:  # noqa: BLE001 - sanitized failure below
+                print("ERROR: YouTube channel verification failed after reauthorization.",
+                      file=sys.stderr)
+                return 1
+        try:
+            if not channel:
+                store.channel_cache_path(profile).unlink(missing_ok=True)
+                print(
+                    f"ERROR: YouTube profile '{profile}' has no accessible channel.",
+                    file=sys.stderr,
+                )
+                return 1
+            store.write_json(store.channel_cache_path(profile), channel)
             if channel.get("title"):
-                print(f"Connected as {channel['title']}.", flush=True)
-        except Exception as exc:  # noqa: BLE001 — pre-flight only; --skip-verify bypasses
+                print(f"Profile '{profile}' is connected as {channel['title']}.", flush=True)
+        except OSError:
             print(
-                f"ERROR: YouTube API not reachable with this token ({exc}).\n"
-                "Check `mangaeasy youtube-status --verify`; pass --skip-verify to try anyway.",
+                "ERROR: could not persist the verified YouTube channel cache.",
                 file=sys.stderr,
             )
             return 1
 
     metadata = build_metadata(
         args.title, description, parse_tags(args.tags), args.category,
-        args.privacy, args.made_for_kids,
+        args.privacy, args.made_for_kids, args.contains_synthetic_media,
     )
     total_mb = video.stat().st_size / (1024 * 1024)
     print(f"Uploading {video.name} ({total_mb:.1f} MB) as '{args.title}' [{args.privacy}]...", flush=True)
@@ -266,6 +340,26 @@ def main() -> int:
     try:
         upload_url = _start_session(session, metadata, video.stat().st_size)
         resource = _upload_file(session, upload_url, video)
+    except YouTubeAPIError as exc:
+        try:
+            replacement = reauthorize_after_api_error(
+                profile, exc, auto_auth=args.auto_auth
+            )
+        except YouTubeAuthorizationError as auth_exc:
+            print(f"ERROR: {auth_exc}", file=sys.stderr)
+            return 1
+        if replacement is None:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        refreshed = store.status_snapshot(profile)
+        channel = {"id": refreshed.get("channel_id"), "title": refreshed.get("channel_title")}
+        session = _session(replacement)
+        try:
+            upload_url = _start_session(session, metadata, video.stat().st_size)
+            resource = _upload_file(session, upload_url, video)
+        except RuntimeError as retry_exc:
+            print(f"ERROR: {retry_exc}", file=sys.stderr)
+            return 1
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -275,18 +369,42 @@ def main() -> int:
     actual_privacy = (resource.get("status") or {}).get("privacyStatus", args.privacy)
 
     if args.thumbnail is not None and video_id:
-        _set_thumbnail(session, video_id, args.thumbnail)
+        try:
+            _set_thumbnail(session, video_id, args.thumbnail)
+        except YouTubeAPIError as exc:
+            try:
+                replacement = reauthorize_after_api_error(
+                    profile, exc, auto_auth=args.auto_auth
+                )
+            except YouTubeAuthorizationError as auth_exc:
+                print(f"[warn] thumbnail not set: {auth_exc}")
+            else:
+                if replacement is None:
+                    print(f"[warn] thumbnail not set: {exc}")
+                else:
+                    session = _session(replacement)
+                    try:
+                        _set_thumbnail(session, video_id, args.thumbnail)
+                    except RuntimeError as retry_exc:
+                        print(f"[warn] thumbnail not set after reauthorization: {retry_exc}")
 
     print(f"\nUploaded: {url}  (privacy: {actual_privacy})")
     if actual_privacy == "private" and args.privacy != "private":
         print("  NOTE: YouTube locked it to private — API projects that haven't passed "
               "YouTube's audit can't publish directly; flip it in YouTube Studio.")
-    emit_result(video_id=video_id, url=url, privacy=actual_privacy)
+    result = {
+        "video_id": video_id,
+        "url": url,
+        "privacy": actual_privacy,
+        "profile": profile,
+        "channel_title": channel.get("title"),
+        "channel_id": channel.get("id"),
+    }
+    emit_result(**result)
     if args.as_json:
         # Last line on purpose: JSON-mode consumers (incl. the MCP server)
         # parse the final stdout line as the report object.
-        print(json.dumps({"video_id": video_id, "url": url, "privacy": actual_privacy, "ok": True},
-                         ensure_ascii=False))
+        print(json.dumps({**result, "ok": True}, ensure_ascii=False))
     return 0
 
 

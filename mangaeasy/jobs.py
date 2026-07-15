@@ -1,17 +1,17 @@
 """mangaeasy.jobs — detached background jobs with a queryable state file.
 
-Almost every real mangaEasy step runs for minutes to hours (TTS, panel
+Almost every real MediaConductor step runs for minutes to hours (TTS, panel
 detection, OCR, renders, uploads). Blocking a caller — an MCP tools/call, a
 script, an agent's foreground shell — for that long is the wrong shape, and
 "spawn it yourself and forensically infer liveness from log mtimes and
 nvidia-smi" was the documented workaround. This module replaces that:
 
-    mangaeasy job-start video --project-root library/X --items 01-12
-    -> {"ok": true, "job_id": "20260714-153000-video", ...}   (returns instantly)
-    mangaeasy job-status 20260714-153000-video --json
+    mediaconductor job-start video --project-root library/X --items 01-12
+    -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", ...}   (returns instantly)
+    mediaconductor job-status 20260714-153000-video-a1b2c3d4 --json
     -> status running/succeeded/failed/orphaned, exit code, last
        MANGAEASY_PROGRESS marker, parsed MANGAEASY_RESULT, log tail
-    mangaeasy jobs --json
+    mediaconductor jobs --json
     -> every job, newest first
 
 How it works: `job-start` writes `<jobs-dir>/<id>.json` and spawns a detached
@@ -29,14 +29,18 @@ small JSON; logs are plain text. Both are safe to delete when a job is done.
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import json
 import os
+import re
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
+from mangaeasy.brand import CLI_NAME, PRODUCT_NAME
 from mangaeasy.runtime import cli_command, popen_kwargs
 from mangaeasy.video_pipeline.common import DEFAULT_WORK_DIR
 
@@ -46,6 +50,9 @@ _DENYLIST = {"mcp", "job-start", "job-run", "job-status", "jobs"}
 
 _TAIL_DEFAULT = 20
 _STILL_ACTIVE = 259  # Windows GetExitCodeProcess sentinel
+_JOB_ID_RE = re.compile(
+    r"\A\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{8}\Z"
+)
 
 
 def jobs_dir() -> Path:
@@ -60,13 +67,46 @@ def _now_iso() -> str:
 
 
 def _save_state(path: Path, state: dict) -> None:
-    tmp = path.with_suffix(".json.tmp")
+    """Atomically persist a job state, tolerating short Windows reader races.
+
+    A fixed ``.tmp`` filename lets two closely spaced supervisor writes collide.
+    On Windows, replacing the destination can also fail briefly while another
+    process is opening it for ``job-status``.  Use a per-write temporary file
+    and retry only the atomic replace; never expose a partially written JSON
+    document to readers.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
     tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    try:
+        for attempt in range(50):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == 49:
+                    raise
+                time.sleep(0.02)
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _load_state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _state_file_for_id(job_id: str, base: Path) -> Path:
+    """Resolve a generated job id below *base*; reject paths and traversal."""
+    if _JOB_ID_RE.fullmatch(job_id) is None:
+        raise ValueError("invalid job id; pass the id returned by job-start, not a file path")
+    resolved_base = base.expanduser().resolve()
+    state_file = (resolved_base / f"{job_id}.json").resolve()
+    if not state_file.is_relative_to(resolved_base):
+        raise ValueError("job state file resolves outside --jobs-dir")
+    return state_file
 
 
 def _pid_alive(pid: int | None) -> bool:
@@ -109,17 +149,17 @@ def _scan_log_markers(log_path: Path) -> tuple[str | None, dict | None]:
     progress = None
     result = None
     try:
-        text = log_path.read_text(encoding="utf-8", errors="replace")
+        with log_path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if line.startswith("MANGAEASY_PROGRESS "):
+                    progress = line[len("MANGAEASY_PROGRESS "):].strip()
+                elif line.startswith("MANGAEASY_RESULT "):
+                    try:
+                        result = json.loads(line[len("MANGAEASY_RESULT "):])
+                    except ValueError:
+                        pass
     except OSError:
         return None, None
-    for line in text.splitlines():
-        if line.startswith("MANGAEASY_PROGRESS "):
-            progress = line[len("MANGAEASY_PROGRESS "):].strip()
-        elif line.startswith("MANGAEASY_RESULT "):
-            try:
-                result = json.loads(line[len("MANGAEASY_RESULT "):])
-            except ValueError:
-                pass
     return progress, result
 
 
@@ -135,18 +175,61 @@ def _effective_status(state: dict) -> str:
 
 def start_main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run any mangaeasy command as a detached background job. "
-                    "Prints exactly one JSON object: the job id to poll with job-status.")
-    parser.add_argument("command", help="The mangaeasy command to run, e.g. 'video'.")
+        prog=f"{CLI_NAME} job-start",
+        description=f"Run a long-running {PRODUCT_NAME} tool as a detached background job. "
+                    "Prefer the typed --tool/--arguments-json form; the legacy positional "
+                    "command form remains accepted. Prints one JSON object with the job id.")
+    parser.add_argument("--tool",
+                        help="Typed MCP tool name, e.g. 'run_full_pipeline'.")
+    parser.add_argument("--arguments-json", default="{}", metavar="OBJECT",
+                        help="JSON object matching --tool's machine schema (default: {}).")
+    parser.add_argument("command", nargs="?",
+                        help="Compatibility form: CLI command name, e.g. 'video'.")
     parser.add_argument("args", nargs=argparse.REMAINDER,
-                        help="Arguments passed through to the command verbatim.")
+                        help="Compatibility form: arguments passed through verbatim.")
     parser.add_argument("--jobs-dir", type=Path, default=None,
                         help="Where job state/log files live (default: <work>/jobs).")
     args = parser.parse_args()
 
     from mangaeasy.cli import COMMANDS  # late import: cli imports nothing heavy
 
-    command = args.command
+    typed_tool = args.tool
+    if typed_tool and (args.command is not None or args.args):
+        parser.error("use either --tool/--arguments-json or the positional command form, not both")
+
+    if typed_tool:
+        from mangaeasy.command_spec import LONG_RUNNING, TOOLS
+        from mangaeasy.mcp_server import _build_args
+
+        if typed_tool not in TOOLS or typed_tool == "job_start":
+            print(json.dumps({"ok": False, "error": f"unknown or recursive tool: {typed_tool}"}))
+            return 2
+        command = TOOLS[typed_tool][0]
+        if command not in LONG_RUNNING:
+            print(json.dumps({
+                "ok": False,
+                "error": f"tool '{typed_tool}' is not marked long-running; call it directly",
+            }))
+            return 2
+        try:
+            arguments = json.loads(args.arguments_json)
+        except ValueError as exc:
+            print(json.dumps({"ok": False, "error": f"--arguments-json is invalid JSON: {exc}"}))
+            return 2
+        if not isinstance(arguments, dict):
+            print(json.dumps({"ok": False, "error": "--arguments-json must be a JSON object"}))
+            return 2
+        try:
+            command_args = _build_args(typed_tool, arguments)
+        except ValueError as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}))
+            return 2
+    else:
+        if args.command is None:
+            parser.error("provide --tool or a positional command")
+        command = args.command
+        command_args = list(args.args)
+
     if command not in COMMANDS:
         print(json.dumps({"ok": False, "error": f"unknown command: {command}"}))
         return 2
@@ -157,18 +240,14 @@ def start_main() -> int:
     base = args.jobs_dir or jobs_dir()
     base.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    job_id = f"{stamp}-{command}"
-    n = 1
-    while (base / f"{job_id}.json").exists():
-        n += 1
-        job_id = f"{stamp}-{command}-{n}"
+    job_id = f"{stamp}-{command}-{uuid4().hex[:8]}"
     state_file = base / f"{job_id}.json"
     log_file = base / f"{job_id}.log"
 
     state = {
         "id": job_id,
         "command": command,
-        "args": list(args.args),
+        "args": command_args,
         "status": "starting",
         "started_at": _now_iso(),
         "log": str(log_file.resolve()),
@@ -177,6 +256,8 @@ def start_main() -> int:
         "child_pid": None,
         "exit_code": None,
     }
+    if typed_tool:
+        state["tool"] = typed_tool
     _save_state(state_file, state)
 
     supervisor = subprocess.Popen(
@@ -196,9 +277,9 @@ def start_main() -> int:
         time.sleep(0.1)
 
     print(json.dumps({
-        "ok": True, "job_id": job_id, "command": command,
+        "ok": True, "job_id": job_id, "command": command, "tool": typed_tool,
         "state_file": str(state_file.resolve()), "log": str(log_file.resolve()),
-        "poll": f"mangaeasy job-status {job_id} --json",
+        "poll": f"{CLI_NAME} job-status {job_id} --json",
     }, ensure_ascii=False))
     return 0
 
@@ -241,7 +322,10 @@ def run_main() -> int:
 def _status_report(state_file: Path, tail: int) -> dict:
     state = _load_state(state_file)
     status = _effective_status(state)
-    log_path = Path(state.get("log", ""))
+    # The state record is local data, but never trust its `log` value as a
+    # read path. A crafted JSON file must not turn job-status into an arbitrary
+    # file reader; generated logs are always siblings of their state file.
+    log_path = state_file.with_suffix(".log")
     progress, result = _scan_log_markers(log_path)
     report = {
         "ok": status == "succeeded" or status == "running" or status == "starting",
@@ -254,30 +338,33 @@ def _status_report(state_file: Path, tail: int) -> dict:
         "finished_at": state.get("finished_at"),
         "progress": progress,
         "result": state.get("result", result),
-        "log": state.get("log"),
+        "log": str(log_path.resolve()),
     }
     if tail > 0 and log_path.exists():
-        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
-        report["log_tail"] = lines[-tail:]
+        with log_path.open("r", encoding="utf-8", errors="replace") as handle:
+            report["log_tail"] = list(deque((line.rstrip("\r\n") for line in handle), maxlen=min(tail, 500)))
     return report
 
 
 def status_main() -> int:
     parser = argparse.ArgumentParser(
         description="Status of one background job started by job-start.")
-    parser.add_argument("job_id", help="Job id (or a path to its state file).")
+    parser.add_argument("job_id", help="Generated id returned by job-start (file paths are rejected).")
     parser.add_argument("--tail", type=int, default=_TAIL_DEFAULT,
                         help=f"Log tail lines to include (default {_TAIL_DEFAULT}).")
     parser.add_argument("--jobs-dir", type=Path, default=None)
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="Emit one JSON object on stdout.")
     args = parser.parse_args()
+    if args.tail < 0 or args.tail > 500:
+        parser.error("--tail must be between 0 and 500")
 
-    candidate = Path(args.job_id)
-    if candidate.suffix == ".json" and candidate.exists():
-        state_file = candidate
-    else:
-        state_file = (args.jobs_dir or jobs_dir()) / f"{args.job_id}.json"
+    try:
+        state_file = _state_file_for_id(args.job_id, args.jobs_dir or jobs_dir())
+    except ValueError as exc:
+        message = {"ok": False, "error": str(exc)}
+        print(json.dumps(message) if args.as_json else f"[job-status] {message['error']}")
+        return 1
     if not state_file.exists():
         message = {"ok": False, "error": f"no such job: {args.job_id}"}
         print(json.dumps(message) if args.as_json else f"[job-status] {message['error']}")

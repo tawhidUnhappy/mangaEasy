@@ -1,7 +1,7 @@
-# Installing mangaEasy
+# Installing MediaConductor
 
-**mangaEasy is a CLI + MCP tool for LLM agents — there is no GUI.** Three ways
-to get the `mangaeasy` command, from easiest to most hands-on.
+MediaConductor is a CLI and MCP server for manga video, AI story, and song
+video production. These are the three supported installation paths.
 
 ---
 
@@ -10,34 +10,35 @@ to get the `mangaeasy` command, from easiest to most hands-on.
 Requires [uv](https://docs.astral.sh/uv/) installed on your system.
 
 ```bash
-uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
-mangaeasy --version
+uv tool install git+https://github.com/tawhidUnhappy/MediaConductor.git
+mediaconductor --version
 ```
 
-This puts a `mangaeasy` command on your `PATH`. Update later:
+This puts `mediaconductor` on your `PATH`. The legacy `mangaeasy` alias is also
+installed for existing automation. Update later:
 
 ```bash
-uv tool upgrade mangaeasy
+uv tool upgrade media-conductor
 ```
 
 Run without installing (useful for a quick test):
 
 ```bash
-uvx --from git+https://github.com/tawhidUnhappy/mangaEasy.git mangaeasy --help
+uvx --from git+https://github.com/tawhidUnhappy/MediaConductor.git mediaconductor --help
 ```
 
 ---
 
 ## Option 2 — Download a frozen release (no Python needed)
 
-The [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest)
+The [**Releases page**](https://github.com/tawhidUnhappy/MediaConductor/releases/latest)
 ships a self-contained frozen build of the CLI per platform:
 
 | Platform | File | Run |
 |---|---|---|
-| Windows | `mangaeasy-windows.zip` | unzip → `mangaEasy\mangaeasy.exe --help` |
-| macOS (Apple Silicon) | `mangaeasy-macos-arm64.zip` | unzip → `xattr -cr mangaEasy.app` once → `mangaEasy.app/Contents/MacOS/mangaeasy --help` |
-| Linux | `mangaeasy-linux.tar.gz` | `tar xzf` → `mangaEasy/mangaeasy --help` |
+| Windows | `media-conductor-windows.zip` | unzip → `MediaConductor\mediaconductor.exe --help` |
+| macOS (Apple Silicon) | `media-conductor-macos-arm64.zip` | unzip → `xattr -cr MediaConductor.app` once → `MediaConductor.app/Contents/MacOS/mediaconductor --help` |
+| Linux | `media-conductor-linux.tar.gz` | `tar xzf` → `MediaConductor/mediaconductor --help` |
 
 No system Python is required — the build bundles it. The archives are unsigned
 (free software, no paid certificate): on Windows SmartScreen click **More
@@ -48,10 +49,10 @@ info → Run anyway**; on macOS run the `xattr -cr` line above once.
 ## Option 3 — From source (contributors)
 
 ```bash
-git clone https://github.com/tawhidUnhappy/mangaEasy.git
-cd mangaEasy
+git clone https://github.com/tawhidUnhappy/MediaConductor.git
+cd MediaConductor
 uv sync
-uv run mangaeasy --help
+uv run mediaconductor --help
 ```
 
 Or run `./run.sh` (macOS/Linux) / `run.bat` (Windows) from the repo root — it
@@ -62,18 +63,20 @@ Build a frozen release yourself with PyInstaller:
 
 ```bash
 uv sync --group dev
-uv run pyinstaller packaging/mangaeasy.spec
-# Output: dist/mangaEasy/ (Windows/Linux) or dist/mangaEasy.app/ (macOS)
+uv run pyinstaller packaging/mediaconductor.spec
+# Output: dist/MediaConductor/ (Windows/Linux) or dist/MediaConductor.app/ (macOS)
 ```
 
 ---
 
 ## First-run setup
 
-One command (GPU-aware — details in [setup.md](setup.md)):
+Select one mode, then install only that mode's isolated dependencies
+(details in [setup.md](setup.md)):
 
 ```bash
-mangaeasy setup
+mediaconductor modes
+mediaconductor setup --mode ai-story  # or manga-video / song-video
 ```
 
 It vendors the core binaries (ffmpeg/uv/git-lfs), then installs the AI tool
@@ -84,33 +87,34 @@ DeepSeek-OCR 2 and Z-Image Turbo when an NVIDIA GPU is present. `--minimal`,
 Prefer picking pieces yourself?
 
 ```bash
-mangaeasy doctor --json          # ffmpeg/git/GPU/tool status
-mangaeasy bootstrap-tools        # one-time ~100 MB: ffmpeg/ffprobe/uv/git-lfs
-mangaeasy install-tool kokoro-82m   # lightweight CPU TTS
-mangaeasy install-tool index-tts    # optional: GPU voice cloning
-mangaeasy install-tool magi-v3      # optional: paged-manga panel detection
+mediaconductor doctor --mode ai-story --json
+mediaconductor bootstrap-tools
+mediaconductor install-tool kokoro-82m
+mediaconductor install-tool index-tts
+mediaconductor install-tool magi-v3
 ```
 
-Everything mangaEasy writes — installed AI tools, models, settings, logs, and
+Everything MediaConductor writes — installed AI tools, models, settings, logs, and
 (by default) your projects — lives under one data folder, so deleting it leaves
 no trace. GPU acceleration (NVIDIA CUDA / Apple Silicon) is detected
-automatically, with CPU fallback everywhere. Override the data root with the
-`MANGAEASY_ROOT` environment variable.
+automatically. Core video tools and selected models support CPU fallback;
+GPU-only or impractically slow tools are reported by `doctor` for the chosen
+mode. Override the data root with the `MANGAEASY_ROOT` environment variable.
 
 ### Where your data lives
 
 | Platform | Data folder (when `MANGAEASY_ROOT` is unset) |
 |---|---|
 | Windows (frozen) | next to the exe |
-| macOS | `~/Library/Application Support/mangaEasy` |
-| Linux | `~/.local/share/mangaEasy` (or `$XDG_DATA_HOME/mangaEasy`) |
+| macOS | `~/Library/Application Support/mangaEasy` (legacy-compatible path) |
+| Linux | `~/.local/share/mangaEasy` (or `$XDG_DATA_HOME/mangaEasy`; legacy-compatible path) |
 | Dev checkout | the repo root |
 
 ---
 
 ## Updating
 
-- **uv install**: `uv tool upgrade mangaeasy`.
+- **uv install**: `uv tool upgrade media-conductor`.
 - **Frozen release**: download the newer archive and replace the old one; your
   data folder is separate, so installed tools/projects carry over.
 - **Source**: `git pull && uv sync`.

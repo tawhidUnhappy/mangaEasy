@@ -35,8 +35,6 @@ draw.rounded_rectangle(
 img.save('packaging/icon.png')
 
 ico_sizes = [(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)]
-frames = [img.resize(s, Image.LANCZOS).convert('RGBA') for s in ico_sizes]
-frames[0].save('packaging/icon.ico', format='ICO',
-               sizes=ico_sizes, append_images=frames[1:])
+img.save('packaging/icon.ico', format='ICO', sizes=ico_sizes)
 
 print("Done: packaging/icon.png  packaging/icon.ico")

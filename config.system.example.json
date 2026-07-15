@@ -7,7 +7,7 @@
   },
   "bgm": {
     "directory": "bgm",
-    "file": "bgm/tapionBySea.wav",
+    "file": null,
     "volume_db": -26
   },
   "video": {
@@ -57,14 +57,9 @@
     "font_size": 48,
     "padding": 20
   },
-  "whisper": {
-    "model": "medium",
-    "device": "auto",
-    "compute": "float16"
-  },
   "tts": {
-    "engine": "indextts",
-    "speaker_wav": "vocal/manga_vocal2.wav",
+    "engine": "auto",
+    "speaker_wav": null,
     "use_raw_narration": true
   },
   "cut_page": {

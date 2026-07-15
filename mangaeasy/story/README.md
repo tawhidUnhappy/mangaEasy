@@ -1,0 +1,3 @@
+# AI Story package
+
+`workflow.py` owns the versioned `story.json` contract, immutable character/environment cards, scene-state ledger validation, explicit hard-cut/continuous transitions, deterministic hashed prompt locks, sequential previous-frame img2img, reference and scene contact sheets, dependency-bound approvals, narration/voice/video provenance, and the explicit publishing gate. Scene approvals bind the exact current reference artifacts; video approvals bind FPS, resolved TTS, narration/voice inputs, scene artifacts, and the rendered SHA-256. The creative authoring instructions live in `skills/ai-story/`; the detailed style specification is in `docs/ai-story-art-style.md`; model dependencies remain in isolated tool environments.

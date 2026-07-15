@@ -19,14 +19,20 @@ import json
 import re
 import sys
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import emit_result
-from mangaeasy.youtube.upload import _session, friendly_api_error
+from mangaeasy.youtube import store
+from mangaeasy.youtube.upload import YouTubeAPIError, _session
 
 VIDEOS_ENDPOINT = "https://www.googleapis.com/youtube/v3/videos"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Delete a video from the connected YouTube channel.")
+    parser.add_argument("--profile", type=store.validate_profile, default=store.DEFAULT_PROFILE,
+                        metavar="NAME", help="YouTube account profile (default: default).")
+    parser.add_argument("--no-auto-auth", action="store_false", dest="auto_auth", default=True,
+                        help="Do not open browser consent automatically if authorization is needed.")
     parser.add_argument("--video-id", default=None, help="Video id, e.g. dQw4w9WgXcQ.")
     parser.add_argument("--url", default=None,
                         help="Video URL (youtu.be/... or youtube.com/watch?v=...); alternative to --video-id.")
@@ -54,7 +60,7 @@ def lookup_video(session, video_id: str) -> dict | None:
         timeout=60,
     )
     if response.status_code != 200:
-        raise RuntimeError(friendly_api_error(response.status_code, response.text))
+        raise YouTubeAPIError(response.status_code, response.text)
     items = response.json().get("items") or []
     return items[0] if items else None
 
@@ -62,7 +68,7 @@ def lookup_video(session, video_id: str) -> dict | None:
 def delete_video(session, video_id: str) -> None:
     response = session.delete(VIDEOS_ENDPOINT, params={"id": video_id}, timeout=60)
     if response.status_code != 204:
-        raise RuntimeError(friendly_api_error(response.status_code, response.text))
+        raise YouTubeAPIError(response.status_code, response.text)
 
 
 def main() -> int:
@@ -72,13 +78,27 @@ def main() -> int:
         print("ERROR: pass --video-id or --url.", file=sys.stderr)
         return 2
 
-    from mangaeasy.youtube.auth import load_credentials
+    from mangaeasy.youtube.auth import (
+        YouTubeAuthorizationError,
+        ensure_credentials,
+        reauthorize_after_api_error,
+    )
 
-    creds = load_credentials()
+    try:
+        creds = ensure_credentials(args.profile, auto_auth=args.auto_auth)
+    except YouTubeAuthorizationError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except Exception:  # noqa: BLE001 - never echo credential/refresh exception contents
+        print("ERROR: stored YouTube token is unusable.\n"
+              f"Run `{CLI_NAME} youtube-auth --profile {args.profile}` or remove --no-auto-auth.",
+              file=sys.stderr)
+        return 1
     if creds is None:
         print(
-            "ERROR: no YouTube account connected.\n"
-            "Run `mangaeasy youtube-auth` first (see docs/youtube.md for the one-time setup).",
+            f"ERROR: YouTube profile '{args.profile}' is not connected and automatic "
+            "authorization is disabled.\n"
+            f"Run `{CLI_NAME} youtube-auth --profile {args.profile}` or omit --no-auto-auth.",
             file=sys.stderr,
         )
         return 1
@@ -86,26 +106,66 @@ def main() -> int:
     session = _session(creds)
     try:
         video = lookup_video(session, video_id)
-        if video is None:
-            print(f"ERROR: video {video_id} not found (already deleted, or not visible to this account).",
-                  file=sys.stderr)
+    except YouTubeAPIError as exc:
+        try:
+            replacement = reauthorize_after_api_error(
+                args.profile, exc, auto_auth=args.auto_auth
+            )
+        except YouTubeAuthorizationError as auth_exc:
+            print(f"ERROR: {auth_exc}", file=sys.stderr)
             return 1
-        title = (video.get("snippet") or {}).get("title", "")
-        privacy = (video.get("status") or {}).get("privacyStatus", "")
-        if not args.confirm:
-            print(f"Would delete: {video_id}  '{title}'  [{privacy}]")
-            print("Re-run with --confirm to actually delete it (irreversible).")
-            return 2
-        delete_video(session, video_id)
-    except RuntimeError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        if replacement is None:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        session = _session(replacement)
+        try:
+            video = lookup_video(session, video_id)
+        except RuntimeError as retry_exc:
+            print(f"ERROR: {retry_exc}", file=sys.stderr)
+            return 1
+    if video is None:
+        print(f"ERROR: video {video_id} not found (already deleted, or not visible to this account).",
+              file=sys.stderr)
         return 1
+    title = (video.get("snippet") or {}).get("title", "")
+    privacy = (video.get("status") or {}).get("privacyStatus", "")
+    if not args.confirm:
+        print(f"Would delete: {video_id}  '{title}'  [{privacy}]")
+        print("Re-run with --confirm to actually delete it (irreversible).")
+        return 2
+    try:
+        delete_video(session, video_id)
+    except YouTubeAPIError as exc:
+        try:
+            replacement = reauthorize_after_api_error(
+                args.profile, exc, auto_auth=args.auto_auth
+            )
+        except YouTubeAuthorizationError as auth_exc:
+            print(f"ERROR: {auth_exc}", file=sys.stderr)
+            return 1
+        if replacement is None:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        try:
+            delete_video(_session(replacement), video_id)
+        except RuntimeError as retry_exc:
+            print(f"ERROR: {retry_exc}", file=sys.stderr)
+            return 1
 
     print(f"Deleted: {video_id}  '{title}'")
-    emit_result(video_id=video_id, deleted=True, title=title)
+    snapshot = store.status_snapshot(args.profile)
+    result = {
+        "video_id": video_id,
+        "deleted": True,
+        "title": title,
+        "profile": args.profile,
+        "channel_title": snapshot.get("channel_title"),
+        "channel_id": snapshot.get("channel_id"),
+    }
+    emit_result(**result)
     if args.as_json:
         # Last line on purpose: JSON-mode consumers parse the final stdout line.
-        print(json.dumps({"video_id": video_id, "deleted": True, "ok": True}, ensure_ascii=False))
+        print(json.dumps({**result, "ok": True}, ensure_ascii=False))
     return 0
 
 

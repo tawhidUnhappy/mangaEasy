@@ -1,7 +1,7 @@
 # mangaeasy.audio — TTS generation internals
 
 - `tts_pipeline.py` — the batch IndexTTS2 worker. **Runs inside the external
-  `index-tts` tool env** (launched by `mangaeasy video-audio-indextts`, which
+  `index-tts` tool env** (launched by `mediaconductor video-audio-indextts`, which
   sets `INDEX_TTS_ROOT` and the env's Python) — never import it from app
   code; it imports `indextts` at module scope and exits if that fails.
 - `emotion.py` — the narration `"emotion"` field contract: validation

@@ -1,4 +1,4 @@
-name: Build & Release
+name: Build and release
 
 on:
   push:
@@ -13,10 +13,9 @@ env:
 
 jobs:
   build:
-    name: Build - ${{ matrix.platform }}
+    name: Build / ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
-    # The Intel-mac build is best-effort: if GitHub retires the runner label
-    # or the build breaks, the release still ships for the other platforms.
+    timeout-minutes: 45
     continue-on-error: ${{ matrix.optional == true }}
     strategy:
       fail-fast: false
@@ -42,83 +41,99 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install uv
-        run: python -m pip install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Set version
+      - name: Set build version
+        shell: bash
+        run: echo "MEDIACONDUCTOR_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Verify tag and source versions
         shell: bash
         run: |
-          echo "MANGAEASY_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-
-      # The tag is the single source of truth for a release's version —
-      # refuse to build if the sources disagree with it.
-      - name: Check versions are in sync with the tag
-        shell: bash
-        run: |
-          set -e
+          set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          py=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          init=$(python -c "import re;print(re.search(r'__version__ = \"(.+?)\"', open('mangaeasy/__init__.py').read()).group(1))")
-          echo "tag=$tag pyproject=$py __init__=$init"
-          if [ "$tag" != "$py" ] || [ "$tag" != "$init" ]; then
-            echo "::error::Version mismatch: tag v$tag vs pyproject $py vs __init__ $init. Run scripts/release.py first."
+          pyproject=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          package=$(python -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('mangaeasy/__init__.py', encoding='utf-8').read()).group(1))")
+          echo "tag=$tag pyproject=$pyproject package=$package"
+          if [ "$tag" != "$pyproject" ] || [ "$tag" != "$package" ]; then
+            echo "::error::Version mismatch. Run scripts/release.py before tagging."
             exit 1
           fi
 
-      - name: Sync Python dependencies
-        run: uv sync --group dev
+      - name: Sync locked dependencies
+        run: uv sync --locked --group dev
 
-      - name: Lint + tests
+      - name: Lint, compile, and test
         run: |
-          uv run ruff check .
-          uv run python -m compileall -q mangaeasy
-          uv run pytest
+          uv run --no-sync ruff check .
+          uv run --no-sync python -m compileall -q mangaeasy scripts
+          uv run --no-sync pytest
 
-      # Freeze the CLI (packaging/mangaeasy.spec, excludes torch/transformers —
-      # those stay in isolated install-tool envs). Produces dist/mangaEasy/ on
-      # Windows/Linux and dist/mangaEasy.app/ on macOS. ffmpeg/uv/git-lfs are
-      # NOT bundled: `mangaeasy bootstrap-tools` downloads them on first use.
-      - name: Build frozen CLI (PyInstaller)
-        run: uv run pyinstaller packaging/mangaeasy.spec
+      - name: Verify Python distributions
+        run: |
+          uv build
+          uv run --no-sync python scripts/check_distribution.py dist
 
-      # The frozen backend must at least answer --version and doctor --json.
-      - name: Smoke-test frozen backend
+      # Heavy AI stacks stay in isolated install-tool environments and are not
+      # frozen. Core executables are provisioned on first use.
+      - name: Build frozen CLI and MCP server
+        run: uv run --no-sync pyinstaller packaging/mediaconductor.spec
+
+      - name: Verify macOS bundle icon
+        if: runner.os == 'macOS'
         shell: bash
         run: |
+          set -euo pipefail
+          bundle="dist/MediaConductor.app"
+          icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$bundle/Contents/Info.plist")
+          test -n "$icon"
+          test -s "$bundle/Contents/Resources/$icon"
+
+      - name: Smoke-test frozen CLI and MCP server
+        shell: bash
+        run: |
+          set -euo pipefail
           if [ "$RUNNER_OS" = "macOS" ]; then
-            backend="dist/mangaEasy.app/Contents/MacOS/mangaeasy"
+            backend="dist/MediaConductor.app/Contents/MacOS/mediaconductor"
           elif [ "$RUNNER_OS" = "Windows" ]; then
-            backend="dist/mangaEasy/mangaeasy.exe"
+            backend="dist/MediaConductor/mediaconductor.exe"
           else
-            backend="dist/mangaEasy/mangaeasy"
+            backend="dist/MediaConductor/mediaconductor"
           fi
           "$backend" --version
           "$backend" doctor --json | python -c "import json,sys; json.loads(sys.stdin.read().strip().splitlines()[-1]); print('doctor JSON ok')"
+          python scripts/smoke_mcp.py "$backend" mcp
+          python scripts/smoke_mcp.py "$backend" mcp --mode manga-video
+          python scripts/smoke_mcp.py "$backend" mcp --mode ai-story
+          python scripts/smoke_mcp.py "$backend" mcp --mode song-video
 
       - name: Package release archive
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p release-assets
           if [ "$RUNNER_OS" = "macOS" ]; then
-            ( cd dist && zip -qry "../release-assets/mangaeasy-${{ matrix.platform }}.zip" mangaEasy.app )
+            (cd dist && zip -qry "../release-assets/media-conductor-${{ matrix.platform }}.zip" MediaConductor.app)
           elif [ "$RUNNER_OS" = "Windows" ]; then
-            7z a -tzip "release-assets/mangaeasy-${{ matrix.platform }}.zip" "./dist/mangaEasy/*" >/dev/null
+            (cd dist && 7z a -tzip "../release-assets/media-conductor-${{ matrix.platform }}.zip" MediaConductor >/dev/null)
           else
-            ( cd dist && tar czf "../release-assets/mangaeasy-${{ matrix.platform }}.tar.gz" mangaEasy )
+            (cd dist && tar czf "../release-assets/media-conductor-${{ matrix.platform }}.tar.gz" MediaConductor)
           fi
 
       - name: Upload build assets
         uses: actions/upload-artifact@v4
         with:
-          name: mangaeasy-${{ matrix.platform }}
+          name: media-conductor-${{ matrix.platform }}
           path: release-assets/*
-          if-no-files-found: ${{ matrix.optional == true && 'warn' || 'error' }}
+          if-no-files-found: error
 
   release:
-    name: Publish GitHub Release
+    name: Publish GitHub release
     runs-on: ubuntu-latest
     needs: build
-    # Publish as long as the required platforms built (the optional
-    # Intel-mac job may be missing).
     if: ${{ !cancelled() && needs.build.result == 'success' }}
     steps:
       - name: Download build assets
@@ -130,36 +145,37 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: mangaEasy ${{ github.ref_name }}
+          name: MediaConductor ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: release-assets/**/*
           body: |
-            ## mangaEasy ${{ github.ref_name }}
+            ## MediaConductor ${{ github.ref_name }}
 
-            **mangaEasy is a CLI + MCP tool for LLM agents — there is no GUI.**
-            These are self-contained frozen builds of the `mangaeasy` CLI — no
-            system Python needed. On first use, `mangaeasy bootstrap-tools`
-            downloads core tools (ffmpeg and friends) into the install's own
-            data folder; nothing is installed system-wide. (You can also just
-            `uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git`.)
+            MediaConductor is a CLI and MCP server for manga video, AI story,
+            and song video production. These archives contain the frozen
+            `mediaconductor` executable and do not require a system Python.
 
-            GPU acceleration (NVIDIA CUDA, Apple Silicon) is detected
-            automatically; everything falls back to CPU.
+            AI models and media tools are intentionally not embedded. After
+            unpacking, run `mediaconductor modes`, then
+            `mediaconductor setup --mode <mode>` to provision only the selected
+            mode in isolated environments. A source install is also available:
 
-            See [CHANGELOG.md](https://github.com/tawhidUnhappy/mangaEasy/blob/main/CHANGELOG.md)
-            for what changed, and [START_HERE.md](https://github.com/tawhidUnhappy/mangaEasy/blob/main/START_HERE.md)
-            to get oriented.
+            `uv tool install git+${{ github.server_url }}/${{ github.repository }}.git`
+
+            See [README.md](${{ github.server_url }}/${{ github.repository }}/blob/main/README.md)
+            for setup and mode-specific examples and
+            [CHANGELOG.md](${{ github.server_url }}/${{ github.repository }}/blob/main/CHANGELOG.md)
+            for the release history.
 
             ### Downloads
 
-            Each archive contains the `mangaeasy` executable. Unpack it and run
-            `mangaeasy --help` (or `mangaeasy mcp` to serve an agent host).
-
-            - **Windows** — `mangaeasy-windows.zip`. SmartScreen may warn
-              because the build is unsigned; click **More info → Run anyway**.
-            - **macOS** — `mangaeasy-macos-arm64.zip` (Intel included when
-              available). Unsigned, so first run needs
-              `xattr -cr mangaEasy.app`.
-            - **Linux** — `mangaeasy-linux.tar.gz`.
+            - **Windows** — `media-conductor-windows.zip`; run
+              `MediaConductor\mediaconductor.exe --help`. The unsigned build may
+              trigger SmartScreen.
+            - **macOS** — `media-conductor-macos-arm64.zip` (and an Intel build
+              when available). Run `xattr -cr MediaConductor.app` once, then use
+              `MediaConductor.app/Contents/MacOS/mediaconductor`.
+            - **Linux** — `media-conductor-linux.tar.gz`; run
+              `MediaConductor/mediaconductor --help`.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

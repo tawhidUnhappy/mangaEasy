@@ -7,7 +7,9 @@ touching any Python files.
 """
 
 from pathlib import Path
+
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
+from mangaeasy.path_safety import validate_portable_segment, validate_relative_subpath
 
 
 def _dl() -> dict:
@@ -15,7 +17,12 @@ def _dl() -> dict:
 
 
 def _path_cfg() -> dict:
-    return load_system_config().get("paths", {})
+    value = load_system_config().get("paths", {})
+    return value if isinstance(value, dict) else {}
+
+
+def _configured_subdir(value: object, label: str) -> Path:
+    return Path(validate_relative_subpath(value, label=label))
 
 
 # ── Library / chapter dirs ────────────────────────────────────────────────────
@@ -31,7 +38,7 @@ def library_dir() -> Path:
     """
     configured = _path_cfg().get("library_subdir")
     if configured:
-        return PROJECT_ROOT / configured
+        return PROJECT_ROOT / _configured_subdir(configured, "configured library subdirectory")
     library = PROJECT_ROOT / "library"
     legacy = PROJECT_ROOT / "manga"
     if legacy.is_dir() and not library.is_dir():
@@ -43,7 +50,7 @@ def manga_dir(name: str | None = None) -> Path:
     """One manga's own folder (holds its chapter subfolders)."""
     if name is None:
         name = str(_dl()["name"])
-    return library_dir() / name
+    return library_dir() / validate_portable_segment(name, label="manga project name")
 
 
 def chapter_dir(name: str | None = None, chapter: int | None = None) -> Path:
@@ -60,18 +67,24 @@ def download_dir(name=None, chapter=None) -> Path:
 
 def panels_dir(name=None, chapter=None) -> Path:
     subdir = _path_cfg().get("panels_subdir", "panels")
-    return chapter_dir(name, chapter) / subdir
+    return chapter_dir(name, chapter) / _configured_subdir(
+        subdir, "configured panels subdirectory"
+    )
 
 
 def processed_panels_dir(name=None, chapter=None) -> Path:
     """Post-processed (upscaled / mirrored / cleaned) panels directory."""
     subdir = _path_cfg().get("processed_subdir", "panels_processed")
-    return chapter_dir(name, chapter) / subdir
+    return chapter_dir(name, chapter) / _configured_subdir(
+        subdir, "configured processed-panel subdirectory"
+    )
 
 
 def audio_dir(name=None, chapter=None) -> Path:
     subdir = _path_cfg().get("audio_subdir", "audio")
-    return chapter_dir(name, chapter) / subdir
+    return chapter_dir(name, chapter) / _configured_subdir(
+        subdir, "configured audio subdirectory"
+    )
 
 
 def narration_json(name=None, chapter=None) -> Path:

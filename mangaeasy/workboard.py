@@ -36,11 +36,13 @@ import argparse
 import getpass
 import json
 import os
+import re
 import socket
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -259,7 +261,7 @@ def next_tasks(statuses: list[dict], claims: list[dict]) -> list[dict]:
 
 def status_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy work-status",
+        prog=f"{CLI_NAME} work-status",
         description="Multi-agent dashboard: per-item pipeline stage derived from the filesystem, "
                     "active claims, recent shared notes, and (--next) unclaimed actionable tasks. "
                     "Run this first in every session — it is the resume command.",
@@ -329,13 +331,21 @@ def status_main() -> int:
 
 def _claim_file(project_root: Path, *, item: str | None, stage: str | None,
                 resource: str | None) -> Path:
+    for label, value in (("item", item), ("stage", stage), ("resource", resource)):
+        if value is not None and (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", value)
+                                  or value in {".", ".."}):
+            raise ValueError(f"invalid {label} claim component: {value!r}")
     if resource:
         key = f"resource-{resource}"
     elif item:
         key = f"item-{item}--{stage}"
     else:
         key = f"project--{stage}"  # project-level stage: join / thumbnail / upload
-    return claims_dir(project_root) / f"{key}.json"
+    directory = claims_dir(project_root).resolve()
+    path = (directory / f"{key}.json").resolve()
+    if path.parent != directory:
+        raise ValueError("claim path escaped the project claim directory")
+    return path
 
 
 def _claim_label(claim: dict) -> str:
@@ -411,7 +421,7 @@ def release_claim(project_root: Path, *, agent: str, force: bool,
 
 def claim_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy work-claim",
+        prog=f"{CLI_NAME} work-claim",
         description="Atomically claim an (item, stage) pair or a shared --resource (e.g. gpu) "
                     "with a TTL lease so concurrent agents never do the same work twice. "
                     "Exit 0 = acquired/released, 1 = held by another live agent.",
@@ -539,7 +549,7 @@ def add_note(project_root: Path, *, agent: str, topic: str, text: str) -> dict:
 
 def note_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy work-note",
+        prog=f"{CLI_NAME} work-note",
         description="Shared append-only project notebook for agent handoff: character names and "
                     "speaker conventions, tone decisions, warnings. Add with --add; read with --list.",
     )

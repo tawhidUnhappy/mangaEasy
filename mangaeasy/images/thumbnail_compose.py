@@ -1,7 +1,7 @@
 """mangaeasy.images.thumbnail_compose — add text furniture to a thumbnail base.
 
 ``mangaeasy thumbnail-compose`` turns a generated key-art image (usually the
-best ``mangaeasy zimage`` variant) into a finished YouTube thumbnail:
+best ``mediaconductor zimage`` variant) into a finished YouTube thumbnail:
 1280×720 canvas (cover-scaled, center-cropped), 1–3 short text blocks in a
 bold impact-style font with the channel's proven treatment (black stroke
 ≈ 12 % of the font size, #FFE600/white fills), an optional arrow, and a thin
@@ -37,6 +37,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import archive_before_overwrite, emit_result
 
 DEFAULT_SIZE = (1280, 720)
@@ -162,7 +163,7 @@ def draw_border(draw: ImageDraw.ImageDraw, size: tuple[int, int]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy thumbnail-compose",
+        prog=f"{CLI_NAME} thumbnail-compose",
         description="Compose a YouTube thumbnail: base art + bold stroked text "
                     "blocks + optional arrow + white inset border (1280x720).",
     )

@@ -1,22 +1,26 @@
-# mangaEasy — guide for AI agents working on this codebase
+# MediaConductor — guide for AI agents changing this codebase
 
-mangaEasy turns a manga/webtoon chapter (a folder of panel images + a
-narration script) into a narrated video and chains chapters into long YouTube
-"recap" videos with background music. **It is a CLI + MCP tool built for LLM
-agents — there is no GUI** (the old Electron/Flask surfaces were removed; see
-`docs/history/legacy-inventory.md`).
+MediaConductor is an agent-native CLI and MCP server for manga recap videos,
+continuity-checked AI story videos, and generated or imported song lyric
+videos. Heavy AI tools live in isolated `uv` projects. **There is no GUI** (the
+old Electron/Flask surfaces were removed; see
+`docs/history/legacy-inventory.md`). The Python package and compatibility
+command remain `mangaeasy` during the 2.x migration.
 
-This file is for **changing mangaEasy itself**. For *using* the tool, read
-[docs/ai-guide.md](docs/ai-guide.md); for producing a recap series end to end,
-follow [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md).
+This file is for **changing MediaConductor itself**. For *using* it, begin with
+[docs/ai-guide.md](docs/ai-guide.md), select one mode, and load only that
+mode's skill.
 
 ## Which doc for which job
 
 | Job | Doc |
 |---|---|
-| Drive the CLI/MCP from a script or agent | [docs/ai-guide.md](docs/ai-guide.md) |
+| Select a scoped CLI/MCP mode | [docs/ai-guide.md](docs/ai-guide.md) |
+| Written story to narrated video | [skills/ai-story/SKILL.md](skills/ai-story/SKILL.md) |
+| Song generation or timed lyric video | [skills/song-video/SKILL.md](skills/song-video/SKILL.md) |
 | Fresh clone/machine setup + verification | [docs/setup.md](docs/setup.md) |
 | Produce a recap series (URL → uploads) | [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) |
+| Manga CLI/MCP reference | [docs/manga-video-guide.md](docs/manga-video-guide.md) |
 | Crop → verify → narrate loop details | [docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md) |
 | Full production recipe + troubleshooting | [docs/recap-video-playbook.md](docs/recap-video-playbook.md) |
 | Several agents on one project / resuming | [docs/multi-agent.md](docs/multi-agent.md) |
@@ -34,6 +38,8 @@ Each package has its own README.md with entry points and gotchas.
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
 | produce | `video_pipeline/` | audio → render → join → normalize → BGM |
+| produce | `story/` | AI Story manifest, continuity prompts, visual QA gates, orchestration |
+| produce | `song/` | Song manifest, canonical lyric alignment, subtitle/render orchestration |
 | produce | `audio/` | IndexTTS pipeline + emotion mapping |
 | publish | `youtube/` | OAuth, resumable upload, list/delete/thumbnail |
 | tools | `tools/` | isolated external AI tool envs + vendored ffmpeg/uv/git-lfs |
@@ -54,7 +60,9 @@ Each package has its own README.md with entry points and gotchas.
   change** — it is what agents see.
 - **MCP server** (`mangaeasy/mcp_server.py`): stdlib-only JSON-RPC over
   stdio; every tool shells out to the CLI. Long-running work must go through
-  the `job_start`/`job_status` tools, never a blocking call.
+  the `job_start`/`job_status` tools, never a blocking call. Public startup
+  always applies `--allow-root` (the current directory by default) to direct,
+  nested-job, configured-default, and manifest-linked filesystem paths.
 - **Background jobs** (`mangaeasy/jobs.py`): `job-start <command> [args…]`
   spawns a detached supervisor that logs to `<work>/jobs/<id>.log` and
   records exit code + `MANGAEASY_RESULT` into `<id>.json`; `job-status` /
@@ -104,8 +112,10 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **`amix=…:normalize=0` and `alimiter=level=disabled`** in
   `build_mix_filter()` — each silently undid the −14 LUFS target once;
   test-guarded in `test_music_bed.py`.
-- **dB-native volume flags only** (`--music-volume-db`, default −22; keep new
-  defaults within −18…−24). Never a linear multiplier.
+- **dB-native volume flags only** (`--music-volume-db`, default −26 — a true
+  LU separation now that the bed is loudness-aligned to the −14 LUFS
+  reference first; keep new defaults within −20…−28). Never a linear
+  multiplier.
 - **`cudnn.benchmark` stays False** in `kokoro_batch_worker.py`;
   `--gpu-workers` is clamped to 4 by `clamp_gpu_workers()`.
 - **Resume-pruning is shard-aware** (`prune_recent_audio_for_resume(...,
@@ -116,10 +126,12 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **Item selection compares `item_value()`** (handles "2.1"), not
   `item_number()`.
 - **UTF-8 stdio forcing in cli.py stays** (Windows pipes are cp1252).
-- **Machine contract stays stable**: exit 0/1/2; `--json` commands print
+- **Machine contract stays stable**: exit 0/1/2/3 (3 = artifact created but review required); `--json` commands print
   exactly one JSON object on stdout; generation commands end with
   `MANGAEASY_RESULT {...}` (`utils.emit_result()`); `MANGAEASY_PROGRESS n/m`
-  ticks; no interactive prompts, ever.
+  ticks. Pipeline commands never prompt on stdin. Live YouTube operations may
+  open the explicit OAuth browser flow unless `--no-auto-auth` is set; browser
+  progress must remain on stderr so JSON stdout stays parseable.
 - **YouTube**: tokens are secrets (print paths/booleans, never contents);
   default privacy stays `private`; scopes stay video-management-only; the
   upload is hand-rolled resumable `requests` — don't add the discovery client.
@@ -134,8 +146,8 @@ dispatcher renders it; never `sys.exit` from library code). Note
   when fixing a logic bug) and `uv run ruff check .` must pass before commit.
   CI runs both plus compileall on all three OSes; release additionally
   smoke-tests the frozen CLI.
-- `mangaeasy smoke-test` renders a tiny real video — the proof an env works.
-- Packaging: `packaging/mangaeasy.spec` (PyInstaller); `scripts/release.py`
+- `mediaconductor smoke-test` renders a tiny real video — the proof an env works.
+- Packaging: `packaging/mediaconductor.spec` (PyInstaller); `scripts/release.py`
   keeps the version fields in lockstep. Data-root resolution for installed
   apps lives in `_default_frozen_root()` — never assume `~/.mangaeasy`.
 
@@ -145,7 +157,7 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - Every pipeline stage works CPU-only; GPU is an optimization (`--device
   auto|cuda|cpu`, encoder fallback to libx264).
 - Long steps: launch in the background (harness background shell or
-  `mangaeasy job-start`) and wait for completion; GPU tools block-buffer
+  `mediaconductor job-start`) and wait for completion; GPU tools block-buffer
   stdout, so judge liveness from filesystem signals or `job-status`, not log
   tails.
 - Agents edit data through commands (`narration-edit`, `webtoon-override`),

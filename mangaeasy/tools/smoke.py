@@ -24,6 +24,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.runtime import cli_command
 from mangaeasy.utils import emit_result
 
@@ -78,9 +79,9 @@ def parse_args() -> argparse.Namespace:
     from mangaeasy.video_pipeline.common import DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy smoke-test",
+        prog=f"{CLI_NAME} smoke-test",
         description="Build and verify a tiny real video to prove the install works "
-                    "(run after `mangaeasy setup`).",
+                    f"(run after `{CLI_NAME} setup`).",
     )
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
     parser.add_argument("--tts", choices=("silent", "kokoro"), default="silent",
@@ -99,8 +100,8 @@ def main() -> int:
     checks: dict[str, str] = {}
 
     if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
-        print("FAIL: ffmpeg/ffprobe not found — run `mangaeasy setup` "
-              "(or `mangaeasy bootstrap-tools`) first")
+        print(f"FAIL: ffmpeg/ffprobe not found — run `{CLI_NAME} setup` "
+              f"(or `{CLI_NAME} bootstrap-tools`) first")
         return 1
     checks["ffmpeg"] = "ok"
 
@@ -118,7 +119,7 @@ def main() -> int:
         ))
         if result.returncode != 0:
             print("FAIL: Kokoro TTS generation failed — check "
-                  "`mangaeasy install-tool kokoro-82m` / `mangaeasy doctor --json`")
+                  f"`{CLI_NAME} install-tool kokoro-82m` / `{CLI_NAME} doctor --json`")
             emit_result(command="smoke-test", ok=False, checks=checks)
             return 1
         checks["tts"] = "kokoro"

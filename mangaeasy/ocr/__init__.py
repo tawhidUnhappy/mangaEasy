@@ -1,1 +1,1 @@
-"""OCR integrations for mangaEasy."""
+"""OCR integrations for MediaConductor."""

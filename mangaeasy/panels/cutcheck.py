@@ -27,6 +27,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import emit_result
 
 RED = (255, 0, 0)
@@ -112,17 +113,18 @@ def montage(windows: list[tuple[str, Image.Image]], columns: int, pad: int = 14,
 
 
 def parse_args() -> argparse.Namespace:
+    from mangaeasy.path_safety import relative_subpath_arg
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy webtoon-cutcheck",
+        prog=f"{CLI_NAME} webtoon-cutcheck",
         description="Render full-resolution review windows around every forced cut and "
                     "short panel from a webtoon-split ranges manifest.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08.")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-07.")
-    parser.add_argument("--source-subdir", default="download")
+    parser.add_argument("--source-subdir", type=relative_subpath_arg, default="download")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
     parser.add_argument("--verify-root", type=Path, default=None,
                         help="Where webtoon-split wrote <item>_ranges.json "

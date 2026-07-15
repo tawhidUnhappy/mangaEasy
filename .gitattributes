@@ -11,3 +11,10 @@
 *.html text eol=lf
 *.wav binary
 *.mp3 binary
+*.flac binary
+*.ttf binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.otf binary

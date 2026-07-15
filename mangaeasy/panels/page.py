@@ -1,5 +1,5 @@
 """mangaeasy.panels.page
-Item-pipeline paged-manga splitter with verification output (`mangaeasy page-split`).
+Item-pipeline paged-manga splitter with verification output (`mediaconductor page-split`).
 
 This is the paged-manga counterpart to `webtoon-split`. Where `webtoon-split`
 finds gutters in one tall vertical strip, `page-split` runs **MAGI v3** panel
@@ -44,6 +44,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from PIL import Image, ImageDraw, ImageFont
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.panels.ai import _clamp_box, _manga_reading_order
 from mangaeasy.panels.gutter import collect_image_paths
 from mangaeasy.panels.webtoon import _archive_existing_panels, write_contact_sheets
@@ -93,7 +94,7 @@ def run_batch_detect(
     if magi_dir is None:
         print(
             "[page-split] MAGI v3 tool env not found. Install it with "
-            "`mangaeasy install-tool magi-v3`.",
+            f"`{CLI_NAME} install-tool magi-v3`.",
             flush=True,
         )
         return None
@@ -245,6 +246,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    from mangaeasy.path_safety import portable_prefix_template_arg, relative_subpath_arg
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
@@ -255,15 +257,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="Project folder containing item subfolders (library/<name>).")
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08.")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-19.")
-    parser.add_argument("--source-subdir", default="download",
+    parser.add_argument("--source-subdir", type=relative_subpath_arg, default="download",
                         help="Subfolder inside each item with the raw pages (default: download).")
-    parser.add_argument("--panels-subdir", default="panels",
+    parser.add_argument("--panels-subdir", type=relative_subpath_arg, default="panels",
                         help="Subfolder inside each item to write crops to (default: panels).")
     parser.add_argument("--verify-root", type=Path, default=None,
                         help="Where to write verification sheets "
                              "(default: <work-dir>/page_verify/<project-name>).")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
-    parser.add_argument("--prefix-template", default="{item}_",
+    parser.add_argument("--prefix-template", type=portable_prefix_template_arg, default="{item}_",
                         help="Crop filename prefix; '{item}' expands to the item name.")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--dtype", default="auto", choices=["auto", "fp16", "fp32"])

@@ -4,6 +4,7 @@ import argparse
 import subprocess
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.defaults import (
     DEFAULT_NARRATION_VOLUME,
     default_background_music,
@@ -45,11 +46,11 @@ def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
     tool_dir = resolve_tool_dir("index-tts", required=False)
     if tool_dir is None:
         print("[tts:auto] GPU found, but index-tts is not installed -> Kokoro")
-        print("           (get the higher-quality TTS with: mangaeasy install-tool index-tts)")
+        print(f"           (get the higher-quality TTS with: {CLI_NAME} install-tool index-tts)")
         return "kokoro"
     if not (tool_dir / "checkpoints" / "config.yaml").exists():
         print("[tts:auto] index-tts found, but model checkpoints are missing -> Kokoro")
-        print("           (re-run: mangaeasy install-tool index-tts)")
+        print(f"           (re-run: {CLI_NAME} install-tool index-tts)")
         return "kokoro"
     ref = (speaker_wav or _default_speaker_wav()).resolve()
     if not ref.is_file():
@@ -69,7 +70,7 @@ def parse_args() -> argparse.Namespace:
                         help="TTS engine. Defaults to config.system.json -> tts.engine, else auto. "
                              "auto picks IndexTTS when an NVIDIA GPU, the index-tts "
                              "tool + checkpoints, and a speaker WAV are all present, else Kokoro -- this is what "
-                             "keeps 'mangaeasy video' working on any machine out of the box. Force one "
+                             f"keeps '{CLI_NAME} video' working on any machine out of the box. Force one "
                              "explicitly with --tts indextts / --tts kokoro; forcing indextts on a machine "
                              "without it installed fails outright instead of falling back to Kokoro.")
     parser.add_argument("--speaker-wav", type=Path, default=None,

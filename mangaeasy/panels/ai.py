@@ -121,11 +121,11 @@ def _clamp_box(raw, W: int, H: int) -> Optional[Dict[str, int]]:
 def _run_magi_external(image_path: Path) -> Dict:
     """Run MAGI in the standalone ../magi-v3 uv environment.
 
-    This avoids the transformers version conflict between mangaEasy's main env
+    This avoids the transformers version conflict between MediaConductor's main env
     and MAGI v3.
     """
     if MAGI_V3_DIR is None:
-        print("[manga-ai] External MAGI not found. Put ./magi-v3 next to mangaEasy or set MAGI_V3_ROOT.")
+        print("[manga-ai] External MAGI not found. Run 'mediaconductor install-tool magi-v3' or set MAGI_V3_ROOT.")
         return {}
 
     script = MAGI_V3_DIR / "detect_magi.py"

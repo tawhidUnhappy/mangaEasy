@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """batch_detect_magi.py — MAGI v3 panel detection over a whole folder, model loaded once.
 
-mangaEasy ships this file and `mangaeasy install-tool magi-v3` copies it into the
+MediaConductor ships this file and `mediaconductor install-tool magi-v3` copies it into the
 external `magi-v3/` tool environment (alongside `detect_magi.py`). `mangaeasy
 page-split` runs it from that env:
 

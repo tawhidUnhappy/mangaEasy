@@ -27,8 +27,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import archive_before_overwrite, emit_result
 from mangaeasy.video_pipeline.check_items import is_speakable
 
@@ -57,7 +59,7 @@ def parse_args() -> argparse.Namespace:
     from mangaeasy.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_PROJECT_ROOT
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy narration-edit",
+        prog=f"{CLI_NAME} narration-edit",
         description="Upsert/delete/list narration.json (or intro.json) entries "
                     "without hand-editing JSON.",
     )
@@ -88,7 +90,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     project_root = args.project_root.resolve()
-    item_dir = project_root / args.item
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", args.item) or args.item in {".", ".."}:
+        print("ERROR: --item must be one direct-child folder name (letters, digits, dot, underscore, hyphen)")
+        return 1
+    item_dir = (project_root / args.item).resolve()
+    if item_dir.parent != project_root:
+        print(f"ERROR: --item escapes project root: {args.item}")
+        return 1
     if not item_dir.is_dir():
         print(f"ERROR: no item folder {item_dir}")
         return 1

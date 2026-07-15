@@ -18,18 +18,19 @@ Windows / Linux / macOS (Apple Silicon, plus best-effort Intel):
 1. **Fails fast if the tag and source versions disagree** (so a forgotten
    `release.py` run can't ship mislabeled artifacts).
 2. Runs ruff + pytest + a compile check.
-3. Freezes the CLI with PyInstaller (`packaging/mangaeasy.spec`) into
-   `dist/mangaEasy/` (or `dist/mangaEasy.app/` on macOS) and **smoke-tests it**
-   (`--version`, `doctor --json`).
+3. Freezes the CLI with PyInstaller (`packaging/mediaconductor.spec`) into
+   `dist/MediaConductor/` (or `dist/MediaConductor.app/` on macOS), verifies the
+   macOS bundle contains its declared brand icon, and **smoke-tests it**
+   (`--version`, `doctor --json`, and an MCP handshake).
 4. Packages the frozen build into a per-OS archive
-   (`mangaeasy-<platform>.zip` / `.tar.gz`).
+   (`media-conductor-<platform>.zip` / `.tar.gz`).
 5. Publishes a GitHub Release with every platform's archive attached.
 
-Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not** bundled — `mangaeasy
+Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not** bundled — `mediaconductor
 bootstrap-tools` downloads them once on first use, keeping archives small.
 
-Monitor the build at `https://github.com/tawhidUnhappy/mangaEasy/actions`.
-The Release appears at `https://github.com/tawhidUnhappy/mangaEasy/releases`
+Monitor the build at `https://github.com/tawhidUnhappy/MediaConductor/actions`.
+The Release appears at `https://github.com/tawhidUnhappy/MediaConductor/releases`
 once the builds succeed (usually ~10-15 minutes).
 
 ### Pre-releases

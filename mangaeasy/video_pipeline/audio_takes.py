@@ -7,6 +7,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mangaeasy.path_safety import portable_segment_arg
 from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -108,7 +109,8 @@ def restore_main_args() -> argparse.Namespace:
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT)
     parser.add_argument("--project-name", default=None)
-    parser.add_argument("--run", required=True, help="Run folder to restore, for example: run_0002.")
+    parser.add_argument("--run", type=portable_segment_arg, required=True,
+                        help="Run folder to restore, for example: run_0002.")
     parser.add_argument("--items", nargs="*",
                          help="Restore only these item folders from the run (default: every item present in it).")
     return parser.parse_args()

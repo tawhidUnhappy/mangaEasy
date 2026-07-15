@@ -1,9 +1,8 @@
-"""PyInstaller entry point for the standalone mangaEasy backend executable.
+"""PyInstaller entry point for the standalone MediaConductor executable.
 
-The frozen exe *is* the CLI: ``mangaeasy.exe <command> [args...]`` behaves
-exactly like ``mangaeasy <command>``. mangaEasy is a CLI + MCP tool for LLM
-agents — there is no GUI. This build is invoked with explicit args (a
-command); with no args it just prints ``--help``.
+The frozen executable *is* the CLI: ``mediaconductor <command> [args...]``.
+It also serves MCP over stdio via ``mediaconductor mcp``. With no arguments it
+prints the curated help instead of starting a second process or a GUI.
 """
 
 import multiprocessing

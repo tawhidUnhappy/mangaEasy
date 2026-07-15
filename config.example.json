@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to config.json only if you want per-project download defaults. Leave `name` null — a non-null name here SILENTLY overrides the project name `mangaeasy download --url` derives from the manga title; agents should pass --name explicitly instead.",
+  "_comment": "Copy to config.json only if you want per-project download defaults. Leave `name` null — a non-null name here SILENTLY overrides the project name `mediaconductor download --url` derives from the manga title; agents should pass --name explicitly instead.",
   "download": {
     "manga_id": "https://mangadex.org/title/your-title-id",
     "name": null,

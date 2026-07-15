@@ -19,6 +19,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dir", type=Path, required=True,
                          help="The manga-specific output directory to delete wholesale "
                               "(e.g. library/<manga>/output).")
+    parser.add_argument("--allowed-root", type=Path,
+                        help="Required with --yes: target must be a strict descendant of this generated-data root.")
+    parser.add_argument("--confirm-name",
+                        help="Required with --yes: repeat the exact final directory name being deleted.")
     parser.add_argument("--yes", action="store_true", help="Actually delete. Default is dry run.")
     return parser.parse_args()
 
@@ -34,7 +38,10 @@ def total_size(path: Path) -> int:
 def main() -> int:
     args = parse_args()
     project_root = args.project_root.resolve()
-    target = args.dir.resolve()
+    raw_target = args.dir.expanduser()
+    if raw_target.is_symlink():
+        raise SystemExit(f"[FATAL] Refusing to delete a symlink/reparse target: {raw_target}")
+    target = raw_target.resolve()
 
     if not target.exists():
         print(f"Nothing to delete: {target} does not exist.")
@@ -45,6 +52,17 @@ def main() -> int:
             "or an ancestor of it. --dir must be the project's own generated-output folder, "
             "not its source library folder."
         )
+    if args.yes:
+        if args.allowed_root is None:
+            raise SystemExit("[FATAL] --yes requires --allowed-root.")
+        allowed_root = args.allowed_root.expanduser().resolve()
+        if target == allowed_root or allowed_root not in target.parents:
+            raise SystemExit(
+                f"[FATAL] Refusing to delete {target}: it is not a strict descendant of "
+                f"--allowed-root {allowed_root}."
+            )
+        if args.confirm_name != target.name:
+            raise SystemExit(f"[FATAL] --confirm-name must exactly equal '{target.name}'.")
 
     files = count_files(target)
     size_gb = total_size(target) / 1024**3
@@ -52,7 +70,8 @@ def main() -> int:
     print(f"{action}: {target} ({files} file(s), {size_gb:.2f} GB)")
 
     if not args.yes:
-        print("\nRun again with --yes to delete it.")
+        print("\nRun again with --yes --allowed-root <generated-root> "
+              f"--confirm-name {target.name} to delete it.")
         return 0
 
     shutil.rmtree(target)

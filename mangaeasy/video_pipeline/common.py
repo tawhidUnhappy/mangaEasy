@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 
+from mangaeasy.path_safety import validate_portable_segment
 from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
 
 
@@ -60,7 +61,8 @@ def clamp_gpu_workers(requested: int) -> int:
     return GPU_WORKERS_SAFE_MAX
 
 def project_name(project_root: Path, override: str | None = None) -> str:
-    return override or project_root.resolve().name
+    value = override if override is not None else project_root.resolve().name
+    return validate_portable_segment(value, label="project name")
 
 
 def item_number(value: str) -> int:

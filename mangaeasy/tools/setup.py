@@ -1,6 +1,6 @@
 """mangaeasy.tools.setup — one-command provisioning from a fresh clone.
 
-``mangaeasy setup`` chains everything a new machine needs, in order:
+``mediaconductor setup`` chains everything a new machine needs, in order:
 
 1. Vendored core binaries — ffmpeg/ffprobe, uv, git-lfs into this install's
    own tools dir (``bootstrap-tools``).
@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.tools.hardware import has_nvidia_gpu, nvidia_gpu_name
 from mangaeasy.tools.install import TOOLS, InstallError, doctor, install_tool
 from mangaeasy.tools.vendored import ensure_core_tools, ensure_vendored_path
@@ -38,10 +39,18 @@ BASE_TOOLS = ["kokoro-82m"]
 # Installed when an NVIDIA GPU is detected (or forced with --all).
 GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"]
 
+MODE_TOOLS = {
+    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"],
+    "ai-story": ["kokoro-82m", "index-tts", "z-image-turbo"],
+    "song-video": ["ace-step", "demucs", "whisperx", "z-image-turbo"],
+}
 
-def plan_tools(profile: str, gpu: bool, skip: set[str]) -> list[str]:
+
+def plan_tools(profile: str, gpu: bool, skip: set[str], mode: str | None = None) -> list[str]:
     """Which tool envs this run will install, in install order."""
-    if profile == "minimal":
+    if mode:
+        selected = list(MODE_TOOLS[mode])
+    elif profile == "minimal":
         selected: list[str] = []
     elif profile == "all":
         selected = list(TOOLS)
@@ -52,7 +61,7 @@ def plan_tools(profile: str, gpu: bool, skip: set[str]) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy setup",
+        prog=f"{CLI_NAME} setup",
         description="Provision this install end to end: core binaries, AI tool "
                     "environments, and model downloads. GPU-aware by default; "
                     "safe to re-run (updates / resumes instead of reinstalling).",
@@ -64,6 +73,8 @@ def main() -> int:
     profile_group.add_argument("--minimal", action="store_true",
                                help="Only the core binaries (ffmpeg/uv/git-lfs, ~100 MB); "
                                     "install AI tools later with install-tool.")
+    profile_group.add_argument("--mode", choices=tuple(MODE_TOOLS),
+                               help="Install only one production mode's isolated dependencies.")
     parser.add_argument("--skip", action="append", default=[], metavar="TOOL",
                         choices=sorted(TOOLS), help="Skip one tool (repeatable).")
     gpu_group = parser.add_mutually_exclusive_group()
@@ -80,19 +91,19 @@ def main() -> int:
     profile = "all" if args.all else "minimal" if args.minimal else "auto"
     gpu = has_nvidia_gpu()
     gpu_mode = "cpu" if args.cpu else "cuda" if args.cuda else "auto"
-    tools = plan_tools(profile, gpu, set(args.skip))
+    tools = plan_tools(profile, gpu, set(args.skip), args.mode)
 
     gpu_label = nvidia_gpu_name() or ("yes" if gpu else "none")
-    print(f"mangaeasy setup — profile: {profile}, NVIDIA GPU: {gpu_label}")
+    print(f"MediaConductor setup — profile: {profile}, mode: {args.mode or 'all'}, NVIDIA GPU: {gpu_label}")
     print("Core binaries: ffmpeg/ffprobe, uv, git-lfs (vendored into this install)")
     print("AI tools this run: " + (", ".join(tools) if tools else "(none — minimal profile)"))
-    skipped_gpu = [t for t in GPU_TOOLS if t not in tools and profile == "auto"]
+    skipped_gpu = [t for t in GPU_TOOLS if t not in tools and profile == "auto" and not args.mode]
     if skipped_gpu:
         print(f"Skipped (no NVIDIA GPU): {', '.join(skipped_gpu)} — "
-              f"install later with `mangaeasy install-tool <name>` or re-run `setup --all`.")
+              f"install later with `{CLI_NAME} install-tool <name>` or re-run `setup --all`.")
 
     if args.dry_run:
-        emit_result(dry_run=True, profile=profile, gpu=gpu, tools=tools)
+        emit_result(dry_run=True, profile=profile, mode=args.mode, gpu=gpu, tools=tools)
         return 0
 
     # 1. Core binaries — everything after this (git clone, uv sync, hf download)
@@ -103,7 +114,7 @@ def main() -> int:
     if not all(core.values()):
         failed = ", ".join(name for name, ok in core.items() if not ok)
         print(f"\nERROR: core binaries failed to download: {failed}. "
-              f"Check the network and re-run `mangaeasy setup`.", file=sys.stderr)
+              f"Check the network and re-run `{CLI_NAME} setup`.", file=sys.stderr)
         return 1
 
     # 2. Tool envs — keep going past individual failures so one flaky download
@@ -118,7 +129,7 @@ def main() -> int:
             print(f"[setup] {name} failed: {exc}", file=sys.stderr)
             statuses[name] = "failed"
         except KeyboardInterrupt:
-            print("\n[setup] interrupted — re-run `mangaeasy setup` to resume.", file=sys.stderr)
+            print(f"\n[setup] interrupted — re-run `{CLI_NAME} setup` to resume.", file=sys.stderr)
             return 1
 
     # 3. Readiness report.
@@ -130,13 +141,14 @@ def main() -> int:
         print(f"  {name:14s} {statuses[name]}")
     failures = [name for name, status in statuses.items() if status == "failed"]
     if failures:
-        print(f"\nSome tools failed: {', '.join(failures)}. Re-run `mangaeasy setup` "
-              f"(resumes where it left off) or `mangaeasy install-tool <name>`.")
+        print(f"\nSome tools failed: {', '.join(failures)}. Re-run `{CLI_NAME} setup` "
+              f"(resumes where it left off) or `{CLI_NAME} install-tool <name>`.")
     else:
-        print("\nReady. Orient with: mangaeasy where --json / commands --json / doctor --json")
+        print(f"\nReady. Orient with: {CLI_NAME} where --json / commands --json / doctor --json")
 
     emit_result(
         profile=profile,
+        mode=args.mode,
         gpu=gpu,
         core=core,
         tools=statuses,

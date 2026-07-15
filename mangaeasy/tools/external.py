@@ -5,10 +5,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.runtime import is_frozen
 
 
 TOOL_ENVS = {
+    "ace-step": ("ACESTEP_ROOT", "ACE_STEP_ROOT"),
+    "demucs": ("DEMUCS_ROOT",),
+    "whisperx": ("WHISPERX_ROOT",),
     "kokoro-82m": ("KOKORO_ROOT",),
     "index-tts": ("INDEX_TTS_ROOT", "INDEX_TTS_DIR"),
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
@@ -49,7 +53,7 @@ def _default_frozen_root() -> Path:
 
 
 def app_root() -> Path:
-    """Directory this install of mangaEasy keeps its data in.
+    """Directory this MediaConductor install keeps its data in.
 
     Frozen build: a per-platform writable root (see _default_frozen_root).
     Dev checkout: the repo root (parent of the ``mangaeasy`` package).
@@ -78,7 +82,7 @@ def mangaeasy_home() -> Path:
 
 
 def tools_home() -> Path:
-    """Managed dir where `mangaeasy install-tool` puts external tool envs.
+    """Managed dir where `mediaconductor install-tool` puts external tool envs.
 
     Default `<app_root>/.mangaeasy/tools` — self-contained, deleted along
     with the install/repo folder. Override with MANGAEASY_TOOLS_DIR.
@@ -91,7 +95,7 @@ def tools_home() -> Path:
 
 def candidate_roots() -> list[Path]:
     # Only the managed install dir — tools must be provisioned with
-    # `mangaeasy install-tool` rather than relied on as sibling directories.
+    # `mediaconductor install-tool` rather than relied on as sibling directories.
     return [tools_home()]
 
 
@@ -149,7 +153,7 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     """Env for subprocesses that run inside an isolated tool venv.
 
     Every cache an external tool (or `uv` itself) might write is pinned under
-    this install's own `.mangaeasy/` dir, so the "everything mangaEasy writes
+    this install's own `.mangaeasy/` dir, so the "everything MediaConductor writes
     lives in one folder" promise holds and deleting the install folder leaves
     nothing behind. These are **force-set** (they override an inherited
     ``HF_HOME`` / ``UV_CACHE_DIR`` / ... from the ambient environment): a
@@ -182,6 +186,14 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     set_cache("TRANSFORMERS_CACHE", str(hf_cache / "hub"))
     set_cache("TORCH_HOME", str(mangaeasy_home() / "torch_cache"))
     set_cache("UV_CACHE_DIR", str(mangaeasy_home() / "uv_cache"))
+    set_cache("UV_PYTHON_INSTALL_DIR", str(mangaeasy_home() / "uv_python"))
+    set_cache("XDG_CACHE_HOME", str(mangaeasy_home() / "xdg_cache"))
+    set_cache("NLTK_DATA", str(mangaeasy_home() / "nltk_data"))
+    set_cache("TRITON_CACHE_DIR", str(mangaeasy_home() / "triton_cache"))
+    set_cache("TORCHINDUCTOR_CACHE_DIR", str(mangaeasy_home() / "torchinductor_cache"))
+    set_cache("TORCH_EXTENSIONS_DIR", str(mangaeasy_home() / "torch_extensions"))
+    env.setdefault("ACESTEP_CHECKPOINTS_DIR", str(tools_home() / "ace-step" / "checkpoints"))
+    env.setdefault("ACESTEP_TMPDIR", str(mangaeasy_home() / "ace_step_tmp"))
     env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     env.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -250,7 +262,7 @@ def main() -> int:
         print(f"  {tool_name:10s} {status}  ({', '.join(env_vars)})")
     print()
     print(f"Tools are installed to: {tools_home()}")
-    print("Run `mangaeasy install-tool <name>` to provision a tool.")
+    print(f"Run `{CLI_NAME} install-tool <name>` to provision a tool.")
     print("Override with MANGAEASY_TOOLS_DIR or per-tool env vars above.")
     return 0
 

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "media-conductor-manga": {
+      "command": "mediaconductor",
+      "args": ["mcp", "--mode", "manga-video", "--allow-root", "D:/MediaProjects"]
+    },
+    "media-conductor-story": {
+      "command": "mediaconductor",
+      "args": ["mcp", "--mode", "ai-story", "--allow-root", "D:/MediaProjects"]
+    },
+    "media-conductor-song": {
+      "command": "mediaconductor",
+      "args": ["mcp", "--mode", "song-video", "--allow-root", "D:/MediaProjects"]
+    }
+  }
+}

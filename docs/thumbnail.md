@@ -5,15 +5,15 @@ as an isolated tool and auto-selects the best strategy for the detected
 hardware (CUDA, Apple Silicon MPS, or CPU):
 
 ```bash
-mangaeasy install-tool z-image-turbo
-mangaeasy zimage --prompt-file thumb_prompt.txt --output thumbnail_base.png \
+mediaconductor install-tool z-image-turbo
+mediaconductor zimage --prompt-file thumb_prompt.txt --output thumbnail_base.png \
     --width 1280 --height 720 --count 4
 ```
 
-For the channel style, write a platform-safe "gooner thumbnail" prompt: glossy
-anime/manhwa key art, visibly adult characters, fanservice energy, exaggerated
-expressions, dramatic camera angle, and a clear emotional hook. Keep it
-YouTube-safe:
+For the channel style, write a platform-safe, high-energy character-tension
+prompt: glossy anime/manhwa key art, visibly adult characters, expressive
+reactions, a dramatic camera angle, and a clear emotional hook. Keep it
+YouTube-safe and faithful to the source:
 
 - Every character must be visibly adult and fully clothed.
 - Suggestive fanservice is the ceiling: no nudity, transparent clothing,
@@ -23,7 +23,7 @@ YouTube-safe:
 - Use two- or three-character tension: one shocked/flustered/blushing, one
   calm/smug/powered-up.
 - Do not put text, logos, or watermarks in the generated image; add those
-  afterward with `mangaeasy thumbnail-compose`.
+  afterward with `mediaconductor thumbnail-compose`.
 
 Prompt shape:
 

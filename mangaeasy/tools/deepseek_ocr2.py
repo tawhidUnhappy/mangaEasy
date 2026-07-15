@@ -7,13 +7,14 @@ import os
 import subprocess
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.runtime import popen_kwargs
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy deepseek-ocr2",
+        prog=f"{CLI_NAME} deepseek-ocr2",
         description="Run DeepSeek-OCR 2 over narration JSON files and write `ocr` fields.",
     )
     parser.add_argument("--project-root", type=Path, default=Path.cwd())

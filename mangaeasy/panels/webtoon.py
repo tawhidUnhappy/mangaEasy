@@ -498,6 +498,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
 
 
 def parse_args() -> argparse.Namespace:
+    from mangaeasy.path_safety import portable_prefix_template_arg, relative_subpath_arg
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
@@ -508,15 +509,15 @@ def parse_args() -> argparse.Namespace:
                         help="Project folder containing item subfolders (library/<name>).")
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08.")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-19.")
-    parser.add_argument("--source-subdir", default="download",
+    parser.add_argument("--source-subdir", type=relative_subpath_arg, default="download",
                         help="Subfolder inside each item with the raw pages (default: download).")
-    parser.add_argument("--panels-subdir", default="panels",
+    parser.add_argument("--panels-subdir", type=relative_subpath_arg, default="panels",
                         help="Subfolder inside each item to write crops to (default: panels).")
     parser.add_argument("--verify-root", type=Path, default=None,
                         help="Where to write verification sheets "
                              "(default: <work-dir>/webtoon_verify/<project-name>).")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
-    parser.add_argument("--prefix-template", default="ch{item}_",
+    parser.add_argument("--prefix-template", type=portable_prefix_template_arg, default="ch{item}_",
                         help="Crop filename prefix; '{item}' expands to the item name.")
     parser.add_argument("--config", default=None,
                         help="Optional config.json with UPPER_SNAKE gutter keys (see gutter-split).")

@@ -1,6 +1,6 @@
 # Crop → verify → see → narrate
 
-The core loop of mangaEasy: turn a folder of raw manga/webtoon pages into
+The core manga-video loop in MediaConductor: turn raw manga/webtoon pages into
 verified panel crops, look at every one, and write the narration script that
 drives the video. This is the **flagship operator doc** — self-contained, and
 the template every other operator doc is written to. When you have crops +
@@ -15,7 +15,7 @@ audio, video, thumbnail, and upload.
 Prerequisites: a project laid out as `library/<Project>/<item>/download/`
 (raw pages), one `item` per chapter (`01`, `02`, …). See
 [the data layout](../../CLAUDE.md) ("Data layout") for the full folder contract.
-Orient first with `mangaeasy where --json` and `mangaeasy doctor --json`.
+Orient first with `mediaconductor where --json` and `mediaconductor doctor --json`.
 
 ---
 
@@ -23,13 +23,13 @@ Orient first with `mangaeasy where --json` and `mangaeasy doctor --json`.
 
 | Source shape | Use | Detector |
 |---|---|---|
-| **Vertical strip** — one endless scroll, panels separated by gutters (Korean/Chinese webtoons) | `mangaeasy webtoon-split` | gutter analysis (no GPU model) |
-| **Paged manga** — discrete pages, multiple panels per page (Japanese tankōbon, most scanlations) | `mangaeasy page-split` | MAGI v3 (needs `install-tool magi-v3`) |
+| **Vertical strip** — one endless scroll, panels separated by gutters (Korean/Chinese webtoons) | `mediaconductor webtoon-split` | gutter analysis (no GPU model) |
+| **Paged manga** — discrete pages, multiple panels per page (Japanese tankōbon, most scanlations) | `mediaconductor page-split` | MAGI v3 (needs `install-tool magi-v3`) |
 
 Let the machine measure first:
 
 ```bash
-mangaeasy style-detect --project-root library/<Project> --json
+mediaconductor style-detect --project-root library/<Project> --json
 ```
 
 It reports a per-item and overall verdict (`webtoon` / `paged` / `uncertain`)
@@ -43,7 +43,7 @@ than wide → webtoon. Roughly page-shaped images with panel grids → paged.
 ## Step 1A — Crop a **webtoon** (`webtoon-split`)
 
 ```bash
-mangaeasy webtoon-split --project-root library/<Project> --item-range 01-19
+mediaconductor webtoon-split --project-root library/<Project> --item-range 01-19
 ```
 
 Per item it stitches `download/` into one tall strip, splits at gutters, then
@@ -70,19 +70,19 @@ indices by hand (doing that by eye shipped one-off merges twice):
 
 ```bash
 # undo the bad auto-split cut at stitched y=31099 (from a cutcheck label):
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 01 --merge-at-cut 31099
 
 # fuse the panels labeled #29 and #30 on the current sheets:
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 01 --merge-panels 29,30
 
 # reposition a bad cut: merge across it, then force the right y:
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 02 \
     --merge-at-cut 42186 --split-at 42394
 
-mangaeasy webtoon-split --project-root library/<Project> --items 01 02 \
+mediaconductor webtoon-split --project-root library/<Project> --items 01 02 \
     --overrides work/overrides.json
 ```
 
@@ -105,8 +105,8 @@ Implementation: [mangaeasy/panels/webtoon.py](../../mangaeasy/panels/webtoon.py)
 ## Step 1B — Crop **paged manga** (`page-split`)
 
 ```bash
-mangaeasy install-tool magi-v3        # one-time; downloads the model on first run
-mangaeasy page-split --project-root library/<Project> --item-range 01-12 \
+mediaconductor install-tool magi-v3   # one-time; downloads the model on first run
+mediaconductor page-split --project-root library/<Project> --item-range 01-12 \
     --reading-direction rtl            # rtl = Japanese; ltr = Chinese/Korean
 ```
 
@@ -156,7 +156,7 @@ crops on downscaled contact sheets shipped a video with half panels, fused
 panels and sliced speech bubbles that all had to be redone:
 
 ```bash
-mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-07
+mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-07
 ```
 
 It renders a full-resolution window (±650 px of context) around **every
@@ -205,8 +205,8 @@ Re-running a splitter renumbers every panel, orphaning `narration.json` and
 the per-panel WAVs. Never re-narrate to fix that:
 
 ```bash
-mangaeasy panels-remap --project-root library/<Project> --item-range 01-07   # dry run
-mangaeasy panels-remap --project-root library/<Project> --item-range 01-07 --apply
+mediaconductor panels-remap --project-root library/<Project> --item-range 01-07   # dry run
+mediaconductor panels-remap --project-root library/<Project> --item-range 01-07 --apply
 ```
 
 It locates each archived old panel's span in the stitched strip, maps old →
@@ -217,7 +217,7 @@ Refuse to `--apply` while the dry run reports orphans or bad locates; pass
 `--old-run` explicitly if the item was re-cropped more than once (the
 narration must match that archive). Afterwards, review every `shift`/`merge`
 panel with `narration-review-sheets --only-images ...` and rebuild with
-`mangaeasy video --overwrite-video` (stale item videos are also auto-detected
+`mediaconductor video --overwrite-video` (stale item videos are also auto-detected
 now, but be explicit).
 
 ---
@@ -239,8 +239,8 @@ beats; you can't hook a viewer on a story you skimmed. While reading, note:
 ## Step 3.5 — Transcribe the bubbles first (`panel-transcript`)
 
 ```bash
-mangaeasy install-tool deepseek-ocr2   # one-time
-mangaeasy panel-transcript --project-root library/<Project> --item-range 01-07
+mediaconductor install-tool deepseek-ocr2   # one-time
+mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07
 ```
 
 This OCRs every panel into `<item>/transcript.json`. Write narration **from
@@ -307,7 +307,7 @@ Feed it plus the panel images to an LLM, or write by hand.
 Validate before spending GPU time:
 
 ```bash
-mangaeasy video-check --project-root library/<Project> --items 01 --json
+mediaconductor video-check --project-root library/<Project> --items 01 --json
 ```
 
 When you deliberately narrate a subset, `video-check` returns `"ok": false`
@@ -322,7 +322,7 @@ text" warnings** (those become corrupt near-empty WAVs).
 are right. That pass is:
 
 ```bash
-mangaeasy narration-review-sheets --project-root library/<Project> --item-range 01-07
+mediaconductor narration-review-sheets --project-root library/<Project> --item-range 01-07
 ```
 
 Each sheet pairs a panel image with the narration line that will be spoken
@@ -332,7 +332,7 @@ right, reads naturally aloud). Fix each bad line with one command — no JSON
 editing, and the stale WAV is pruned so the next audio run regenerates it:
 
 ```bash
-mangaeasy narration-edit --project-root library/<Project> --item 01 \
+mediaconductor narration-edit --project-root library/<Project> --item 01 \
     --set ch01_005.jpg "Something ancient stirs inside the light." \
     --prune-audio
 ```

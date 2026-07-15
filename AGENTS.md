@@ -1,52 +1,25 @@
-# Agent notes for mangaEasy
+# MediaConductor agent entry point
 
-**Using the tool** (turning images + narration into videos): the entire tool
-surface is the `mangaeasy` CLI — read **[docs/ai-guide.md](docs/ai-guide.md)**
-first; it is the complete operating manual (install modes, data anatomy,
-recipes, JSON/exit-code contract, safety rules). Orient with:
+MediaConductor (formerly mangaEasy) has three isolated production modes. Load exactly one skill so unrelated pipelines do not consume context:
 
-```bash
-mangaeasy where --json             # this install's data/tool paths + version
-mangaeasy commands --json --full   # full catalog WITH argument schemas — no per-command --help needed
-mangaeasy doctor --json            # machine readiness (ffmpeg, GPU, AI tools)
-```
+| Request | Read only this skill |
+|---|---|
+| Manga/manhwa/webtoon recap or image-panel narration | [`skills/manga-video/SKILL.md`](skills/manga-video/SKILL.md) |
+| Written story to consistent scene art + narration video | [`skills/ai-story/SKILL.md`](skills/ai-story/SKILL.md) |
+| Song generation or correctly timed lyrics video | [`skills/song-video/SKILL.md`](skills/song-video/SKILL.md) |
+| Mode is unclear or setup-only | [`skills/media-conductor/SKILL.md`](skills/media-conductor/SKILL.md) |
 
-No command prompts for input. `--json` commands print one JSON object;
-generation commands end with a `MANGAEASY_RESULT {"outputs": [...]}` line.
-An MCP server is available: `mangaeasy mcp` (stdio) — same engine, typed tools.
-
-**Long-running steps** (download, page-split, panel-transcript, video, zimage,
-youtube-upload — minutes to hours each; `commands --json --full` marks them
-`long_running`): never block on them. Either use your harness's background
-shell, or the built-in job runner from any environment:
+From a fresh clone:
 
 ```bash
-mangaeasy job-start video --project-root library/<P> --item-range 01-12 ...
-mangaeasy job-status <job-id> --json    # running/succeeded/failed/orphaned + progress + result
-mangaeasy jobs --json                   # everything, newest first
+uv sync
+uv run mediaconductor modes --json
+uv run mediaconductor setup --mode <manga-video|ai-story|song-video>
+uv run mediaconductor doctor --mode <mode> --json
 ```
 
-Fresh clone or fresh machine? Follow the runbook in [docs/setup.md](docs/setup.md):
-`uv sync` → `mangaeasy setup` → `mangaeasy doctor --json` → `mangaeasy
-smoke-test` (renders and verifies a tiny real video — proof the env works).
+For MCP, register `mediaconductor mcp --mode <mode> --allow-root <workspace>`. Repeat `--allow-root` only for additional intentional workspaces; when omitted it defaults to the server's startup directory. The no-mode server is a small router; `--all-tools` is only a legacy/debug escape hatch. Long operations must use the typed `job_start` MCP tool or the built-in background job commands.
 
-**Several agents on one project / resuming after interruption**: follow
-[docs/multi-agent.md](docs/multi-agent.md) — `work-status` (resume), `work-claim`
-(don't collide), `work-note` (share story facts), `work-qa` (fix-until-clean loop),
-`work-artifacts` (reuse instead of regenerate).
+Publishing is always explicit. Story and song builds stop at local QA gates; do not bypass rights, voice-consent, visual/timing review, or synthetic-media disclosure fields. Never expose OAuth token files or install heavy models into the core environment.
 
-**Producing a recap series** (MangaDex URL → uploaded videos, 12 chapters per
-video): follow the skill at
-[.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) —
-Claude Code loads it automatically; other agents can read it as a runbook.
-
-Hard safety rules: never delete/rename inside `library/` source items; clear
-generated output only via the `video-clean-*` commands (everything else is
-archived to `old/run_NNNN/`, never silently destroyed); edit narration through
-`narration-edit`, not by hand. Unsafe values are clamped in code
-(`--gpu-workers` caps at 4), so out-of-range requests warn instead of crashing
-the GPU.
-
-**Developing this repo** (changing mangaEasy itself): read
-[CLAUDE.md](CLAUDE.md) — doc map, code map, architecture, invariants,
-test/lint requirements (`uv run pytest`, `uv run ruff check .`).
+When changing the software itself, read [CLAUDE.md](CLAUDE.md), preserve existing user changes, and run `uv run ruff check .` plus `uv run pytest`.

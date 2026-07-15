@@ -7,9 +7,9 @@ from pathlib import Path
 
 from mangaeasy.config import PROJECT_ROOT, SYSTEM_CONFIG_FILE
 
-DEFAULT_BACKGROUND_MUSIC = Path("bgm/tapionBySea.wav")
+DEFAULT_BACKGROUND_MUSIC = Path("media/background-music.wav")
 DEFAULT_BACKGROUND_MUSIC_DIR = Path("bgm")
-DEFAULT_SPEAKER_WAV = Path("vocal/manga_vocal2.wav")
+DEFAULT_SPEAKER_WAV = Path("media/speaker-reference.wav")
 DEFAULT_MUSIC_VOLUME_DB = -26.0
 DEFAULT_NARRATION_VOLUME = 1.2
 DEFAULT_TTS_ENGINE = "auto"

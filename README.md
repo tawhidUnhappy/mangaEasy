@@ -1,418 +1,299 @@
-# mangaEasy
+# MediaConductor
 
-> Turn manga panels (or any folder of images + narration) into narrated videos — one installable tool, one command.
+> One agent-native toolkit for manga videos, narrated AI stories, and song/lyrics videos.
 
-[![GitHub Release](https://img.shields.io/github/v/release/tawhidUnhappy/mangaEasy?label=download&color=blue)](https://github.com/tawhidUnhappy/mangaEasy/releases/latest)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Install with uv](https://img.shields.io/badge/install-uv%20tool-261230.svg)](https://docs.astral.sh/uv/)
+[![CI](https://github.com/tawhidUnhappy/MediaConductor/actions/workflows/ci.yml/badge.svg)](https://github.com/tawhidUnhappy/MediaConductor/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.12-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/core-MIT-green)](LICENSE)
 
-`mangaeasy` is a batteries-included pipeline for building narrated videos from
-image panels. It downloads chapters, crops panels, verifies them, takes a
-narration script, generates text-to-speech audio, renders a video per item, and
-stitches everything into one long video. Heavy AI models (TTS, panel detection)
-stay in their **own isolated environments**, so the core tool installs fast and
-stays conflict-free.
-
-**mangaEasy is a CLI + MCP tool built for LLM agents — there is no GUI.** New to
-the repo? Agents start at **[AGENTS.md](AGENTS.md)**; developers at
-**[CLAUDE.md](CLAUDE.md)** (doc map + code map). Everything is exposed through
-a single command:
-
-```console
-$ mangaeasy --help
-mangaeasy 1.0.0 - manga & image-to-video automation
-
-Usage:
-  mangaeasy <command> [args...]
-  mangaeasy <command> --help     Show a command's own options
-  mangaeasy --version
-...
-```
-
----
-
-## Contents
-
-- [Features](#features)
-- [Install — nothing left behind](#install--nothing-left-behind)
-- [Requirements](#requirements)
-- [Install the AI tools (one command)](#install-the-ai-tools-one-command)
-- [Quick start: image folders → video](#quick-start-image-folders--video)
-- [The `mangaeasy` command](#the-mangaeasy-command)
-- [External AI tools](#external-ai-tools)
-- [Manga chapter workflow](#manga-chapter-workflow)
-- [Configuration](#configuration)
-- [Output layout](#output-layout)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-## Features
-
-- **One command, many tools** — `mangaeasy <subcommand>`, discoverable via `--help`.
-- **Agent-native** — every command has a `--json` / machine-readable contract,
-  and `mangaeasy mcp` exposes the same engine as typed MCP tools for an agent host.
-- **One-command setup** — `mangaeasy setup` provisions a fresh machine end to
-  end (core binaries, AI tool envs, model downloads), GPU-aware and resumable
-  ([docs/setup.md](docs/setup.md)); `mangaeasy install-tool <name>` installs
-  tools individually.
-- **Full-series acquisition** — `mangaeasy download --url <mangadex url> --all`
-  grabs a whole series politely (rate-limited, jittered, resumable), and
-  `series-plan` slices it into 12-chapter upload batches and tracks what's
-  published.
-- **General item-based video pipeline** — point it at numbered folders of images +
-  `narration.json` and get per-item videos plus an optional joined long video.
-- **Isolated AI tools** — Kokoro / IndexTTS / MAGI / DeepSeek-OCR 2 / Z-Image Turbo run in their own `uv`
-  environments so their Torch/CUDA stacks never clash with the core install.
-- **Hardware-aware everything** — `--encoder auto` picks NVENC, AMF, Quick Sync,
-  VideoToolbox, or falls back to `libx264`; `--tts auto` (the default) uses
-  IndexTTS (voice cloning) whenever your machine is ready for it — NVIDIA GPU,
-  the `index-tts` tool installed, and a speaker reference WAV — falling back
-  to Kokoro otherwise, so `mangaeasy video` always works out of the box.
-- **Direct YouTube upload** — connect your channel once (your own free
-  Google OAuth client, see [docs/youtube.md](docs/youtube.md)) and upload
-  finished videos from the CLI (`mangaeasy youtube-upload`) or an AI assistant.
-  Resumable uploads with progress; tokens stay in the install's own data folder.
-- **Cross-platform** — Windows, macOS, and Linux.
-
-## Install — nothing left behind
-
-Get the `mangaeasy` command one of three ways (full details in
-[docs/install.md](docs/install.md)):
-
-```bash
-# 1. uv tool (recommended)
-uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
-
-# 2. from source
-git clone https://github.com/tawhidUnhappy/mangaEasy.git && cd mangaEasy && uv sync
-
-# 3. a frozen release build (no Python) — from the Releases page:
-#    mangaeasy-windows.zip / mangaeasy-macos-arm64.zip / mangaeasy-linux.tar.gz
-```
-
-Then provision everything in one go (downloads land in the install's own
-self-contained data folder, never your home dir):
-
-```bash
-mangaeasy setup      # core binaries + GPU-appropriate AI tools + models
-                     # (--minimal / --all / --skip <tool> — see docs/setup.md)
-mangaeasy smoke-test # proves it: renders and verifies a tiny real video
-```
-
-LLM agents: [docs/setup.md](docs/setup.md) is a full from-clone runbook
-(prerequisite bootstrap, `doctor --json` verification contract,
-troubleshooting) designed to be followed unattended.
-
-GPU acceleration (NVIDIA CUDA, Apple Silicon) is auto-detected, with CPU
-fallback everywhere. **Everything mangaEasy ever writes lives in one data
-folder** — tool installs, model weights, HF/torch/uv caches, logs — so
-deleting it leaves nothing behind. Override its location with `MANGAEASY_ROOT`.
-
-### Using mangaEasy with an AI assistant
-
-The whole tool surface is one non-interactive CLI, so AI assistants (Claude
-Code, Cursor, any agent with a shell) can drive it directly —
-**[docs/ai-guide.md](docs/ai-guide.md)** is the complete operating manual:
-machine-readable discovery (`mangaeasy commands --json`, `where --json`,
-`library-list --json`), stable `MANGAEASY_RESULT`/`MANGAEASY_PROGRESS`
-output markers, exit codes, and copy-paste recipes. There's also a built-in
-MCP server: register `mangaeasy mcp` and the pipeline shows up as typed
-tools in any MCP-capable assistant. The full production workflow (MangaDex
-URL → narrated, thumbnailed, uploaded recap series in 12-chapter batches) is
-encoded as an agent skill in
-[.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) —
-Claude Code discovers it automatically when working in this repo.
-
----
-
-## Requirements
-
-**Using a frozen release build:** just `git` (used to fetch the optional AI
-tools); Python ships inside the build, and `mangaeasy bootstrap-tools`
-downloads ffmpeg/ffprobe/uv/git-lfs on demand.
-
-**Running from source / as a CLI tool:**
-
-- Python **3.10+**
-- [`uv`](https://docs.astral.sh/uv/) (recommended installer/runner) — or let
-  `mangaeasy bootstrap-tools` vendor a copy into the self-contained data folder
-- `git` (plain git stays a real system prerequisite either way)
-- *(optional)* external TTS / detection tools — installed for you by
-  [`mangaeasy install-tool`](#install-the-ai-tools-one-command)
-
-**A GPU is not required.** Everything runs on plain CPUs (Windows, macOS,
-Linux): video encoding falls back to `libx264`, and `mangaeasy doctor` /
-`install-tool` auto-detect NVIDIA CUDA, Apple Silicon (MPS), or CPU-only and
-configure themselves accordingly — no flags to pass. With a GPU you get
-hardware video encoding and much faster TTS/panel-detection; without one,
-everything still works, just slower.
-
-## Install (developers / advanced)
-
-### As a uv tool
-
-```bash
-uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
-```
-
-This puts a single `mangaeasy` command on your `PATH`. Update later with:
-
-```bash
-uv tool upgrade mangaeasy
-```
-
-### Run once without installing
-
-```bash
-uvx --from git+https://github.com/tawhidUnhappy/mangaEasy.git mangaeasy --help
-```
-
-### From source (development)
-
-```bash
-git clone https://github.com/tawhidUnhappy/mangaEasy.git
-cd mangaEasy
-uv sync
-uv run mangaeasy --help
-```
-
-Or just run `./run.sh` (macOS/Linux) or `run.bat` (Windows) from the repo
-root — it syncs Python deps and prints the command list.
-
-Optional extras (only if you want heavy models *inside* the main env instead of
-managed external tool environments — most users should not need these):
-
-```bash
-uv sync --extra whisper   # faster-whisper
-uv sync --extra ml        # torch, transformers, opencv, MAGI deps, ...
-uv sync --extra all        # everything above
-```
-
-## Install the AI tools (one command)
-
-The heavy AI models (TTS, panel detection, OCR, image generation) live in their **own isolated
-environments** so they never break the main install. Check what your system has
-and provision what's missing:
-
-```bash
-mangaeasy doctor                       # prerequisite + tool status report
-mangaeasy install-tool index-tts       # IndexTTS-2 voice-cloning TTS (clone + env + model)
-mangaeasy install-tool magi-v3         # MAGI v3 manga panel detection (env + adapter)
-mangaeasy install-tool deepseek-ocr2   # DeepSeek-OCR 2 panel/document OCR (HF model + env)
-mangaeasy install-tool z-image-turbo   # Z-Image Turbo text-to-image (thumbnails; ~33 GB)
-```
-
-Tools install into `<data folder>/.mangaeasy/tools` and are found automatically from any
-folder. The installer **detects your hardware**: NVIDIA GPU → CUDA builds,
-Apple Silicon → MPS-enabled builds, otherwise CPU builds that work on any
-machine (force one with `--cuda` / `--cpu`). Other flags: `--ref <branch/tag>`
-to pin a version, `--skip-model` to skip the big weight download, `--update`
-to pull the latest version of an already-installed tool.
-
-See [docs/install-tools.md](docs/install-tools.md) for what each installer does.
-
-## Quick start: image folders → video
-
-Lay out your content as numbered item folders, each with a `narration.json` and a
-`panels/` directory:
+MediaConductor (formerly **mangaEasy**) is a production-oriented CLI and MCP
+server that lets an LLM plan, generate, verify, render, and explicitly publish
+long-form media. It has no GUI. Heavy AI projects run in separate `uv`
+environments so incompatible Torch/CUDA stacks never enter the small core
+environment.
 
 ```text
-content/
-  01/
-    narration.json
-    panels/
-      panel_001.png
-      panel_002.png
-  02/
-    narration.json
-    panels/
+Manga Video                 AI Story                    Song & Lyrics Video
+download/import             written source              lyrics + prompt/audio
+→ crop + visual QA          → continuity bible          → ACE-Step generation
+→ narration + TTS           → batched scene art          → Demucs vocals
+→ render + QA               → contact-sheet QA          → WhisperX timing
+→ explicit upload           → narration + render        → canonical lyric video
+                             → explicit upload           → explicit upload
 ```
 
-`narration.json` is an array pairing each image with its narration:
+## Start from a repository link
+
+An AI agent can set up the complete application from only this URL:
+
+```bash
+git clone --depth 1 https://github.com/tawhidUnhappy/MediaConductor.git
+cd MediaConductor
+uv sync
+uv run mediaconductor modes --json
+uv run mediaconductor setup --mode ai-story   # or manga-video / song-video
+uv run mediaconductor doctor --mode ai-story --json
+```
+
+Then point the agent to [AGENTS.md](AGENTS.md). It routes the request to one
+small mode skill and prevents the other pipelines from flooding model context.
+`mediaconductor modes --json` also returns the absolute `skill_path` for each
+mode, including wheel and frozen installations where the skills are bundled
+inside the package.
+
+Requirements for a source clone are Git and
+[`uv`](https://docs.astral.sh/uv/); uv provisions a compatible Python
+3.10–3.12 interpreter when needed. `setup` vendors ffmpeg/ffprobe and other
+core executables into the application data folder. NVIDIA is optional; CPU
+fallbacks work but large image/music models can be very slow.
+
+Install the command globally instead:
+
+```bash
+uv tool install git+https://github.com/tawhidUnhappy/MediaConductor.git
+mediaconductor modes
+```
+
+`mangaeasy` remains an equivalent compatibility command for existing scripts.
+The internal Python import remains `mangaeasy` during the 2.x migration.
+
+## Three isolated modes
+
+### Manga Video
+
+```bash
+mediaconductor setup --mode manga-video
+mediaconductor commands --mode manga-video --json --full
+mediaconductor mcp --mode manga-video --allow-root D:/MediaProjects
+```
+
+This is the mature manga/manhwa/webtoon pipeline: MangaDex acquisition,
+webtoon or paged-manga crops, visual verification sheets, OCR-grounded
+narration, Kokoro/IndexTTS, item and long-video rendering, music mixing,
+thumbnails, QA, and YouTube.
+
+See [the Manga Video skill](skills/manga-video/SKILL.md).
+
+### AI Story
+
+```bash
+mediaconductor setup --mode ai-story
+mediaconductor story-init --project-root projects/my-story \
+  --title "The Last Lantern" --story-file story.txt
+# An agent completes projects/my-story/story.json.
+mediaconductor story-check --manifest projects/my-story/story.json --json
+mediaconductor story-build --manifest projects/my-story/story.json --stage all
+```
+
+Schema-v2 `story.json` stores the source story, a fixed style contract,
+immutable character/environment cards, an ordered per-scene state ledger,
+narration, deterministic seeds, provenance, rights, and YouTube metadata. The
+default contract was distilled from the supplied fantasy-webcomic references;
+see [the complete art specification](docs/ai-story-art-style.md).
+
+The first image pass creates character and environment reference sheets. Each
+approval binds both the manifest contract and the generated file hashes; the
+same contract/artifact pair protects the final scenes, and the reviewed video
+is bound to its SHA-256. Editing an input, regenerating, or replacing a file
+invalidates the downstream approval and archives stale output. These controls
+make drift visible and reproducible, but every generative backend still needs
+visual review before claiming identity continuity. Publishing is never
+included in `--stage all`; after artifact-bound video review, rights and
+consent confirmation, use the explicit `--stage publish`.
+
+See [the AI Story skill](skills/ai-story/SKILL.md).
+
+### Song & Lyrics Video
+
+```bash
+mediaconductor setup --mode song-video
+mediaconductor song-init --project-root projects/my-song \
+  --title "Open Sky" --lyrics-file lyrics.txt \
+  --music-prompt "cinematic synth pop, clear lead vocal, hopeful chorus"
+mediaconductor song-check --manifest projects/my-song/song.json --json
+mediaconductor song-build --manifest projects/my-song/song.json --stage all
+```
+
+The mode can also ingest a finished song with `song-init --audio song.wav`.
+ACE-Step 1.5 generates new audio; the maintained Demucs fork isolates vocals;
+WhisperX supplies word timing. The supplied lyrics remain authoritative—ASR
+spelling never silently replaces them, and structural tags such as `[Chorus]`
+are not displayed. JSON records confidence and unmatched words; SRT/ASS is
+rebuilt from the approved JSON before render. Generation, separation, timing,
+visual, font/style, and final video are content-hash bound. Exit code `3`
+means “review and resume,” not generation failure.
+
+The default editable visual prompt begins with **“minimalistic sky”**. Lyrics
+use the bundled Edo SZ face in a centered 7clouds-like treatment: white text,
+a restrained outline, a small shadow, and per-line fade-in/fade-out. All style
+values remain editable in `render.lyrics_style`, and canonical lyrics remain
+the text authority. The final video uses the full song mix, not the separation
+stems. Public upload requires explicit rights, voice-consent, and
+synthetic-media disclosure fields.
+
+See [the Song Video skill](skills/song-video/SKILL.md).
+
+## MCP server
+
+Start a small, mode-scoped stdio server:
+
+```bash
+mediaconductor mcp --mode ai-story --allow-root D:/MediaProjects
+```
+
+Generic client configuration:
 
 ```json
-[
-  { "image": "panel_001.png", "narration": "Our story begins on a quiet night." },
-  { "image": "panel_002.png", "narration": "But quiet never lasts for long." }
-]
+{
+  "mcpServers": {
+    "media-conductor-story": {
+      "command": "mediaconductor",
+      "args": ["mcp", "--mode", "ai-story", "--allow-root", "D:/MediaProjects"]
+    }
+  }
+}
 ```
 
-Check the inputs, then build everything (TTS audio → per-item videos → one long video):
+The no-mode server exposes only the router/readiness/job catalog. Use
+`--all-tools` only for legacy/debug clients; it costs far more context. Hidden
+mode tools are rejected even if a client calls them directly. Background jobs
+accept a typed MCP tool and validated argument object—never raw command lines.
+Each repeatable `--allow-root` confines direct arguments, nested job arguments,
+and external paths embedded in Story/Song manifests. If it is omitted, the
+server allows only its startup working directory. This same-user stdio boundary
+reduces accidental filesystem reach; it is not an operating-system sandbox.
+
+Long-running calls must use `job_start`, then `job_status`:
+
+```json
+{
+  "tool": "job_start",
+  "arguments": {
+    "tool": "story_build",
+    "arguments": {"manifest": "D:/MediaProjects/story/story.json", "stage": "images"}
+  }
+}
+```
+
+Shell-only agents can use the equivalent detached runner:
+
+```powershell
+mediaconductor job-start --tool story_build --arguments-json '{"manifest":"D:/MediaProjects/story/story.json","stage":"images"}'
+mediaconductor job-status <job-id> --json
+```
+
+`job-status` accepts only the generated id returned by `job-start`. Use
+`--jobs-dir` to select a different state root; JSON file paths and traversal
+segments are rejected.
+
+For a containerized stdio server, keep application state and media in the
+mounted `/data` workspace:
 
 ```bash
-# 1. Validate panels + narration before spending GPU time
-mangaeasy video-check --project-root content --item-range 01-24 --strict
-
-# 2. Generate audio, render item videos, and join into one long video
-mangaeasy video --project-root content --project-name my_project \
-    --item-range 01-24 --build-long-video
+docker build -t media-conductor .
+docker run --rm -i -v D:/MediaProjects:/data media-conductor \
+  mcp --mode song-video --allow-root /data
 ```
 
-Prefer to run the stages yourself?
+The image exposes no unauthenticated network port. Run setup against the same
+persistent volume first (`... media-conductor setup --mode song-video`) so its
+isolated tools and model snapshots survive container replacement.
+
+## Isolated external tools
+
+Each tool lives under the managed tools directory with its own interpreter,
+dependency graph, caches, adapter, model provenance, and `READY.json`.
+`doctor` treats that marker as a local completeness record: an installer-managed
+model must still have its model directory and either every declared file or at
+least one real payload file outside the Hugging Face metadata cache.
+
+Every model snapshot downloaded by `mediaconductor install-tool` is locked to
+an immutable Hugging Face commit and checked against a required-file allowlist.
+Source checkouts are also commit-pinned. Kokoro, MAGI, and the optional generic
+Faster Whisper integration still obtain model weights on first use, so those
+three paths are explicitly documented as non-reproducible follow-ups.
+
+| Tool | Role | Source strategy |
+|---|---|---|
+| Kokoro 82M | CPU-friendly narration | pinned optional source clone; model weights resolve on first use |
+| IndexTTS 2 | voice-cloned narration | pinned source commit and HF model revision |
+| Z-Image Turbo | thumbnails/story/song art | pinned HF model revision and required-file allowlist |
+| ACE-Step 1.5 | song generation | pinned source commit, uv lock, and HF model revision |
+| Demucs 4.1 | vocal separation | pinned maintained fork + revisioned local `HTDemucs-ft` snapshot; runtime is offline |
+| WhisperX 3.8.6 | vocal timing | pinned source plus local HF faster-whisper and English Wav2Vec2 alignment snapshots |
+| MAGI v3 | manga panel detection | pinned optional source clone; remote-code model resolves on first use |
+| DeepSeek-OCR 2 | panel OCR | pinned source commit and HF model revision |
+
+Install or inspect one tool:
 
 ```bash
-mangaeasy video-audio    --project-root content --item-range 01-24
-mangaeasy video-render   --project-root content --item-range 01-24
-mangaeasy video-join     --project-root content --project-name my_project --item-range 01-24
-mangaeasy video-validate --project-root content --project-name my_project --item-range 01-24 --require-long
+mediaconductor install-tool whisperx
+mediaconductor tools --json
+mediaconductor doctor --mode song-video --json
 ```
 
-> **TTS engine:** `mangaeasy video` picks the best engine for your machine —
-> **IndexTTS** (voice cloning, highest quality) when you have an NVIDIA GPU and
-> have run `mangaeasy install-tool index-tts`, otherwise **Kokoro** (light,
-> great on CPU). Force one with `--tts indextts` / `--tts kokoro`. IndexTTS
-> clones the voice from a reference WAV (`config.system.json → tts.speaker_wav`
-> or `--speaker-wav`); Kokoro uses the built-in `af_heart` voice.
+All HF, Torch, uv Python, Triton, TorchInductor, NLTK, and extension caches are
+redirected below the application data directory. Set `MANGAEASY_SHARE_CACHES=1`
+only when deliberately opting into global caches. Existing `MANGAEASY_*`
+environment names and `.mangaeasy` data directories remain stable in 2.x so
+multi-gigabyte installs are never silently moved.
 
-## The `mangaeasy` command
+## Safety and publishing
 
-Run `mangaeasy` (or `mangaeasy --help`) to list every subcommand, grouped by
-purpose. Add `--help` to any subcommand for its own options:
+- Story/song `all` builds stop locally; upload is a separate stage.
+- Public song/story upload requires rights/provenance, voice consent, review,
+  and synthetic-media disclosure acknowledgements.
+- `publish.json` prevents accidental repeat uploads.
+- Destructive cleanup is not exposed in Story/Song MCP catalogs. Full cleanup
+  requires an allowed generated root and exact directory-name confirmation.
+- MCP path arguments, typed background jobs, and manifest-linked source files
+  are confined to the server's repeatable `--allow-root` workspace boundary.
+- Project item and claim identifiers reject path traversal.
+- OAuth JSON is atomically written with owner-only file permissions where the
+  platform supports them. Tokens are never printed.
+- Multiple named YouTube profiles can isolate manga, song, and AI-story
+  channels, or one profile can be reused across modes. Discover them with
+  `mediaconductor youtube-profiles --json`; it reports the predefined shared
+  Desktop-app client path. One client JSON supports every profile, while each
+  keeps an isolated token/channel. A live status/upload opens browser consent
+  automatically when needed; `--no-auto-auth` disables that for headless use.
+- MediaConductor ships no music or voice samples. Supply only media you are
+  licensed and authorized to use.
 
-```bash
-mangaeasy video --help
-mangaeasy download --help
-```
+YouTube OAuth requires a one-time browser action by the channel owner. Follow
+[docs/youtube.md](docs/youtube.md). API projects that have not passed Google's
+audit can have uploads forced to private regardless of the requested setting.
 
-Command groups:
+## Machine contract
 
-| Group | What it covers |
-|-------|----------------|
-| **Setup** | `where`, `commands`, `doctor` (environment report), `bootstrap-tools`, `install-tool` (provision AI tools), `library-list`, `mcp`. |
-| **Video pipeline** | `video`, `video-audio`, `video-render`, `video-join`, `video-check`, `video-validate`, and audio/clean helpers — the general image-folder workflow. |
-| **YouTube** | `youtube-auth`, `youtube-status`, `youtube-upload`, `youtube-delete`. |
-| **External tools** | `tools` (show where envs resolve), `index-tts`, `deepseek-ocr2`, `zimage`. |
-| **Manga: acquire** | `download`, `webtoon-split`, `page-split`, `gutter-split` — crop → verify → narrate ([guide](docs/operate/crop-verify-narrate.md)). |
-| **Manga: export** | `to-pdf`, `to-pdf-lossless`, `convert-images`, `watermark`, `ai-zip`. |
+- `0`: success.
+- `1`: runtime/validation failure.
+- `2`: invalid CLI usage.
+- `3`: artifact created, but human/agent QA approval is required.
+- `--json` commands print one JSON report.
+- Generation commands finish with `MANGAEASY_RESULT {...}` for 2.x
+  compatibility.
+- Progress lines use `MANGAEASY_PROGRESS current/total label`.
 
-## External AI tools
+Use `mediaconductor commands --mode <mode> --json --full` instead of scraping
+help text.
 
-The heavy model tools are kept in **their own isolated `uv` environments** so
-their large, conflicting dependency stacks never touch the core install. The
-easiest way to get them is [`mangaeasy install-tool`](#install-the-ai-tools-one-command),
-which puts them in the managed folder:
-
-```text
-<data folder>/.mangaeasy/tools/
-  index-tts/       # IndexTTS-2  (cloned uv project + model checkpoints)
-  magi-v3/         # MAGI v3 panel detection (generated env + detect_magi.py)
-  deepseek-ocr2/   # DeepSeek-OCR 2 panel/document OCR (generated env + HF model)
-  kokoro-82m/      # Kokoro TTS  (generated env, default voice af_heart)
-  z-image-turbo/   # Z-Image Turbo text-to-image (generated env + HF model)
-```
-
-Check what resolves:
-
-```bash
-mangaeasy tools
-```
-
-Override locations with environment variables (handy when the tool is installed
-globally but your models live elsewhere):
-
-```bash
-# Windows (PowerShell)
-$env:KOKORO_ROOT    = "D:/kokoro-82m"
-$env:INDEX_TTS_ROOT = "D:/index-tts"
-$env:MAGI_V3_ROOT   = "D:/magi-v3"
-$env:DEEPSEEK_OCR2_ROOT = "D:/deepseek-ocr2"
-```
-
-```bash
-# macOS / Linux
-export KOKORO_ROOT=~/models/kokoro-82m
-export INDEX_TTS_ROOT=~/models/index-tts
-export DEEPSEEK_OCR2_ROOT=~/models/deepseek-ocr2
-```
-
-See [docs/external-tools.md](docs/external-tools.md) for how each tool is invoked.
-
-## Manga chapter workflow
-
-End-to-end manga work is: download → crop panels → verify → write narration →
-build video. The crop → verify → narrate loop has its own guide:
-[docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md); the
-full recap production recipe is
-[docs/recap-video-playbook.md](docs/recap-video-playbook.md).
-
-```bash
-# copy the examples and edit them in your project folder
-cp config.example.json config.json
-cp config.system.example.json config.system.json
-
-mangaeasy download                                    # fetch a chapter from MangaDex
-mangaeasy webtoon-split --project-root library/<Proj> --items 01   # crop (webtoons)
-mangaeasy page-split    --project-root library/<Proj> --items 01   # crop (paged manga)
-# ...verify the crops, write narration.json, then build:
-mangaeasy video         --project-root library/<Proj> --items 01 --build-long-video
-```
-
-`download` records where each manga came from in
-`library/<name>/manga.json` (source link, title, downloaded chapters), and
-`mangaeasy library-list` shows it — so the link isn't lost when you point
-`config.json` at the next manga.
-
-If the tool is installed globally but your project files live elsewhere, run
-commands from the project folder or set:
-
-```bash
-$env:MANGAEASY_PROJECT_ROOT = "D:/my-manga-project"   # PowerShell
-export MANGAEASY_PROJECT_ROOT=~/my-manga-project       # bash
-```
-
-## Configuration
-
-| File | Purpose | Tracked? |
-|------|---------|----------|
-| `config.example.json` | Template for per-manga settings (title, name, chapter). | ✅ committed |
-| `config.system.example.json` | Template for machine/render settings (resolution, fps, encoder, ports, paths). | ✅ committed |
-| `config.json` | Your real per-manga config. | ❌ git-ignored |
-| `config.system.json` | Your real machine config. | ❌ git-ignored |
-
-The general video pipeline (`mangaeasy video …`) is driven entirely by
-command-line flags and does **not** require these config files — they are only
-used by the manga chapter tools.
-
-## Output layout
-
-The video pipeline writes alongside your project:
-
-```text
-audio/<project>/                       # generated narration audio
-output/<project>/items/                # one video per item
-output/<project>/<project>_full.mp4    # the joined long video
-work/<project>/                        # scratch / intermediates
-```
-
-## Documentation
-
-- [**AGENTS.md**](AGENTS.md) — agent entry point · [**CLAUDE.md**](CLAUDE.md) — developer guide, doc map, code map
-- [Installation guide](docs/install.md) — uv tool, frozen release, and from-source options
-- [AI/CLI guide](docs/ai-guide.md) — the complete operating manual + machine-readable contract
-- [Crop → verify → narrate](docs/operate/crop-verify-narrate.md) — the core loop
-- [Recap video playbook](docs/recap-video-playbook.md) — full end-to-end production recipe
-- [Installing AI tools](docs/install-tools.md) — what `install-tool` sets up for each tool
-- [Architecture](docs/architecture.md) — how the package and external tools fit together
-- [External tools](docs/external-tools.md) — Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, Z-Image Turbo
-- [Thumbnail guide](docs/thumbnail.md) — Z-Image Turbo prompts and checks for recap thumbnails
-- [Publishing](docs/publishing.md) — release checklist and CI workflow
-
-## Contributing
-
-Issues and pull requests are welcome at
-<https://github.com/tawhidUnhappy/mangaEasy>. For local development:
+## Development and production checks
 
 ```bash
 uv sync
-uv run mangaeasy --help
-# byte-compile the package as a quick sanity check
-uv run python -m compileall mangaeasy
+uv run ruff check .
+uv run python -m compileall -q mangaeasy
+uv run pytest
 ```
+
+CI covers Windows, Linux, and macOS. Frozen releases use a console executable
+so MCP stdio remains available. See [SECURITY.md](SECURITY.md),
+[docs/production-audit.md](docs/production-audit.md), and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## License
 
-[MIT](LICENSE) © mangaEasy contributors.
+The MediaConductor core is MIT licensed. External tools and models keep their
+own licenses; verify each license and the rights to all input/output media for
+your use case.

@@ -4,15 +4,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME, PRODUCT_NAME
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 from mangaeasy.runtime import popen_kwargs
 
 
 def print_help() -> None:
-    print("usage: mangaeasy index-tts")
+    print(f"usage: {CLI_NAME} index-tts")
     print()
     print("Generate narration audio by delegating to the managed index-tts uv environment.")
-    print("The command reads mangaEasy config.json/config.system.json from the current project root.")
+    print(f"The command reads {PRODUCT_NAME} config.json/config.system.json from the current project root.")
     print()
     print("Environment overrides:")
     print("  INDEX_TTS_ROOT or INDEX_TTS_DIR")

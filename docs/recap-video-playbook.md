@@ -1,14 +1,15 @@
 # Manga recap video playbook — for AI agents
 
 This is the exact, end-to-end recipe used to produce a full YouTube manga
-recap video autonomously with mangaEasy (reference production: *Irozuku
+recap video autonomously with MediaConductor (reference production: *Irozuku
 Monochrome* ch. 1 — 9:05, 96 narrated panels, IndexTTS voice clone,
 uploaded with thumbnail/title/description/chapters). Follow it top to
 bottom. Everything here was learned the hard way in a real production;
 the **bold warnings are the places it actually went wrong**.
 
-Read `docs/ai-guide.md` (CLI contract) and the repo `CLAUDE.md` first.
-All commands run from the install root (`uv run mangaeasy ...` in a dev
+Read `docs/manga-video-guide.md` (manga-only CLI contract) and the repo
+`CLAUDE.md` first.
+All commands run from the install root (`uv run mediaconductor ...` in a dev
 checkout).
 
 **Working style — go idle between long steps.** Downloading, cropping, OCR,
@@ -26,24 +27,25 @@ for a finished chapter while the GPU works through the rest.
 ## Phase 0 — Environment
 
 ```bash
-mangaeasy where --json      # resolved paths; run this first
-mangaeasy doctor --json     # ffmpeg/GPU/tool status
-mangaeasy tools --json      # which external tool envs are installed
+mediaconductor where --json      # resolved paths; run this first
+mediaconductor doctor --json     # ffmpeg/GPU/tool status
+mediaconductor tools --json      # which external tool envs are installed
 ```
 
 Install what's missing:
 
 ```bash
-mangaeasy install-tool magi-v3     # panel detection (needed for paged manga)
-mangaeasy install-tool index-tts   # default recap TTS: voice clone, slow, best quality
-mangaeasy install-tool z-image-turbo # generated thumbnails; auto GPU/CPU strategy
-# Kokoro installs the same way if absent: mangaeasy install-tool kokoro-82m
+mediaconductor install-tool magi-v3       # panel detection (needed for paged manga)
+mediaconductor install-tool index-tts     # default recap TTS: voice clone, slow, best quality
+mediaconductor install-tool z-image-turbo # generated thumbnails; auto GPU/CPU strategy
+# Kokoro installs the same way if absent: mediaconductor install-tool kokoro-82m
 ```
 
-YouTube must be connected once (browser consent — the human does this):
-`mangaeasy youtube-auth`, verify with `mangaeasy youtube-status --verify`.
-See `docs/youtube.md` for the one-time Google Cloud setup and what the
-token can/can't do.
+For YouTube, place one Desktop-app client JSON at the shared path reported by
+`mediaconductor youtube-profiles --json`. Before publishing, select an explicit
+profile and run `mediaconductor youtube-status --profile <profile> --verify`;
+the live call opens browser consent when that profile needs it. See
+`docs/youtube.md` for setup, profile isolation, and token permissions.
 
 ## Phase 1 — Download the chapter
 
@@ -51,7 +53,7 @@ Set the `download` block of `config.json` (project root): MangaDex title
 URL, chapter number, `translated_language`. Then:
 
 ```bash
-mangaeasy download
+mediaconductor download
 ```
 
 Put/keep the raw pages in `library/<Project>/<item>/download/` (item =
@@ -61,7 +63,7 @@ zero-padded chapter, e.g. `01`). Page files are `01_00.jpg … 01_NN.jpg`.
 source record (MangaDex title URL, canonical title, per-chapter download
 info). Read it later when you need the manga's link or the official title,
 e.g. for the description's credits / "support the official release" section
-(`mangaeasy library-list --json` includes it as each project's `manga`
+(`mediaconductor library-list --json` includes it as each project's `manga`
 field).
 
 ## Phase 2–3 for webtoons — `webtoon-split`, then clear every flag
@@ -72,7 +74,7 @@ gutter-separated panels). Paged manga: skip to the MAGI phases below.
 One command replaces detection + cropping + verification-sheet generation:
 
 ```bash
-mangaeasy webtoon-split --project-root library/<Project> --item-range 01-19
+mediaconductor webtoon-split --project-root library/<Project> --item-range 01-19
 ```
 
 Per item it stitches `download/` into one tall strip, splits it at gutters
@@ -100,7 +102,7 @@ its crops were judged on downscaled sheets (half panels, fused stuck-together
 panels, sliced speech bubbles). The pass that catches them:
 
 ```bash
-mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-19
+mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-19
 ```
 
 It reads the `<item>_ranges.json` manifests webtoon-split wrote and renders a
@@ -118,12 +120,12 @@ Collect every FIX into one overrides file with `webtoon-override` — it
 resolves all indices against the manifest, so never compute them by hand:
 
 ```bash
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 07 --merge-at-cut 23140
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 12 --merge-panels 5,6
 # reposition a bad cut = merge across it + force the right y:
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 02 --merge-at-cut 42186 --split-at 42394
 ```
 
@@ -146,13 +148,13 @@ them in narration) and the last sheet for trailing promo panels.
 ## Phase 2 — Panel detection (MAGI v3, paged manga)
 
 **This applies to paged manga.** Vertical webtoons don't need MAGI — use
-`mangaeasy webtoon-split` (previous section) instead.
+`mediaconductor webtoon-split` (previous section) instead.
 
 The repo ships a single-image adapter
 (`mangaeasy/assets/tools/detect_magi.py`, copied into the tool env by
 `install-tool`), but it reloads the model per call. For a whole chapter,
 load the model **once** and loop. Find the tool env via
-`mangaeasy tools --json`, then run this with the env's own python
+`mediaconductor tools --json`, then run this with the env's own python
 (`<tool dir>/.venv/Scripts/python.exe` on Windows):
 
 ```python
@@ -306,8 +308,8 @@ you skimmed. While reading, note:
 ## Phase 4.5 — OCR the bubbles (`panel-transcript`)
 
 ```bash
-mangaeasy install-tool deepseek-ocr2   # one-time
-mangaeasy panel-transcript --project-root library/<Project> --item-range 01-07
+mediaconductor install-tool deepseek-ocr2   # one-time
+mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07
 ```
 
 Writes `<item>/transcript.json` — every panel's bubble/caption text. Write
@@ -376,7 +378,7 @@ Rules learned in production:
 Validate inputs before burning GPU time:
 
 ```bash
-mangaeasy video-check --project-root library/<Project> --items 01 --json
+mediaconductor video-check --project-root library/<Project> --items 01 --json
 ```
 
 When you deliberately narrate a subset of panels (the normal case — hook/CTA
@@ -392,7 +394,7 @@ audio-related — missing audio for a *referenced* entry; see Phase 7.)
 **Then run the semantic pass — this is not optional:**
 
 ```bash
-mangaeasy narration-review-sheets --project-root library/<Project> --item-range 01-07
+mediaconductor narration-review-sheets --project-root library/<Project> --item-range 01-07
 ```
 
 Read every sheet (panel + narration + OCR side by side) and verify the four
@@ -400,7 +402,7 @@ grounding rules above per panel. Fix each bad line in one command (no JSON
 editing; the stale WAV is pruned so the next audio run regenerates it):
 
 ```bash
-mangaeasy narration-edit --project-root library/<Project> --item 01 \
+mediaconductor narration-edit --project-root library/<Project> --item 01 \
     --set ch01_042.jpg "Rewritten line." --prune-audio
 ```
 
@@ -410,26 +412,27 @@ One command runs audio → render → join → normalize → BGM:
 
 ```bash
 # IndexTTS voice clone (default, best quality; leave gpu-workers at default):
-mangaeasy video --project-root library/<Project> --items 01 \
+mediaconductor video --project-root library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -22
+  --background-music "<path to music>" --music-volume-db -26
 
 # Kokoro fallback (fast, ~4x parallel on an RTX 3060 — do not exceed 4 gpu-workers):
-mangaeasy video --project-root library/<Project> --items 01 \
+mediaconductor video --project-root library/<Project> --items 01 \
   --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -22
+  --background-music "<path to music>" --music-volume-db -26
 ```
 
 - Use the **default audio/output roots** (don't pass `--audio-root
   audio/<Project>` — the project name is appended automatically and you
   get a doubled path).
-- `--music-volume-db -22` (the default) is the researched recap-channel
-  sweet spot: audio-engineering and faceless-channel guidance converges on
-  music **18–20 dB below continuous narration** (−15 is the masking
-  boundary on phone speakers, −25 the inaudibility boundary). The music
+- `--music-volume-db -26` (the default) is the tuned recap-channel value
+  for this mixing chain: with the bed conditioned, EQ-carved, and ducked
+  (all default-on) plus the 1.2 narration lift, −26 keeps the bed felt but
+  never competing (−15 is the masking boundary on phone speakers, −28 the
+  inaudibility boundary under this chain). The music
   stem is loudness-aligned to the narration's −14 LUFS reference before
   the offset (`[music-loudnorm]` log line), so the value is a true LU
   separation whatever the track's mastering; `--no-music-loudnorm`
@@ -464,8 +467,8 @@ mangaeasy video --project-root library/<Project> --items 01 \
   long video in `old/run_NNNN/` — no re-render needed, and the duration
   (hence chapter timestamps) stays identical.
 - A published bad take can be replaced without a Studio trip: upload the
-  fixed file first, verify, then `mangaeasy youtube-delete --video-id <id>
-  --confirm` the old one.
+  fixed file first, verify, then `mediaconductor youtube-delete --profile
+  <profile> --video-id <id> --confirm` the old one.
 - Old takes are archived to `old/run_NNNN/`, never destroyed.
 - **After changing panels, narration or audio, pass `--overwrite-video`.**
   The renderer now also detects stale item videos by input mtimes and
@@ -484,12 +487,12 @@ mangaeasy video --project-root library/<Project> --items 01 \
 - Run it in the background and **wait for the completion notification**;
   IndexTTS for ~100 panels is a long job (see "Working style" above — don't
   sit in a poll loop). If audio state is ever in doubt:
-  `mangaeasy video-audio-audit --project-root library/<Project> --json`.
+  `mediaconductor video-audio-audit --project-root library/<Project> --json`.
 
 ## Phase 7 — Verify the build (measure, don't assume)
 
 ```bash
-mangaeasy video-validate --project-root library/<Project> --items 01 --json
+mediaconductor video-validate --project-root library/<Project> --items 01 --json
 ```
 
 Deliberately-unnarrated panels and orphan audio now surface as `warnings`
@@ -535,18 +538,16 @@ first at `0:00`, each ≥10 s. **Recompute after every audio regeneration**
 
 Two proven approaches — pick by what tools are installed:
 
-**A. Generated scene (big-recap-channel style, e.g. MamoruManhwa).** Top
-manhwa-recap channels don't collage panels; the thumbnail is one coherent
-glossy anime/manhwa illustration with a platform-safe, fanservice-leaning
-"gooner" edge —
-that's the established house style for this niche (see the MamoruManhwa
-style guide referenced above: flustered/blushing faces, exaggerated curvy
-proportions, foregrounded characters) and it measurably drives CTR. Write
-the prompt yourself for each video (the chapter's actual characters/scene,
-not a generic template) and generate it with **Z-Image Turbo**:
+**A. Generated scene (high-energy recap key art).** Use one coherent
+anime/manhwa illustration with a strong focal character, readable emotion,
+clear silhouette separation, and enough negative space for the title. Keep it
+platform-safe and faithful to the chapter; never sexualize young-looking
+characters or rely on misleading imagery. Write the prompt for the actual
+characters and scene rather than reusing a generic template, then generate it
+with **Z-Image Turbo**:
 
 ```bash
-mangaeasy zimage --prompt-file thumb_prompt.txt --output thumb_base.png \
+mediaconductor zimage --prompt-file thumb_prompt.txt --output thumb_base.png \
     --width 1280 --height 720 --count 4   # generate 4 variants, pick the best
 ```
 
@@ -564,7 +565,7 @@ monetizable, not optional flavor):
   powered-up — the emotional contrast between the two *is* the hook.
 - Glossy anime/manhwa rendering, saturated blues and gold, dramatic
   low-angle or dutch-tilt camera. No in-image text/logo/watermark — that
-  gets added after, with `mangaeasy thumbnail-compose` (below), where it
+  gets added after, with `mediaconductor thumbnail-compose` (below), where it
   can be positioned precisely.
 - Example prompt shape: `"glossy anime key art, [character A] blushing
   deeply with sparkling wide eyes and a flustered expression, form-fitting
@@ -573,7 +574,7 @@ monetizable, not optional flavor):
   saturated cyan-blue sky, dramatic low-angle shot, highly detailed,
   cinematic anime lighting, no text"`.
 
-Then add the signature text/furniture with `mangaeasy thumbnail-compose`
+Then add the signature text/furniture with `mediaconductor thumbnail-compose`
 (quick mode: repeated `--text` flags; full placement control via `--spec`
 JSON — blocks/arrows/border; a custom PIL script is only needed for effects
 beyond it, e.g. speech-tails and radial glows):
@@ -603,7 +604,8 @@ Example spec:
 ```
 
 A live video's thumbnail can be replaced without re-uploading:
-`mangaeasy youtube-thumbnail --video-id <id> --image <png>`.
+`mediaconductor youtube-thumbnail --profile <profile> --video-id <id>
+--image <png>`.
 
 **B. Panel collage (works with no image model).** Dramatic panel as
 background, scaled to width, blurred (GaussianBlur ~2.5), darkened
@@ -655,23 +657,27 @@ Mandatory checks, all from real failures:
 ## Phase 11 — Upload (and replacing a bad take)
 
 ```bash
-# Verify the token is live BEFORE uploading (it expires silently):
-mangaeasy youtube-status --verify --json
+# Offline discovery: select the exact cached channel, never guess the profile:
+mediaconductor youtube-profiles --json
+mediaconductor youtube-status --profile <profile> --verify --json
 
-mangaeasy youtube-upload \
+mediaconductor youtube-upload --profile <profile> \
   --video output/<Project>/<Project>_full_<timestamp>.mp4 \
   --title "<title>" --description-file description.txt \
   --tags "tag1,tag2,..." --thumbnail thumbnail.png \
   --privacy public --json
 ```
 
-- **Check `youtube-status --verify` first.** The stored OAuth token expires or
-  gets revoked with no warning; a dead one doesn't surface until mid-upload as
-  `invalid_grant: Token has been expired or revoked` — after the whole video is
-  already built and you're ready to publish. If `verified` is false, the human
-  must re-run `mangaeasy youtube-auth` (interactive browser consent — an agent
-  can't do it headless). Nothing else is lost; just retry the upload once the
-  token is refreshed.
+- **Select and verify an explicit profile first.** `youtube-profiles --json`
+  is offline and exposes no secrets; it reports the shared Desktop-app client
+  path plus each cached channel. Ask the user when the intended channel is
+  ambiguous. Pass the same `--profile` to every operation, including
+  `default` when that is truly intended.
+- With the shared client JSON present, live status/upload automatically opens
+  browser consent for a missing, expired, revoked, or API-rejected grant and
+  retries once after the channel owner approves. The agent initiates the call
+  and waits; it never reads credentials. Use `--no-auto-auth` only for a
+  pre-authorized headless worker.
 
 - **Upload with `--privacy public`** — the channel owner's standing
   instruction is to publish directly, not leave the video private for a
@@ -682,14 +688,15 @@ mangaeasy youtube-upload \
   the human (the fix is completing YouTube's API audit for the Google
   Cloud project — not re-uploading). ~1,600 quota units of the
   10,000/day either way.
-- Custom thumbnails need a phone-verified YouTube account. The upload
-  prints `[warn] thumbnail not set: ...` on failure and nothing on success.
+- Custom thumbnails need an eligible YouTube account. An authorization failure
+  triggers the same browser reauthorization and one retry; a remaining failure
+  is reported as `[warn] thumbnail not set ...` after the video upload succeeds.
 - **Replacing a take**: upload the new video first, verify the `--json`
   result, *then* delete the old one — never the reverse. Deletion needs
-  the full-management token (see docs/youtube.md; re-run
-  `mangaeasy youtube-auth` if a delete returns 403) and is a raw API call
-  (`DELETE https://www.googleapis.com/youtube/v3/videos?id=<id>` with the
-  stored bearer token) or one click in Studio. Update the description's
+  the full-management token (see docs/youtube.md; re-consent the same profile
+  if a delete returns insufficient scopes) and must use
+  `mediaconductor youtube-delete --profile <profile> --video-id <id> --confirm`
+  or one click in Studio. Never handle the stored bearer token. Update the description's
   chapter timestamps *before* re-uploading — a new voice changes them.
 
 ## Final checklist
@@ -697,7 +704,7 @@ mangaeasy youtube-upload \
 - [ ] Every overlay sheet visually verified; bad pages overridden and re-cropped
 - [ ] Whole chapter actually read; unsafe panels listed and excluded
 - [ ] Hook = 4-ish late-chapter shock panels as renamed copies; CTA outro present
-- [ ] `mangaeasy video-check --json` ok before building
+- [ ] `mediaconductor video-check --json` ok before building
 - [ ] Final MP4: duration sane, frames spot-checked, integrated ≈ −14 LUFS
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
 - [ ] Thumbnail rendered, viewed, no unsafe bubble text; if generated with

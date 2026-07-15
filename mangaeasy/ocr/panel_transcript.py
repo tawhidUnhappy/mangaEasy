@@ -15,7 +15,7 @@ DeepSeek-OCR 2 read off that panel. It exists to *ground* narration writing:
 Under the hood it seeds the transcript files (preserving existing ``ocr``
 values) and runs the existing ``deepseek-ocr2`` command over them in one
 subprocess, so the model loads once for all items. Requires the
-``deepseek-ocr2`` tool env (``mangaeasy install-tool deepseek-ocr2``).
+``deepseek-ocr2`` tool env (``mediaconductor install-tool deepseek-ocr2``).
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.runtime import cli_command
 from mangaeasy.utils import emit_result
 
@@ -66,7 +67,7 @@ def parse_args() -> argparse.Namespace:
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy panel-transcript",
+        prog=f"{CLI_NAME} panel-transcript",
         description="OCR every panel into <item>/transcript.json (DeepSeek-OCR 2) to "
                     "ground narration writing and speaker attribution.",
     )

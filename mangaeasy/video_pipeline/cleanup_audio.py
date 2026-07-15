@@ -4,6 +4,7 @@ import argparse
 import shutil
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import LazyArchiveRunDir
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -18,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Clear generated audio from make_video/audio so it regenerates fresh, "
                      "without losing the previous take -- it's archived into old/run_NNNN/ "
-                     "first (see `mangaeasy audio-takes-list`/`audio-takes-restore`)."
+                     f"first (see `{CLI_NAME} audio-takes-list`/`audio-takes-restore`)."
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT)
@@ -127,7 +128,7 @@ def main() -> int:
         if audio_dir != manga_audio:
             audio_dir.rmdir()
     print(f"\nArchived to: {archive_run_dir.dir}")
-    print("Pick it back up with `mangaeasy audio-takes-restore`, or list takes with `mangaeasy audio-takes-list`.")
+    print(f"Pick it back up with `{CLI_NAME} audio-takes-restore`, or list takes with `{CLI_NAME} audio-takes-list`.")
     return 0
 
 

@@ -27,6 +27,22 @@ def test_commands_json_catalog(capsys):
     assert set(sample) == {"name", "group", "help", "usage"}
 
 
+def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
+    assert main(["commands", "--mode", "manga-video", "--json", "--full"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    commands = {entry["name"]: entry for entry in data["commands"]}
+
+    job_args = commands["job-start"]["args"]
+    assert job_args["tool"]["flag"] == "--tool"
+    assert job_args["arguments"]["flag"] == "--arguments-json"
+    assert job_args["arguments"]["kind"] == "json"
+
+    assert commands["style-detect"]["args"]["source_subdir"]["flag"] == "--source-subdir"
+    assert commands["panel-transcript"]["args"]["seed_only"]["flag"] == "--seed-only"
+    sheets = commands["narration-review-sheets"]["args"]
+    assert sheets["output_root"]["flag"] == "--output-root"
+
+
 def test_where_json_keys(capsys):
     assert main(["where", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
@@ -40,7 +56,10 @@ def test_tools_json(capsys):
     assert main(["tools", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert "tools_home" in data
-    assert set(data["tools"]) == {"kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"}
+    assert set(data["tools"]) == {
+        "ace-step", "demucs", "whisperx", "kokoro-82m", "index-tts",
+        "magi-v3", "deepseek-ocr2", "z-image-turbo",
+    }
 
 
 def test_emit_result_line_is_parseable(capsys):

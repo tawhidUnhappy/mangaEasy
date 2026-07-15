@@ -21,6 +21,9 @@ from pathlib import Path
 
 from PIL import Image
 
+from mangaeasy.brand import CLI_NAME
+from mangaeasy.path_safety import relative_subpath_arg
+
 _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 
 # height/width above this = a vertical strip segment (webtoon slice).
@@ -75,7 +78,7 @@ def main() -> int:
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, item_dirs, merge_item_selection
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy style-detect",
+        prog=f"{CLI_NAME} style-detect",
         description="Detect whether a series is a webtoon (vertical strips -> "
                     "webtoon-split) or paged manga (-> page-split) from the "
                     "downloaded page dimensions.",
@@ -84,7 +87,7 @@ def main() -> int:
                         help="Project folder containing item subfolders (e.g. library/<name>).")
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08 (default: all).")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-19.")
-    parser.add_argument("--source-subdir", default="download",
+    parser.add_argument("--source-subdir", type=relative_subpath_arg, default="download",
                         help="Subfolder inside each item with the raw pages (default: download).")
     parser.add_argument("--json", action="store_true", help="Emit one JSON object on stdout.")
     args = parser.parse_args()
@@ -142,7 +145,7 @@ def main() -> int:
               f"tall {stats['tall_fraction']:.0%}  paged {stats['paged_fraction']:.0%}  "
               f"({stats['images']} images)")
     print(f"\nOverall: {overall}"
-          + (f"  ->  mangaeasy {RECOMMENDED_COMMAND[overall]}" if RECOMMENDED_COMMAND[overall] else
+          + (f"  ->  {CLI_NAME} {RECOMMENDED_COMMAND[overall]}" if RECOMMENDED_COMMAND[overall] else
              "  ->  inspect the pages before choosing a splitter"))
     print("Confirm visually: " + ", ".join(overall_samples))
     return 0

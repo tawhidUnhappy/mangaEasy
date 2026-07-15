@@ -1,0 +1,4 @@
+interface:
+  display_name: "Song & Lyrics Video"
+  short_description: "Generate songs and timed lyrics videos"
+  default_prompt: "Use $song-video to generate or ingest a song, align its lyrics, render, and publish it."

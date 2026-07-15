@@ -13,7 +13,7 @@ description: >
 # Manga recap production (mangaEasy)
 
 You drive the whole pipeline through the `mangaeasy` CLI (or its MCP tools —
-same engine). Full reference: `docs/ai-guide.md`; discover any command's
+same engine). Full reference: `docs/manga-video-guide.md`; discover any command's
 flags with `mangaeasy commands --json --full` (schemas + `long_running`
 markers — no per-command `--help` needed). Machine contract: every `--json`
 command prints one JSON object; generation commands end with a
@@ -200,7 +200,7 @@ mangaeasy video --project-root library/<Project> --audio-root audio \
 `--tts auto` uses IndexTTS (voice cloning) when an NVIDIA GPU + model +
 speaker WAV are available, otherwise Kokoro. Music is mixed low under the
 narration by design — conditioned, loudness-aligned, side-chain ducked at
-`--music-volume-db` −22 dB default (keep within −18…−24; narration is
+`--music-volume-db` −26 dB default (keep within −20…−28; narration is
 normalized to −14 LUFS first). **Rebuilding after any panel/narration/audio
 change: pass `--overwrite-video`** (stale item videos are also mtime-detected
 now, but be explicit — a silent skip once shipped six outdated chapters).
@@ -235,8 +235,10 @@ Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
    keep the drop shadow on.
 4. **Open the final image at full size** and check text overlap, edges, and
    anything that could read as explicit — fix and re-compose if needed.
-5. Iterating after upload? `mangaeasy youtube-thumbnail --video-id <id>
-   --image final_thumb.png` swaps the live thumbnail without re-uploading.
+5. Iterating after upload? Reuse the exact verified account with
+   `mediaconductor youtube-thumbnail --profile <profile> --video-id <id>
+   --image final_thumb.png` so a multi-channel install cannot target the
+   legacy `default` account accidentally.
 
 ## 7. Title, description, upload
 
@@ -247,18 +249,25 @@ Description: 2–3 sentence spoiler-light hook, then chapter range, then
 series/genre terms.
 
 ```bash
-mangaeasy youtube-upload --video output/<Project>/<Project>_full.mp4 \
+mediaconductor youtube-upload --profile <profile> \
+    --video output/<Project>/<Project>_full.mp4 \
     --title "..." --description "..." --tags "manga,recap,..." \
     --thumbnail final_thumb.png --privacy public --json
 ```
 
-Needs a prior human `youtube-auth` (see `docs/youtube.md`). **Check the token
-is live first: `mangaeasy youtube-status --verify --json`.** The stored OAuth
-token expires/gets revoked silently, and a dead one only surfaces mid-upload as
-`invalid_grant: Token has been expired or revoked` after the whole video was
-built. If `verified` is false, the user must re-run `youtube-auth` (interactive
-browser consent — an agent can't do it headless); everything else is already
-done, so just retry the upload afterward. Default privacy is `private` and
+Before constructing the upload, run `mediaconductor youtube-profiles --json`.
+It is offline, exposes no token/client contents, and reports the one shared
+Desktop-app client path. Match the requested destination to the cached channel
+title/id and ask the user if more than one profile is plausible; never infer a
+channel from the profile name. Pass the selected profile explicitly even when
+it is `default`.
+
+Check that exact account with `mediaconductor youtube-status --profile
+<profile> --verify --json`. With the shared client present, a missing, expired,
+revoked, or API-rejected token opens Google browser consent automatically; the
+agent starts the call, waits for the channel owner to approve it, and lets the
+same call continue. Use `--no-auto-auth` only on a headless worker. Never read
+client/token JSON into context. Default privacy is `private` and
 unaudited API projects are force-locked to it — use `--privacy public` only
 when the channel's API project supports it, and verify the JSON result says the
 privacy you asked for. Then record the batch so the plan advances:

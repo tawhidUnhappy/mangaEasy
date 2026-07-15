@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manga Video"
+  short_description: "Create and publish manga recap videos"
+  default_prompt: "Use $manga-video to produce a manga recap video from source through QA and publishing."

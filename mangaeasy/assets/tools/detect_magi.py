@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """detect_magi.py — standalone MAGI v3 panel-detection adapter.
 
-mangaEasy ships this file and `mangaeasy install-tool magi-v3` copies it into the
-external `magi-v3/` tool environment. mangaEasy then runs it from that env:
+MediaConductor ships this file and `mediaconductor install-tool magi-v3` copies
+it into the external `magi-v3/` tool environment, then runs it from that env:
 
     python detect_magi.py <image> --out <result.json> [--device auto|cuda|cpu] [--dtype fp16|fp32]
 
@@ -12,7 +12,7 @@ runs panel detection, and writes:
 
     {"detections": {"panels": [[x1, y1, x2, y2], ...], ...}}
 
-This is exactly the shape mangaEasy reads back in `mangaeasy.panels.ai`. The
+This is exactly the shape MediaConductor reads back in `mangaeasy.panels.ai`. The
 module has no mangaeasy imports so it can run inside the isolated tool env.
 """
 

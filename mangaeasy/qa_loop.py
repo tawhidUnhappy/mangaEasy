@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 
 from mangaeasy.audio.emotion import emotion_lint
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.video_pipeline.check_items import is_speakable
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -51,12 +52,12 @@ MIN_AUDIO_BYTES = 1024
 
 def _stage_fix(stage: str, project_root: str, item: str) -> str:
     return {
-        "download": f"mangaeasy download --url <mangadex url> --name {Path(project_root).name} --chapters {item}",
-        "crop": f"mangaeasy page-split --project-root {project_root} --items {item}   (webtoon-split for vertical strips; then READ the verify sheets)",
-        "transcribe": f"mangaeasy panel-transcript --project-root {project_root} --items {item}",
+        "download": f"{CLI_NAME} download --url <mangadex url> --name {Path(project_root).name} --chapters {item}",
+        "crop": f"{CLI_NAME} page-split --project-root {project_root} --items {item}   (webtoon-split for vertical strips; then READ the verify sheets)",
+        "transcribe": f"{CLI_NAME} panel-transcript --project-root {project_root} --items {item}",
         "narrate": f"write {project_root}/{item}/narration.json grounded in {item}/transcript.json (see mangaeasy/assets/prompts/narration.md), then re-run work-qa",
-        "audio": f"mangaeasy video --project-root {project_root} --items {item} --tts auto",
-        "render": f"mangaeasy video --project-root {project_root} --items {item} --skip-audio --overwrite-video",
+        "audio": f"{CLI_NAME} video --project-root {project_root} --items {item} --tts auto",
+        "render": f"{CLI_NAME} video --project-root {project_root} --items {item} --skip-audio --overwrite-video",
     }[stage]
 
 
@@ -94,13 +95,13 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
     report = check_item(item_dir)
     for problem in report["problems"]:
         add("error", "narration:structure", problem,
-            f"mangaeasy narration-edit --project-root {root_arg} --item {item} --list  "
+            f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} --list  "
             f"(then fix the entry with --set/--delete --prune-audio)")
     if report["uncovered_panels"]:
         add("info", "narration:uncovered",
             f"{len(report['uncovered_panels'])} panel(s) have no narration entry "
             "(correct for credits/banners/SFX; confirm none is a story panel)",
-            f"mangaeasy narration-review-sheets --project-root {root_arg} --items {item} and READ the sheets")
+            f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item} and READ the sheets")
 
     # 3. Speakability + emotion lint, per entry.
     try:
@@ -115,12 +116,12 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
         if text and not is_speakable(text):
             add("error", "narration:unspeakable",
                 f"{image}: narration has no letters/digits (TTS emits near-silence): {text!r}",
-                f"mangaeasy narration-edit --project-root {root_arg} --item {item} "
+                f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
                 f"--set {image} \"<speakable line>\" --prune-audio")
         lint = emotion_lint(entry)
         if lint:
             add("error", "narration:emotion", f"{image}: {lint}",
-                f"mangaeasy narration-edit --project-root {root_arg} --item {item} "
+                f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
                 f"--set-json '[{{\"image\": \"{image}\", ...}}]'  (fix or drop the emotion field)")
 
     # 4. Audio coverage + integrity (cheap size gate; deep decode check is
@@ -143,7 +144,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             _stage_fix("audio", root_arg, item))
     if corrupt:
         add("error", "audio:corrupt", f"{len(corrupt)} WAV(s) too small to be real audio: {', '.join(corrupt[:5])}",
-            f"mangaeasy video-audio-audit --project-root {root_arg} --items {item} --fix, then "
+            f"{CLI_NAME} video-audio-audit --project-root {root_arg} --items {item} --fix, then "
             + _stage_fix("audio", root_arg, item))
 
     # 5. Render existence/freshness.
@@ -168,7 +169,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
 
 def qa_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy work-qa",
+        prog=f"{CLI_NAME} work-qa",
         description="One aggregated pass/fail QA gate over generated crops, narration, audio and "
                     "renders — every problem comes with the exact fix command, so a small model can "
                     "loop `work-qa → apply first fix → work-qa` until exit code 0.",
@@ -233,7 +234,7 @@ def _dir_entry(path: Path, reuse: str, pattern: str = "*", recursive: bool = Tru
 
 def artifacts_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy work-artifacts",
+        prog=f"{CLI_NAME} work-artifacts",
         description="Inventory of every reusable generated artifact for a project — check here "
                     "before regenerating anything expensive.",
     )

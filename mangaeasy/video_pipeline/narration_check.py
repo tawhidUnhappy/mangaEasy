@@ -23,6 +23,8 @@ import argparse
 import json
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
+
 _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 
 
@@ -125,7 +127,7 @@ def main() -> int:
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, item_dirs, merge_item_selection
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy narration-check",
+        prog=f"{CLI_NAME} narration-check",
         description="Validate narration.json/intro.json structure per item: "
                     "parseable, every entry's image exists, no empty narration, "
                     "no intro/narration overlap. Panels without an entry are a "

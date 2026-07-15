@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## 2.0.0 — 2026-07-15
+
+### MediaConductor platform
+
+- Renamed the product, Python distribution, primary CLI, release artifacts,
+  and MCP identity to **MediaConductor**. The `mangaeasy` command and Python
+  package remain compatibility surfaces for 2.x.
+- Added isolated Manga Video, AI Story, and Song Video modes, each with its
+  own small MCP catalog, setup profile, Codex-compatible skill, and reference
+  documentation.
+- Added schema-v2 AI Story projects with immutable character/environment
+  cards, ordered scene-state ledgers, deterministic prompt locks, reference
+  sheets, digest-bound generation provenance, and explicit visual/video/rights
+  gates before publishing.
+- Added Song Video projects with ACE-Step 1.5 generation, maintained Demucs
+  separation, WhisperX timing against canonical lyrics, minimalistic-sky art,
+  and the bundled Edo SZ lyric treatment with a small shadow and line fades.
+- Added production/release validation for source, wheel, sdist, frozen CLI,
+  and mode-scoped MCP handshakes. Removed tracked sample music and voice media.
+- Added an MCP workspace boundary with repeatable `--allow-root` values and a
+  startup-directory default, including nested typed jobs and manifest-linked
+  media paths.
+- Hardened direct CLI child-path inputs: project/MangaDex names, chapter
+  folders, panel source/output subpaths and prefixes, and archived-run names
+  now reject absolute paths, traversal, reserved names, and non-portable
+  characters while preserving valid Unicode and internal spaces.
+- Added isolated named YouTube account profiles, allowing each production mode
+  to publish to a distinct verified channel or reuse one profile across modes;
+  the original single-account files remain the compatible `default` profile.
+  One shared Desktop-app client can authorize every profile, and live commands
+  automatically open browser re-consent/retry unless `--no-auto-auth` is set.
+
 ### Added
 - **Background job runner** — `job-start <command> [args…]` runs any command
   as a detached, supervised background job (state + log under `<work>/jobs/`);
@@ -58,9 +90,9 @@
 
 ### Added
 - **Thumbnail-generation guidance in the recap playbook** — Phase 9 now spells
-  out how to write the prompt for a generated (Z-Image Turbo) recap thumbnail
-  in the established big-channel "gooner" fanservice house style (see the
-  MamoruManhwa style guide), with a non-negotiable safety bound baked into
+  out how to write the prompt for high-energy generated (Z-Image Turbo) recap
+  key art with a strong focal subject and mobile-readable composition, with a
+  non-negotiable safety bound baked into
   the prompt-writing rules themselves: every character drawn as a visibly
   adult, fully clothed (revealing-but-not-explicit is the ceiling), no
   nudity/transparent clothing/explicit content/minor-coded characters, and a

@@ -33,7 +33,9 @@ from urllib.parse import urlparse
 import requests
 
 from mangaeasy import __version__
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.config import CONFIG_FILE, load_download_config, load_system_config
+from mangaeasy.path_safety import portable_segment_arg, validate_portable_segment
 from mangaeasy.paths import manga_dir
 from mangaeasy.utils import emit_result
 
@@ -44,8 +46,8 @@ API_BASE   = "https://api.mangadex.org"
 REPORT_URL = "https://api.mangadex.network/report"
 
 _USER_AGENT = (
-    f"mangaEasy/{__version__} "
-    "(+https://github.com/tawhidUnhappy/mangaEasy)"
+    f"MediaConductor/{__version__} "
+    "(+https://github.com/tawhidUnhappy/MediaConductor)"
 )
 
 # Minimum seconds between consecutive MangaDex API calls.
@@ -488,6 +490,7 @@ def _download_one_chapter(
     or None when the caller wants this function to look it up itself.
     """
     chapter_str    = str(chapter).zfill(2) if "." not in str(chapter) else str(chapter)
+    chapter_str = validate_portable_segment(chapter_str, label="MangaDex chapter folder")
     lang           = dl_cfg.get("translated_language", "en")
     manga_root     = manga_dir(str(dl_cfg.get("name")))
     output_dir     = manga_root / chapter_str / "download"
@@ -613,6 +616,20 @@ def _chapter_sort_key(ch: str) -> tuple[float, str]:
         return (float("inf"), ch)
 
 
+def _chapter_arg(value: str) -> str:
+    if not re.fullmatch(r"\d+(?:\.\d+)?", value):
+        raise argparse.ArgumentTypeError("chapter must be a non-negative number such as 3 or 3.5")
+    return value
+
+
+def _chapter_token_arg(value: str) -> str:
+    if not re.fullmatch(r"\d+(?:\.\d+)?|\d+-\d+", value):
+        raise argparse.ArgumentTypeError(
+            "chapter token must be a number, decimal, or integer range such as 0-12"
+        )
+    return value
+
+
 def _slugify_project_name(title: str) -> str:
     """Filesystem-safe library folder name derived from a manga title."""
     slug = re.sub(r"[^A-Za-z0-9._-]+", "_", title).strip("_.")
@@ -644,7 +661,7 @@ def _resolve_dl_cfg(args) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy download",
+        prog=f"{CLI_NAME} download",
         description="Download manga chapters from MangaDex — politely (API "
                     "spacing, 429 backoff, jittered image delays, resumable).",
     )
@@ -654,7 +671,7 @@ def main() -> None:
              "so agents can download without editing any file.",
     )
     parser.add_argument(
-        "--name", metavar="PROJECT",
+        "--name", metavar="PROJECT", type=portable_segment_arg,
         help="Library folder name (library/<PROJECT>/). With --url and no "
              "--name, a safe name is derived from the manga's title.",
     )
@@ -663,12 +680,12 @@ def main() -> None:
         help="Bypass the local cache and re-fetch all metadata from MangaDex.",
     )
     parser.add_argument(
-        "--chapter", metavar="N",
+        "--chapter", metavar="N", type=_chapter_arg,
         help="Chapter to download (overrides config.json). "
              "Accepts decimals like 3.5.",
     )
     parser.add_argument(
-        "--chapters", nargs="+", metavar="TOKEN",
+        "--chapters", nargs="+", metavar="TOKEN", type=_chapter_token_arg,
         help="Several chapters: numbers and inclusive ranges, "
              "e.g. --chapters 0-12 14 20.5. Missing chapters are skipped "
              "with a warning instead of aborting the batch.",
@@ -716,6 +733,16 @@ def main() -> None:
         dl_cfg["name"] = _slugify_project_name(title)
         print(f"[INFO] Project name: {dl_cfg['name']} (derived from title; "
               f"override with --name)", flush=True)
+
+    # Config-supplied names pass through the same containment rule as
+    # ``--name``.  Validate before feed/image work so a bad config cannot turn
+    # ``library / name`` into a write outside the library root.
+    try:
+        dl_cfg["name"] = validate_portable_segment(
+            str(dl_cfg["name"]), label="MangaDex project name"
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     # One feed fetch covers every chapter in a batch (and disambiguates
     # duplicate scanlations by page count).

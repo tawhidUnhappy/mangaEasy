@@ -27,6 +27,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import emit_result
 
 PANEL_W = 560
@@ -106,7 +107,7 @@ def parse_args() -> argparse.Namespace:
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy narration-review-sheets",
+        prog=f"{CLI_NAME} narration-review-sheets",
         description="Render panel + narration + OCR review sheets for semantic and "
                     "speaker verification of narration.json.",
     )

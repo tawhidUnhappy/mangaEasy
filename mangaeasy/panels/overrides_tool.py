@@ -25,6 +25,7 @@ import argparse
 import json
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import emit_result
 
 Y_TOLERANCE = 2
@@ -95,7 +96,7 @@ def parse_args() -> argparse.Namespace:
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy webtoon-override",
+        prog=f"{CLI_NAME} webtoon-override",
         description="Add merge/split fixes to a webtoon-split overrides file, resolving "
                     "indices against the ranges manifest (no hand-computed indices).",
     )
@@ -177,7 +178,7 @@ def main() -> int:
         args.file.parent.mkdir(parents=True, exist_ok=True)
         args.file.write_text(json.dumps(overrides, indent=2) + "\n", encoding="utf-8")
         print(f"wrote {args.file}")
-        print(f"apply with: mangaeasy webtoon-split --project-root {args.project_root} "
+        print(f"apply with: {CLI_NAME} webtoon-split --project-root {args.project_root} "
               f"--items {args.item} --overrides {args.file}, then re-run webtoon-cutcheck")
 
     if args.show or not has_fixes:

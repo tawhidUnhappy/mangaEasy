@@ -33,6 +33,7 @@ import shutil
 import wave
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
 from mangaeasy.utils import archive_before_overwrite, emit_result
 
 SIG_COLS = 16
@@ -263,10 +264,11 @@ def apply_item(item_dir: Path, mapping: list[dict], old_panels: Path,
 # --------------------------------------------------------------------- CLI
 
 def parse_args() -> argparse.Namespace:
+    from mangaeasy.path_safety import portable_segment_arg, relative_subpath_arg
     from mangaeasy.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy panels-remap",
+        prog=f"{CLI_NAME} panels-remap",
         description="After a re-crop, map archived old panels to the new crops and carry "
                     "narration + audio over (dry run by default; --apply to write).",
     )
@@ -278,8 +280,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--verify-root", type=Path, default=None,
                         help="Where webtoon-split wrote <item>_ranges.json "
                              "(default: <work-dir>/webtoon_verify/<project-name>).")
-    parser.add_argument("--source-subdir", default="download")
-    parser.add_argument("--old-run", default=None,
+    parser.add_argument("--source-subdir", type=relative_subpath_arg, default="download")
+    parser.add_argument("--old-run", type=portable_segment_arg, default=None,
                         help="Archive run under <item>/old/ holding the panels the CURRENT "
                              "narration was written against (e.g. run_0002). Default: the "
                              "newest run with a panels dir — pass it explicitly if the item "
@@ -346,8 +348,8 @@ def main() -> int:
 
     if args.apply:
         print("Review every 'shift' and 'merge' panel next: "
-              "`mangaeasy narration-review-sheets` renders panel+text pairs for that, "
-              "then run video-audio-audit and rebuild with `mangaeasy video "
+              f"`{CLI_NAME} narration-review-sheets` renders panel+text pairs for that, "
+              f"then run video-audio-audit and rebuild with `{CLI_NAME} video "
               "--overwrite-video`.")
     emit_result(command="panels-remap", report_dir=report_dir,
                 applied=args.apply, items=results)

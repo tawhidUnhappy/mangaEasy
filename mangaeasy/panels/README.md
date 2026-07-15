@@ -32,7 +32,7 @@ Start with the operator doc: [docs/operate/crop-verify-narrate.md](../../docs/op
 
 - **MAGI runs in its own tool env**, not the main env (transformers version
   conflict). `page.py` shells out to `assets/tools/batch_detect_magi.py` via
-  the `magi-v3` env python. Install it with `mangaeasy install-tool magi-v3`.
+  the `magi-v3` env python. Install it with `mediaconductor install-tool magi-v3`.
   The env pins (transformers 4.48.3, `attn_implementation="eager"`) are baked
   into that script — see [CLAUDE.md](../../CLAUDE.md) / the magi-v3 memory.
 - **Never trust detector boxes.** Both commands emit verify images

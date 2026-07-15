@@ -2,7 +2,7 @@
 """mangaeasy.audio.tts_pipeline — batch IndexTTS2 audio generation for the video pipeline.
 
 IMPORTANT: Must run inside the external index-tts uv environment.
-Invoked automatically by mangaeasy video-audio-indextts.
+Invoked automatically by mediaconductor video-audio-indextts.
 """
 
 import argparse
@@ -114,7 +114,7 @@ try:
     from indextts.infer_v2 import IndexTTS2
 except Exception as exc:
     print(f"[FATAL] Could not import IndexTTS2: {exc}")
-    print("  Make sure this runs via: mangaeasy video-audio-indextts")
+    print("  Make sure this runs via: mediaconductor video-audio-indextts")
     sys.exit(1)
 
 

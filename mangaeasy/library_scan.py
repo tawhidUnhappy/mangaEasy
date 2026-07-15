@@ -15,6 +15,8 @@ import argparse
 import json
 from pathlib import Path
 
+from mangaeasy.path_safety import validate_relative_subpath
+
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".aac"}
 
@@ -33,9 +35,12 @@ def library_dir(project_root: Path) -> Path:
     config.system.json, else the first existing conventional folder name, else
     `mangas`."""
     system_config = _read_json(project_root / "config.system.json")
-    configured = (system_config.get("paths") or {}).get("library_subdir")
+    path_config = system_config.get("paths")
+    configured = path_config.get("library_subdir") if isinstance(path_config, dict) else None
     if configured:
-        return project_root / configured
+        return project_root / validate_relative_subpath(
+            configured, label="configured library subdirectory"
+        )
     for candidate in ("mangas", "library", "manga"):
         full = project_root / candidate
         if full.is_dir():

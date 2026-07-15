@@ -11,7 +11,7 @@ later joined into the long video. Item selection syntax across the CLI is
 
 ## The one entry point
 
-[`run_pipeline.py`](run_pipeline.py) (`mangaeasy video`) orchestrates the whole
+[`run_pipeline.py`](run_pipeline.py) (`mediaconductor video`) orchestrates the whole
 build by shelling out to the narrower commands, in this order:
 
 1. **Audio** — [`generate_audio.py`](generate_audio.py) (Kokoro, worker pool) or

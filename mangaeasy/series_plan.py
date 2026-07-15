@@ -24,6 +24,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME
+
 DEFAULT_BATCH_SIZE = 12
 _PUBLISH_FILE = "publish.json"
 
@@ -101,14 +103,14 @@ def build_plan(project_root: Path, batch_size: int) -> dict:
         "next_batch": next_batch,
         "note": None if (next_batch is None or next_batch["full"]) else (
             "next_batch is a partial window — either the series has ended or "
-            "later chapters aren't downloaded yet (run `mangaeasy download --all`)."
+            f"later chapters aren't downloaded yet (run `{CLI_NAME} download --all`)."
         ),
     }
 
 
 def plan_main() -> int:
     parser = argparse.ArgumentParser(
-        prog="mangaeasy series-plan",
+        prog=f"{CLI_NAME} series-plan",
         description="Slice a project's items into fixed upload batches (12 per "
                     "video by default), report readiness and published state, "
                     "and name the next batch to produce.",
@@ -158,7 +160,7 @@ def mark_main() -> int:
     from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
 
     parser = argparse.ArgumentParser(
-        prog="mangaeasy series-mark-published",
+        prog=f"{CLI_NAME} series-mark-published",
         description="Record an uploaded batch in library/<project>/publish.json "
                     "so series-plan advances to the next window.",
     )

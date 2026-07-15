@@ -19,6 +19,7 @@ import importlib
 import sys
 
 from mangaeasy import __version__
+from mangaeasy.brand import CLI_NAME, LEGACY_CLI_NAME, PRODUCT_NAME
 from mangaeasy.tools.vendored import ensure_vendored_path
 
 # Every existing and future bare-name subprocess call (`"ffmpeg"`, `"uv"`,
@@ -53,11 +54,12 @@ _force_utf8_stdio()
 COMMANDS: dict[str, tuple[str, str, str, str]] = {
     # ── Setup ─────────────────────────────────────────────────────────────────
     "commands":             ("mangaeasy.cli",                                  "commands_main","Setup",           "List every command, or emit the full machine-readable catalog (--json)."),
+    "modes":                ("mangaeasy.modes",                                "main",        "Setup",           "List Manga Video, AI Story, and Song Video modes and their isolated dependencies (--json)."),
     "where":                ("mangaeasy.tools.external",                       "where_main",  "Setup",            "Show this install's resolved data/tool paths (--json). Run this first from scripts/AI agents."),
     "library-list":         ("mangaeasy.library_scan",                         "main",        "Setup",            "List projects and per-item readiness under a project root (--json)."),
     "series-plan":          ("mangaeasy.series_plan",                          "plan_main",   "Setup",            "Slice a project into fixed upload batches (default 12/video) and name the next one (--json)."),
     "series-mark-published":("mangaeasy.series_plan",                          "mark_main",   "Setup",            "Record an uploaded batch in publish.json so series-plan advances."),
-    "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup",            "Run an MCP stdio server exposing mangaEasy as typed tools for AI assistants."),
+    "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup",            "Run an MCP stdio server exposing MediaConductor as typed tools for AI assistants."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup",            "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
     "setup":                ("mangaeasy.tools.setup",                          "main",        "Setup",            "One-command provisioning: core binaries + AI tool envs + models, GPU-aware (--all / --minimal)."),
     "smoke-test":           ("mangaeasy.tools.smoke",                          "main",        "Setup",            "Prove the install works: build and verify a tiny real video (run after setup)."),
@@ -65,7 +67,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
 
     # ── Background jobs (the right way to run anything long) ─────────────────
-    "job-start":            ("mangaeasy.jobs",                                 "start_main",  "Jobs",             "Run any command as a detached background job; returns a job id immediately (prints JSON)."),
+    "job-start":            ("mangaeasy.jobs",                                 "start_main",  "Jobs",             "Start a schema-validated long-running tool as a detached job (--tool/--arguments-json; positional CLI compatibility remains)."),
     "job-status":           ("mangaeasy.jobs",                                 "status_main", "Jobs",             "Status/progress/result/log-tail of one background job (--json)."),
     "jobs":                 ("mangaeasy.jobs",                                 "list_main",   "Jobs",             "List background jobs and their states (--json)."),
     "job-run":              ("mangaeasy.jobs",                                 "run_main",    "Jobs",             "(internal) Supervisor spawned by job-start; not for direct use."),
@@ -100,19 +102,33 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "audio-takes-restore":  ("mangaeasy.video_pipeline.audio_takes",           "restore_main","Video pipeline",   "Restore an archived audio take as the active audio instead of regenerating it."),
 
     # ── YouTube ───────────────────────────────────────────────────────────────
-    "youtube-auth":         ("mangaeasy.youtube.auth",                         "auth_main",   "YouTube",          "Connect a YouTube account (browser consent). Attach your Google project via --client-id/--client-secret (pasted) or --client-secrets <file>."),
-    "youtube-status":       ("mangaeasy.youtube.auth",                         "status_main", "YouTube",          "Show YouTube connection status (--json); --verify checks the token live."),
-    "youtube-logout":       ("mangaeasy.youtube.auth",                         "logout_main", "YouTube",          "Disconnect the YouTube account (delete the stored token)."),
-    "youtube-upload":       ("mangaeasy.youtube.upload",                       "main",        "YouTube",          "Upload a video to the connected channel (resumable; default privacy: private)."),
-    "youtube-list":         ("mangaeasy.youtube.list_videos",                  "main",        "YouTube",          "List the connected channel's uploads (id, title, privacy, date) — the IDs delete/thumbnail need."),
-    "youtube-delete":       ("mangaeasy.youtube.delete",                       "main",        "YouTube",          "Delete a video from the connected channel (two-step: requires --confirm)."),
-    "youtube-thumbnail":    ("mangaeasy.youtube.thumbnail",                    "main",        "YouTube",          "Set/replace the thumbnail of an already-uploaded video (no re-upload needed)."),
+    "youtube-profiles":     ("mangaeasy.youtube.auth",                         "profiles_main","YouTube",         "List isolated YouTube account profiles and cached channels (--json)."),
+    "youtube-auth":         ("mangaeasy.youtube.auth",                         "auth_main",   "YouTube",          "Connect a named YouTube account profile (browser consent; default profile: default)."),
+    "youtube-status":       ("mangaeasy.youtube.auth",                         "status_main", "YouTube",          "Show one YouTube profile's status (--json); --verify checks it live."),
+    "youtube-logout":       ("mangaeasy.youtube.auth",                         "logout_main", "YouTube",          "Disconnect one YouTube profile (delete only that profile's token)."),
+    "youtube-upload":       ("mangaeasy.youtube.upload",                       "main",        "YouTube",          "Upload through a selected account profile (resumable; default privacy: private)."),
+    "youtube-list":         ("mangaeasy.youtube.list_videos",                  "main",        "YouTube",          "List a selected profile's uploads (id, title, privacy, date)."),
+    "youtube-delete":       ("mangaeasy.youtube.delete",                       "main",        "YouTube",          "Delete a video through a selected profile (two-step: requires --confirm)."),
+    "youtube-thumbnail":    ("mangaeasy.youtube.thumbnail",                    "main",        "YouTube",          "Set/replace a thumbnail through a selected profile (no re-upload needed)."),
 
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image) resolve."),
     "index-tts":            ("mangaeasy.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
     "deepseek-ocr2":        ("mangaeasy.tools.deepseek_ocr2",                  "main",        "External tools",   "Run DeepSeek-OCR 2 and write `ocr` fields into narration JSON files."),
     "zimage":               ("mangaeasy.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
+    "ace-step":             ("mangaeasy.tools.ace_step",                        "main",        "External tools",   "Generate a song with ACE-Step 1.5 inside its isolated uv environment."),
+    "demucs":               ("mangaeasy.tools.demucs",                          "main",        "External tools",   "Separate vocals from a song with Demucs inside its isolated uv environment."),
+    "whisperx":             ("mangaeasy.tools.whisperx",                        "main",        "External tools",   "Transcribe vocals and align authoritative lyrics with WhisperX timestamps."),
+
+    # AI Story
+    "story-init":           ("mangaeasy.story.workflow",                       "init_main",   "AI Story",        "Create a continuity-first AI story project manifest for an agent to complete."),
+    "story-check":          ("mangaeasy.story.workflow",                       "check_main",  "AI Story",        "Validate story structure, continuity anchors, scene prompts, narration, and publish metadata (--json)."),
+    "story-build":          ("mangaeasy.story.workflow",                       "build_main",  "AI Story",        "Materialize prompts and build scene images, narration video, and optional YouTube upload."),
+
+    # Song & lyrics video
+    "song-init":            ("mangaeasy.song.workflow",                        "init_main",   "Song Video",      "Create a song project manifest with lyrics and the minimalistic-sky visual default."),
+    "song-check":           ("mangaeasy.song.workflow",                        "check_main",  "Song Video",      "Validate lyrics, generation prompt, alignment inputs, visual prompt, and publish metadata (--json)."),
+    "song-build":           ("mangaeasy.song.workflow",                        "build_main",  "Song Video",      "Generate or ingest a song, align corrected lyrics, render a lyric video, and optionally upload."),
 
     # ── Manga chapter workflow: acquire & crop ────────────────────────────────
     "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download manga chapters from MangaDex (--url + --all for a whole series; polite and resumable)."),
@@ -144,22 +160,47 @@ def _group_order() -> list[str]:
     return order
 
 
-def _print_help(stream=None) -> None:
+PRIMARY_COMMANDS = frozenset({
+    "modes", "commands", "where", "doctor", "setup", "mcp",
+    "job-start", "job-status", "jobs", "video", "download",
+    "story-init", "story-check", "story-build",
+    "song-init", "song-check", "song-build",
+})
+
+
+def _print_help(stream=None, mode: str | None = None, all_commands: bool = False) -> None:
     # Resolve sys.stdout at call time, not def time — a default bound at
     # import would ignore any redirection set up after this module loads.
     write = (stream or sys.stdout).write
-    write(f"mangaeasy {__version__} - manga & image-to-video automation\n\n")
-    write("Usage:\n")
-    write("  mangaeasy <command> [args...]\n")
-    write("  mangaeasy <command> --help     Show a command's own options\n")
-    write("  mangaeasy --version\n\n")
+    from mangaeasy.modes import MODES, normalize_mode
 
-    width = max(len(name) for name in COMMANDS) + 2
+    mode = normalize_mode(mode)
+    visible = MODES[mode].commands if mode else frozenset(COMMANDS) if all_commands else PRIMARY_COMMANDS
+    suffix = f" - {MODES[mode].title} mode" if mode else ""
+    write(f"{PRODUCT_NAME} {__version__}{suffix} - agent-native media production\n\n")
+    write("Usage:\n")
+    write(f"  {CLI_NAME} <command> [args...]\n")
+    write(f"  {CLI_NAME} <command> --help     Show a command's own options\n")
+    write(f"  {CLI_NAME} commands --mode <mode> --json --full\n")
+    write(f"  {CLI_NAME} --version\n")
+    write(f"  ({LEGACY_CLI_NAME} remains available as a compatibility alias.)\n\n")
+
+    if mode is None:
+        write("Modes:\n")
+        for spec in MODES.values():
+            write(f"  {spec.key:<14}{spec.description}\n")
+        write(f"\nUse `{CLI_NAME} commands --mode <mode>` for a selected catalog, or "
+              f"`{CLI_NAME} --help --all` for legacy low-level commands.\n\n")
+
+    width = max(len(name) for name in visible) + 2
     for group in _group_order():
+        entries = [(name, details) for name, details in COMMANDS.items()
+                   if name in visible and details[2] == group]
+        if not entries:
+            continue
         write(f"{group}:\n")
-        for name, (_, _, grp, help_text) in COMMANDS.items():
-            if grp == group:
-                write(f"  {name:<{width}}{help_text}\n")
+        for name, (_, _, _grp, help_text) in entries:
+            write(f"  {name:<{width}}{help_text}\n")
         write("\n")
 
 
@@ -175,35 +216,43 @@ def commands_main() -> int:
     import argparse
     import json
 
-    parser = argparse.ArgumentParser(description="List every mangaeasy command.")
+    from mangaeasy.modes import MODES
+
+    parser = argparse.ArgumentParser(description=f"List {PRODUCT_NAME} commands.")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="Emit the catalog as a single JSON object on stdout.")
     parser.add_argument("--full", action="store_true",
                         help="With --json: include each command's argument schema "
                              "(flags, types, required) and long-running marker.")
+    parser.add_argument("--mode", choices=tuple(MODES),
+                        help="Return only one mode's commands, keeping agent context small.")
     args = parser.parse_args()
 
     if args.full:
         from mangaeasy.command_spec import LONG_RUNNING, cli_args_schema
 
+    visible = MODES[args.mode].commands if args.mode else frozenset(COMMANDS)
     catalog = []
     for name, (_, _, group, help_text) in COMMANDS.items():
+        if name not in visible:
+            continue
         entry: dict = {
             "name": name,
             "group": group,
             "help": help_text,
-            "usage": f"mangaeasy {name} --help",
+            "usage": f"{CLI_NAME} {name} --help",
         }
         if args.full:
             entry["long_running"] = name in LONG_RUNNING
-            schema = cli_args_schema(name)
+            schema = cli_args_schema(name, args.mode)
             if schema is not None:
                 entry["args"] = schema
         catalog.append(entry)
     if args.as_json:
-        print(json.dumps({"version": __version__, "commands": catalog}, ensure_ascii=False))
+        print(json.dumps({"product": PRODUCT_NAME, "version": __version__,
+                          "mode": args.mode, "commands": catalog}, ensure_ascii=False))
     else:
-        _print_help()
+        _print_help(mode=args.mode)
     return 0
 
 
@@ -213,16 +262,21 @@ def _dispatch(command: str, rest: list[str]) -> int:
     func = getattr(module, func_name)
     # Present the subcommand's own argparse with a sensible prog name and let it
     # parse the remaining args exactly as if it were a standalone tool.
-    sys.argv = [f"mangaeasy {command}", *rest]
+    sys.argv = [f"{CLI_NAME} {command}", *rest]
     try:
         result = func()
     except Exception as exc:
         # Library code raises ConfigError instead of sys.exit; the CLI is the
         # one place that turns it into a clean message + exit 1.
         from mangaeasy.config import ConfigError
+        from mangaeasy.path_safety import UnsafePathComponentError
+
         if isinstance(exc, ConfigError):
             sys.stderr.write(f"[ERROR] {exc}\n")
             return 1
+        if isinstance(exc, UnsafePathComponentError):
+            sys.stderr.write(f"{CLI_NAME} {command}: error: {exc}\n")
+            return 2
         raise
     return result if isinstance(result, int) else 0
 
@@ -234,20 +288,20 @@ def main(argv: list[str] | None = None) -> int:
         # `mangaeasy help <command>` -> show that command's own help.
         if len(argv) >= 2 and argv[0] == "help" and argv[1] in COMMANDS:
             return _dispatch(argv[1], ["--help"])
-        _print_help()
+        _print_help(all_commands="--all" in argv)
         return 0
 
     if argv[0] in ("-V", "--version", "version"):
-        print(f"mangaeasy {__version__}")
+        print(f"{CLI_NAME} {__version__}")
         return 0
 
     command, rest = argv[0], argv[1:]
     if command not in COMMANDS:
-        sys.stderr.write(f"mangaeasy: unknown command '{command}'\n")
+        sys.stderr.write(f"{CLI_NAME}: unknown command '{command}'\n")
         suggestions = difflib.get_close_matches(command, list(COMMANDS), n=3)
         if suggestions:
             sys.stderr.write("Did you mean: " + ", ".join(suggestions) + "?\n")
-        sys.stderr.write("Run 'mangaeasy --help' to list all commands.\n")
+        sys.stderr.write(f"Run '{CLI_NAME} --help' to list all commands.\n")
         return 2
 
     return _dispatch(command, rest)

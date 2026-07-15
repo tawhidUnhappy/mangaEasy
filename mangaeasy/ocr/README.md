@@ -15,7 +15,7 @@ to work from. Not required by the core pipeline.
 
 ## Gotchas
 
-- Needs the tool env: `mangaeasy install-tool deepseek-ocr2`. Like all external
+- Needs the tool env: `mediaconductor install-tool deepseek-ocr2`. Like all external
   models it runs in its own `uv` env with pinned Torch/Transformers (see
   [`mangaeasy/tools/`](../tools/README.md)); this package only holds the
   in-env pipeline logic.

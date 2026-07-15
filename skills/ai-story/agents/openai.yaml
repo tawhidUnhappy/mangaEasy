@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Story Video"
+  short_description: "Build consistent narrated story videos"
+  default_prompt: "Use $ai-story to turn my story into a continuity-checked narrated video."

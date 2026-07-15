@@ -1,17 +1,18 @@
 # Architecture
 
-`mangaeasy` is intentionally split into a small main package and optional
-external AI tools, all driven through one CLI.
+MediaConductor is intentionally split into a small `mangaeasy` compatibility
+package and optional external AI tools, all driven through one primary CLI.
 
 ## One command
 
-Everything is reachable through the single `mangaeasy` entry point
-(`mangaeasy.cli:main`). It is a thin dispatcher: it maps a subcommand name to a
+Everything is reachable through the `mediaconductor` entry point
+(`mangaeasy.cli:main`; `mangaeasy` remains a 2.x alias). It is a thin
+dispatcher: it maps a subcommand name to a
 module and calls that module's `main()`, importing the module **lazily** so
-`mangaeasy --help` never pulls in heavy optional dependencies.
+`mediaconductor --help` never pulls in heavy optional dependencies.
 
 ```text
-mangaeasy <command> [args...]  ->  mangaeasy.<area>.<module>:main()
+mediaconductor <command> [args...]  ->  mangaeasy.<area>.<module>:main()
 ```
 
 ## Main package
@@ -50,7 +51,7 @@ This avoids dependency conflicts while still allowing full GPU acceleration.
 
 No GPU is required anywhere — every stage has a CPU path.
 
-Tool installs (`mangaeasy install-tool`):
+Tool installs (`mediaconductor install-tool`):
 
 - Auto-detects hardware: CUDA torch builds only on Windows/Linux with an
   NVIDIA GPU; standard CPU builds everywhere else (macOS, AMD, plain CPU).
@@ -58,15 +59,15 @@ Tool installs (`mangaeasy install-tool`):
 
 OCR:
 
-- `mangaeasy deepseek-ocr2` runs inside the isolated DeepSeek-OCR 2 environment and
+- `mediaconductor deepseek-ocr2` runs inside the isolated DeepSeek-OCR 2 environment and
   writes an `ocr` field into narration JSON entries.
 - `--device auto` uses CUDA when the tool env can see it, otherwise CPU.
 
 Audio:
 
-- `mangaeasy video --tts auto` (the default) picks IndexTTS when an NVIDIA GPU
+- `mediaconductor video --tts auto` (the default) picks IndexTTS when an NVIDIA GPU
   and the installed `index-tts` env are available, otherwise Kokoro.
-- `mangaeasy video-audio` calls `kokoro-82m` with that tool's own Python.
+- `mediaconductor video-audio` calls `kokoro-82m` with that tool's own Python.
 - `--device auto` uses CUDA when available, otherwise CPU.
 - `--device cuda` fails fast if CUDA is not visible.
 - The IndexTTS bridge enables fp16/CUDA kernels only when CUDA is present.

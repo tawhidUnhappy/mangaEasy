@@ -33,6 +33,7 @@ config.system.json
 /audio_faded/
 /output/
 /work/
+/projects/
 /audio_preprocessed/
 /download_logs/
 *.log
@@ -47,12 +48,10 @@ config.system.json
 /prompts/
 /music/*
 !/music/
-!/music/Thapin_by_the_sea.wav
+/bgm/
 /fonts/
 /background_image/
-/vocal/*
-!/vocal/
-!/vocal/manga_vocal2.wav
+/vocal/
 /upscale/
 /thumbnail/
 
