@@ -198,6 +198,9 @@ TOOLS: dict[str, ToolSpec] = {
         # native build fails on most machines (needs the system CUDA toolkit
         # to exactly match torch's, plus aio/cufile libs Windows lacks).
         exclude_extras=["deepspeed"],
+        # Upstream pins requires-python ">=3.10,<3.12" at this ref; the
+        # ToolSpec default of 3.12 makes `uv sync` refuse the interpreter.
+        python="3.11",
         needs_gpu=True,
         notes=f"High-quality voice-cloning TTS; the default engine for `{CLI_NAME} video` on NVIDIA GPU machines. ~5.9 GB model download from Hugging Face (config, gpt.pth, s2mel.pth, bpe.model).",
     ),
