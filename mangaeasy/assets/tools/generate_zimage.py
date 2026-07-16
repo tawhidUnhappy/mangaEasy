@@ -126,12 +126,6 @@ def load_pipeline(model: str, strategy: str, torch, *, with_img2img: bool = Fals
             model, text_encoder=text_encoder, transformer=transformer,
             torch_dtype=torch.bfloat16,
         )
-        # With preloaded quantized components, from_pretrained leaves the VAE
-        # in fp32. Decode casts latents to the VAE dtype so text2img hides it,
-        # but img2img feeds vae.encode() the pipeline-dtype (bf16) image and
-        # conv2d rejects the mix. Z-Image supports bf16 end to end (fp16 is
-        # the forbidden dtype), so align the VAE with the other components.
-        pipe.vae.to(torch.bfloat16)
     elif strategy == "bf16":
         pipe = ZImagePipeline.from_pretrained(model, torch_dtype=torch.bfloat16)
     elif strategy == "offload":
@@ -145,8 +139,14 @@ def load_pipeline(model: str, strategy: str, torch, *, with_img2img: bool = Fals
         from diffusers import ZImageImg2ImgPipeline
 
         # Diffusers' supported from_pipe path shares all model components and
-        # does not allocate or load a second copy of the weights.
-        img2img_pipe = ZImageImg2ImgPipeline.from_pipe(pipe)
+        # does not allocate or load a second copy of the weights. It does,
+        # however, silently re-cast shared components to its default dtype
+        # (fp32): the 4-bit-quantized modules refuse the cast, but the VAE
+        # obeys, and img2img then feeds the transformer-dtype (bf16) image to
+        # an fp32 vae.encode(), which conv2d rejects. Pin the dtype the
+        # strategy actually uses so the shared VAE keeps it.
+        shared_dtype = torch.float32 if strategy == "cpu" else torch.bfloat16
+        img2img_pipe = ZImageImg2ImgPipeline.from_pipe(pipe, torch_dtype=shared_dtype)
 
     if strategy == "nf4":
         # Safe now: the quantized transformer is ~3.5 GB, not 12.3 GB.
