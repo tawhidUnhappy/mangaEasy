@@ -5,9 +5,9 @@ Use the manifest's `production.style_contract` verbatim. It describes the suppli
 - hand-drawn 2D fantasy webcomic rendering with anime-influenced proportions;
 - clean, slightly organic dark ink lines and restrained line-weight variation;
 - flat cel color, minimal soft shading, sparse highlights, and no painterly or 3D texture;
-- elegant readable silhouettes, expressive eyes/hands, and stable face/hair anatomy;
+- elegant readable figure shapes, expressive eyes/hands, and stable face/hair anatomy;
 - uncluttered environments with simple geometry and only story-relevant props;
-- single-panel compositions with clear emotion, deliberate negative space, and readable staging;
+- one continuous full-bleed frame per scene with clear emotion, deliberate negative space, and readable staging;
 - charcoal/navy atmospheric gradients for tense interiors, warm cream/gold light for open scenes, and few accent colors.
 
 The references include close-ups, medium conversations, wide group staging, over-the-shoulder views, action poses, and small comedic/chibi beats. Choose the shot for the story beat, but do not change the rendering language. Chibi proportions are allowed only when the manifest explicitly marks a comedic beat; never let them leak into adjacent normal scenes.

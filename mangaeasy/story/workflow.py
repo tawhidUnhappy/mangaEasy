@@ -41,9 +41,12 @@ REFERENCE_STYLE_CONTRACT = {
     "linework": "clean dark organic ink lines, fine facial lines, controlled line-weight variation",
     "color": "flat cel colors with a restrained palette and one or two clear accent colors",
     "shading": "minimal soft cel shading, sparse highlights, no painterly texture",
-    "characters": "elegant readable silhouettes, expressive eyes and hands, natural hair shapes, consistent anatomy",
+    # Wording note: this text is injected into guidance-0 prompts, where
+    # concrete nouns act as attractors — "silhouette" drew black cutout
+    # figures and "single-panel" drew comic panel grids in production.
+    "characters": "elegant readable figure shapes, expressive eyes and hands, natural hair shapes, consistent anatomy",
     "environments": "simple readable geometry, selective prop detail, uncluttered atmospheric backgrounds",
-    "composition": "single-panel storytelling, strong silhouette separation, readable emotion, deliberate negative space",
+    "composition": "one continuous full-bleed cinematic frame, strong figure-to-background separation, readable emotion, deliberate negative space",
     "lighting": "soft cinematic light; use charcoal-navy gradients for tense interiors and warm gold light for open scenes",
 }
 
@@ -691,8 +694,9 @@ def expand_scene_prompt(data: dict, scene: dict) -> str:
     parts.append("RENDER MODE: " + scene["render_mode"] + ".")
     parts.append("SHOT INSTRUCTION: " + scene["image_prompt"].strip())
     parts.append(
-        "Render one coherent 16:9 story frame. Match all locks literally. Preserve identity, costume, "
-        "screen direction, props, injuries, weather, and light. No captions, speech bubbles, logo, or watermark."
+        "Render exactly one continuous 16:9 frame that fills the entire canvas. Match all locks literally. "
+        "Preserve identity, costume, screen direction, props, injuries, weather, and light. "
+        "No captions, speech bubbles, logo, or watermark."
     )
     negative = data["production"].get("negative_prompt", "").strip()
     if negative:
