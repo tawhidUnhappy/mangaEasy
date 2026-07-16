@@ -298,6 +298,9 @@ def main() -> int:
             "--narration-dir", str(effective_audio_root / name / "_items"),
             "--audio-root", str(effective_audio_root),
             "--audio-bitrate", args.audio_bitrate,
+            # When BGM follows, that stage owns the configured voice lift.
+            # Otherwise the narration-only join owns it. Never apply it twice.
+            "--narration-volume", str(1.0 if background_music is not None else args.narration_volume),
             "--overwrite",
         )
         if args.project_name:

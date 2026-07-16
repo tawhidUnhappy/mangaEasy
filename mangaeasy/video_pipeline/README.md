@@ -65,6 +65,10 @@ near −14 LUFS with true peak no higher than −1.5 dBTP.
 
 - Production rendering uses separate symmetric 8 ms per-panel fade derivatives;
   never destructively fade or replace the raw TTS WAVs.
+- Narration gain is applied exactly once. A BGM-bound full pipeline joins at
+  unity and applies the configured lift during mixing; a narration-only join
+  applies it itself. Standalone `video-add-bgm` defaults to unity because its
+  joined input already owns the configured gain.
 - Music mix uses `amix=…:normalize=0` and `alimiter=level=disabled`; BGM volume
   is **dB-native** (`--music-volume-db`, default −26). Mix music before one
   final two-pass whole-mix normalize at −14 LUFS / −1.5 dBTP. See

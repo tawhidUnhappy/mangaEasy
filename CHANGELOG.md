@@ -8,6 +8,8 @@
   derivatives with symmetric 8 ms edge fades; raw TTS WAVs remain untouched.
   The long-video order is join → BGM → one final two-pass whole-mix normalize
   at −14 LUFS / −1.5 dBTP. Any BGM change requires a new final normalization.
+  Narration gain now has a single owner instead of being applied once during
+  join and a second time during BGM remixing.
 - Clarified that `video-validate` is a structural gate and that visual,
   narration-timing, edge-click, and final loudness/true-peak QA remain separate
   release checks.

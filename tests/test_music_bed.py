@@ -191,6 +191,13 @@ def test_condition_filter_stages_toggle_independently():
 # ---------------------------------------------------------------------------
 
 from mangaeasy.video_pipeline.add_long_video_bgm import build_mix_filter  # noqa: E402
+from mangaeasy.video_pipeline.add_long_video_bgm import (  # noqa: E402
+    DEFAULT_EXISTING_VIDEO_NARRATION_VOLUME,
+)
+
+
+def test_standalone_bgm_defaults_to_unity_narration_gain():
+    assert DEFAULT_EXISTING_VIDEO_NARRATION_VOLUME == 1.0
 
 
 def test_mix_filter_keeps_amix_and_limiter_invariants():

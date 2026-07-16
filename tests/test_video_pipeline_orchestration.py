@@ -82,7 +82,10 @@ def test_bgm_precedes_one_final_normalize_with_exact_input(tmp_path, monkeypatch
     ]
     assert names.count("video-normalize-audio") == 1
     bgm = commands[names.index("video-add-bgm")]
+    join = commands[names.index("video-join")]
     normalize = commands[names.index("video-normalize-audio")]
+    assert _flag_value(join, "--narration-volume") == "1.0"
+    assert _flag_value(bgm, "--narration-volume") == "1.2"
     assert Path(_flag_value(bgm, "--input")).resolve() == long_video.resolve()
     assert Path(_flag_value(normalize, "--input")).resolve() == long_video.resolve()
     assert "--replace" in bgm
@@ -96,6 +99,7 @@ def test_normalize_runs_once_without_background_music(tmp_path, monkeypatch):
     ])
     names = [_command_name(command) for command in commands]
     assert names == ["video-render", "video-join", "video-normalize-audio"]
+    assert _flag_value(commands[1], "--narration-volume") == "1.2"
     normalize = commands[-1]
     assert Path(_flag_value(normalize, "--input")).resolve() == long_video.resolve()
     assert "--replace" in normalize

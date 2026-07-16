@@ -9,7 +9,6 @@ from pathlib import Path
 from mangaeasy.defaults import (
     configured_background_music,
     default_music_volume_db,
-    DEFAULT_NARRATION_VOLUME,
 )
 from mangaeasy.utils import archive_before_overwrite, emit_result
 from mangaeasy.video_pipeline.common import (
@@ -19,6 +18,8 @@ from mangaeasy.video_pipeline.common import (
     find_latest_long_video,
     project_name,
 )
+
+DEFAULT_EXISTING_VIDEO_NARRATION_VOLUME = 1.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,10 +68,10 @@ def parse_args() -> argparse.Namespace:
                         help="Gently dip the music in the 2-5 kHz speech-intelligibility band so it masks the "
                              "voice less (part of bed conditioning). On by default; --no-eq-carve keeps the "
                              "music's full spectrum.")
-    parser.add_argument("--narration-volume", type=float, default=DEFAULT_NARRATION_VOLUME,
-                        help="Narration gain before mixing. Use this to bring the voice a bit forward "
-                             "without changing the relative music offset. Default 1.2 is the recommended "
-                             "slight lift for recap-style mixes.")
+    parser.add_argument("--narration-volume", type=float, default=DEFAULT_EXISTING_VIDEO_NARRATION_VOLUME,
+                        help="Narration gain before mixing. Joined videos already contain their configured "
+                             "voice gain, so the standalone default is 1.0 (unity). The full pipeline joins "
+                             "at unity and passes its configured lift here, ensuring gain is applied once.")
     parser.add_argument("--duck", action=argparse.BooleanOptionalAction, default=True,
                         help="Sidechain-duck the music under the narration: the bed automatically dips a few dB "
                              "whenever the voice is present and breathes back up in the pauses — the standard "

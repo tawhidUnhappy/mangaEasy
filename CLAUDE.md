@@ -118,12 +118,16 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **Mix BGM before one final whole-mix normalize** to −14 LUFS / −1.5 dBTP.
   Never normalize narration, add music, and call the result final; every BGM
   change requires another final two-pass normalization pass.
+- **Narration gain has exactly one owner**: a BGM-bound full pipeline joins at
+  unity and applies the configured lift during mixing; narration-only joins
+  apply it themselves. Standalone BGM remixing defaults to unity because its
+  joined input already contains the configured voice gain.
 - **`amix=…:normalize=0` and `alimiter=level=disabled`** in
   `build_mix_filter()` — each silently undid the −14 LUFS target once;
   test-guarded in `test_music_bed.py`.
 - **dB-native volume flags only** (`--music-volume-db`, default −26 — a true
-  LU separation now that the bed is loudness-aligned to the −14 LUFS
-  reference first; keep new defaults within −20…−28). Never a linear
+  LU separation now that the bed is loudness-aligned to the measured
+  narration first; keep new defaults within −20…−28). Never a linear
   multiplier.
 - **`cudnn.benchmark` stays False** in `kokoro_batch_worker.py`;
   `--gpu-workers` is clamped to 4 by `clamp_gpu_workers()`.
