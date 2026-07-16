@@ -126,6 +126,12 @@ def load_pipeline(model: str, strategy: str, torch, *, with_img2img: bool = Fals
             model, text_encoder=text_encoder, transformer=transformer,
             torch_dtype=torch.bfloat16,
         )
+        # With preloaded quantized components, from_pretrained leaves the VAE
+        # in fp32. Decode casts latents to the VAE dtype so text2img hides it,
+        # but img2img feeds vae.encode() the pipeline-dtype (bf16) image and
+        # conv2d rejects the mix. Z-Image supports bf16 end to end (fp16 is
+        # the forbidden dtype), so align the VAE with the other components.
+        pipe.vae.to(torch.bfloat16)
     elif strategy == "bf16":
         pipe = ZImagePipeline.from_pretrained(model, torch_dtype=torch.bfloat16)
     elif strategy == "offload":
