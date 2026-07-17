@@ -116,11 +116,14 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
-         "overrides": {**_STR, "description": "JSON file with per-item split_at/merge fixes."}},
+         "overrides": {**_STR, "description": "JSON file with per-item split_at/merge fixes."},
+         "force_style": {**_BOOL, "description": "Bypass the webtoon-vs-paged pre-flight guard "
+                                                 "(only for deliberate mixed-format items)."}},
         ["project_root"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "source_subdir": ("--source-subdir", "value"),
-         "work_dir": ("--work-dir", "value"), "overrides": ("--overrides", "value")},
+         "work_dir": ("--work-dir", "value"), "overrides": ("--overrides", "value"),
+         "force_style": ("--force-style", "flag")},
     ),
     "webtoon_cutcheck": (
         "webtoon-cutcheck",
@@ -184,12 +187,83 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
          "overrides": {**_STR, "description": "JSON file with per-page box fixes."},
-         "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}},
+         "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
+         "force_style": {**_BOOL, "description": "Bypass the webtoon-vs-paged pre-flight guard "
+                                                 "(only for deliberate mixed-format items)."}},
         ["project_root"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "source_subdir": ("--source-subdir", "value"),
          "work_dir": ("--work-dir", "value"), "overrides": ("--overrides", "value"),
-         "device": ("--device", "value")},
+         "device": ("--device", "value"), "force_style": ("--force-style", "flag")},
+    ),
+    "crop_qa": (
+        "crop-qa",
+        "Review crop verification artifacts with the local Gemma 4 model (needs install-tool "
+        "gemma-4; LONG-RUNNING — prefer job_start). Renders review windows around every "
+        "flagged cut/short panel (webtoon) or page overlay (paged), gets a fix/accept verdict "
+        "per location, and prints the exact override command for every fix. Exit 3 = fixes "
+        "proposed: apply them, re-split, re-run until clean.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "style": {"type": "string", "enum": ["auto", "webtoon", "paged"]},
+         "work_dir": {**_STR, "description": "Work dir holding the verify artifacts (default: work)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "style": ("--style", "value"), "work_dir": ("--work-dir", "value")},
+    ),
+    "characters": (
+        "characters",
+        "Create/validate <project-root>/characters.json — the cast registry (name, aliases, "
+        "appearance, role) that grounds narration and speaker attribution. auto_draft samples "
+        "panels and drafts it with the local Gemma 4 model (always draft:true — review the "
+        "names before relying on them); init writes a hand-fill template.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "init": {**_BOOL, "description": "Write a template registry to fill in by hand."},
+         "auto_draft": {**_BOOL, "description": "Draft the registry with Gemma 4 (needs install-tool gemma-4)."},
+         "overwrite": {**_BOOL, "description": "Replace an existing characters.json."},
+         "work_dir": {**_STR, "description": "Scratch root for the LLM run (default: work)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "init": ("--init", "flag"), "auto_draft": ("--auto-draft", "flag"),
+         "overwrite": ("--overwrite", "flag"), "work_dir": ("--work-dir", "value")},
+    ),
+    "narrate_auto": (
+        "narrate-auto",
+        "Draft grounded <item>/narration.json with the local Gemma 4 model (needs install-tool "
+        "gemma-4; LONG-RUNNING — prefer job_start): panel images + OCR transcript + character "
+        "registry, banner panels skipped, then narration-check + review sheets. ALWAYS exits 3 "
+        "on success — the draft requires review against the sheets before TTS. Existing "
+        "narration.json is never replaced without overwrite=true.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "work_dir": {**_STR, "description": "Scratch root (default: work)."},
+         "chunk_size": {**_INT, "description": "Panels per vision request (default: 8)."},
+         "overwrite": {**_BOOL, "description": "Replace existing narration.json files."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "work_dir": ("--work-dir", "value"), "chunk_size": ("--chunk-size", "value"),
+         "overwrite": ("--overwrite", "flag")},
+    ),
+    "manga_auto": (
+        "manga-auto",
+        "One-command manga pipeline (VERY LONG-RUNNING — prefer job_start). stage=prep: "
+        "download (with url) → style-detect → the correct splitter → crop-qa → "
+        "panel-transcript → characters + narrate-auto, then exit 3 with a review checklist. "
+        "stage=build (after review): TTS + render + join + normalize → video-validate → "
+        "work-qa. Never publishes; exit 3 always means review the printed artifacts.",
+        {"url": {**_STR, "description": "MangaDex title URL to download first."},
+         "name": {**_STR, "description": "Library folder name (with url, or to locate an existing project)."},
+         "project_root": {**_STR, "description": "Existing project folder (library/<name>); overrides name."},
+         "items": _ITEMS,
+         "stage": {"type": "string", "enum": ["prep", "build"], "default": "prep"},
+         "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
+         "work_dir": {**_STR, "description": "Work dir (default: <workspace>/work)."},
+         "audio_root": {**_STR, "description": "Audio root (default: <workspace>/audio)."},
+         "output_root": {**_STR, "description": "Output root (default: <workspace>/output)."}},
+        [],
+        {"url": ("--url", "value"), "name": ("--name", "value"),
+         "project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "stage": ("--stage", "value"), "tts": ("--tts", "value"),
+         "work_dir": ("--work-dir", "value"), "audio_root": ("--audio-root", "value"),
+         "output_root": ("--output-root", "value")},
     ),
     "narration_check": (
         "narration-check",
@@ -798,7 +872,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 # Commands whose --json flag should be appended automatically by the MCP server.
 JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate",
                  "video-audio-audit", "youtube-profiles", "youtube-status", "youtube-upload",
-                 "style-detect", "narration-check", "series-plan",
+                 "style-detect", "narration-check", "series-plan", "crop-qa", "characters",
                  "work-status", "work-claim", "work-note", "work-qa", "work-artifacts",
                  "youtube-list", "youtube-delete", "youtube-thumbnail",
                  "story-init", "story-check", "song-init", "song-check",
@@ -811,7 +885,8 @@ LONG_RUNNING = {"setup", "download", "webtoon-split", "page-split", "panel-trans
                 "video", "video-audio", "video-audio-indextts", "video-render",
                 "video-join", "video-normalize-audio", "zimage", "deepseek-ocr2",
                 "install-tool", "bootstrap-tools", "youtube-upload", "smoke-test",
-                "story-build", "song-build", "ace-step", "demucs", "whisperx"}
+                "story-build", "song-build", "ace-step", "demucs", "whisperx",
+                "llm", "crop-qa", "narrate-auto", "manga-auto"}
 
 # cli command name -> mcp tool name (reverse index)
 CLI_TO_TOOL: dict[str, str] = {cli: tool for tool, (cli, *_rest) in TOOLS.items()}

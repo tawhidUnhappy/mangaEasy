@@ -712,6 +712,21 @@ def main() -> None:
 
     dl_cfg = _resolve_dl_cfg(args)
 
+    # State the destination up front. An agent invoking this from the wrong
+    # cwd used to only discover the mistake after gigabytes landed in a
+    # library/ tree it never intended; make the resolved root impossible
+    # to miss (and cheap to correct) before any network work starts.
+    from mediaconductor.config import PROJECT_ROOT
+    from mediaconductor.paths import library_dir
+
+    print(f"[download] workspace: {PROJECT_ROOT}", flush=True)
+    print(f"[download] library:   {library_dir()}", flush=True)
+    if not (PROJECT_ROOT / "config.json").is_file():
+        print("[download] WARNING: this folder has no config.json — it is not a "
+              "MediaConductor workspace. Chapters will be created here anyway. "
+              "If that is wrong, stop now and run from the workspace (or set "
+              "MEDIACONDUCTOR_PROJECT_ROOT / re-run `setup` there).", flush=True)
+
     raw_id = str(dl_cfg.get("manga_id", "")).strip()
     if not raw_id:
         print("[ERROR] 'manga_id' is missing in config.json download section"

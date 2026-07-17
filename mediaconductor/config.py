@@ -34,11 +34,78 @@ class ConfigError(RuntimeError):
     """
 
 
+def _registered_workspace() -> Path | None:
+    """The workspace `setup` registered for this install, if still valid.
+
+    Stored as ``<data_home>/workspace.json`` so a command started from any
+    directory (agents constantly run from the wrong cwd) still resolves the
+    real workspace instead of silently creating ``library/`` next to wherever
+    the shell happened to be. Returns None when unregistered or stale.
+    """
+    from mediaconductor.tools.external import data_home
+
+    marker = data_home() / "workspace.json"
+    try:
+        recorded = json.loads(marker.read_text(encoding="utf-8"))
+        root = Path(str(recorded["workspace_root"])).expanduser().resolve()
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return root if (root / "config.json").is_file() else None
+
+
 def _project_root() -> Path:
+    """Resolve the workspace root. Priority:
+
+    1. ``MEDIACONDUCTOR_PROJECT_ROOT`` — explicit always wins.
+    2. The cwd, when it actually is a workspace (has ``config.json``).
+    3. The workspace registered by ``mediaconductor setup`` (workspace.json).
+    4. A source checkout's own root, when it is a workspace.
+    5. The cwd (legacy behavior — lets ``download --name`` bootstrap anywhere).
+
+    Steps 3-4 exist because agents routinely invoke the CLI from an arbitrary
+    cwd; before them, that silently created a second ``library/`` tree outside
+    the install (a real production incident).
+    """
     configured = os.environ.get("MEDIACONDUCTOR_PROJECT_ROOT")
     if configured:
         return Path(configured).expanduser().resolve()
-    return Path.cwd().resolve()
+    cwd = Path.cwd().resolve()
+    if (cwd / "config.json").is_file():
+        return cwd
+    registered = _registered_workspace()
+    if registered is not None:
+        return registered
+    from mediaconductor.runtime import is_frozen
+
+    if not is_frozen():
+        from mediaconductor.tools.external import app_root
+
+        checkout = app_root()
+        if (checkout / "config.json").is_file():
+            return checkout
+    return cwd
+
+
+def register_workspace(root: Path) -> Path | None:
+    """Record *root* as this install's workspace (used by resolution step 3).
+
+    Only roots that look like a workspace (have ``config.json``) are recorded;
+    returns the marker path on success, None when skipped/unwritable.
+    """
+    from mediaconductor.tools.external import data_home
+
+    root = root.expanduser().resolve()
+    if not (root / "config.json").is_file():
+        return None
+    marker = data_home() / "workspace.json"
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            json.dumps({"workspace_root": str(root)}, indent=2) + "\n", encoding="utf-8"
+        )
+    except OSError:
+        return None
+    return marker
 
 
 PROJECT_ROOT: Path = _project_root()

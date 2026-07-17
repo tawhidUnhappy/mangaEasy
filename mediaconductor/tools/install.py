@@ -294,6 +294,39 @@ TOOLS: dict[str, ToolSpec] = {
         needs_gpu=False,
         notes=f"Light TTS (voice af_heart); the default engine for `{CLI_NAME} video` on machines without an NVIDIA GPU. Model downloads from Hugging Face on first run.",
     ),
+    "gemma-4": ToolSpec(
+        key="gemma-4",
+        title="Gemma 4 E4B (local LLM, text + vision)",
+        kind="managed_env",
+        git_url=None,
+        extra_models=(HfModelSpec(
+            repo="ggml-org/gemma-4-E4B-it-GGUF",
+            revision="06f24bb269339b2a19a5167199b81e89ef813c10",
+            subdir="model",
+            required_files=(
+                "gemma-4-E4B-it-Q4_0.gguf",
+                "mmproj-gemma-4-E4B-it-Q8_0.gguf",
+            ),
+            # Only the weights the runner loads — the repo also carries BF16 /
+            # Q8_0 / mtp variants that would multiply the download for nothing.
+            include=(
+                "gemma-4-E4B-it-Q4_0.gguf",
+                "mmproj-gemma-4-E4B-it-Q8_0.gguf",
+            ),
+        ),),
+        adapter="run_gemma.py",
+        # The runtime is a pinned llama.cpp release binary (installed by
+        # _install_llama_runtime below), not a Python stack — this env only
+        # needs Pillow so the adapter can downscale panel images before
+        # base64-ing them into vision requests.
+        env_deps=["pillow>=10.0.0"],
+        verify_import="PIL",
+        needs_gpu=False,
+        notes="Google's Gemma 4 E4B instruct model (Apache-2.0) served by a pinned llama.cpp "
+              "runtime — the local LLM behind `llm`, `crop-qa`, `characters --auto-draft`, and "
+              "`narrate-auto`. ~5.4 GB model + ~0.6 GB vision projector from Hugging Face; runs "
+              "on CPU (slow but fine) and offloads to GPU via Vulkan when available.",
+    ),
     "z-image-turbo": ToolSpec(
         key="z-image-turbo",
         title="Z-Image Turbo (image generation)",
@@ -829,6 +862,126 @@ def _install_managed_env(
         log("Model weights/code download from Hugging Face on first run.")
 
 
+# ── llama.cpp runtime (Gemma 4) ───────────────────────────────────────────────
+
+# Pinned llama.cpp release that serves the Gemma 4 GGUF (day-one Gemma 4
+# support landed well before this tag). Vulkan builds cover NVIDIA/AMD/Intel
+# GPUs without the ~640 MB CUDA+cudart download; CPU builds work everywhere.
+LLAMA_CPP_RELEASE = "b10064"
+
+
+def llama_release_asset(system: str, arch: str, gpu: bool) -> str | None:
+    """The llama.cpp release asset for this platform, or None when unsupported."""
+    tag = LLAMA_CPP_RELEASE
+    if system == "windows" and arch == "x64":
+        flavor = "vulkan" if gpu else "cpu"
+        return f"llama-{tag}-bin-win-{flavor}-x64.zip"
+    if system == "linux" and arch == "x64":
+        return f"llama-{tag}-bin-ubuntu-{'vulkan-' if gpu else ''}x64.tar.gz"
+    if system == "darwin":
+        return f"llama-{tag}-bin-macos-{'arm64' if arch == 'arm64' else 'x64'}.tar.gz"
+    return None
+
+
+def _extract_archive_all(archive: Path, dest: Path, log: LogFn) -> None:
+    """Extract a zip/tar.gz completely into ``dest`` with traversal guards."""
+    import tarfile
+    import zipfile
+
+    dest.mkdir(parents=True, exist_ok=True)
+    resolved_dest = dest.resolve()
+
+    def target_for(name: str) -> Path | None:
+        member = Path(name.replace("\\", "/"))
+        if member.is_absolute() or ".." in member.parts:
+            raise InstallError(f"archive member escapes the target dir: {name}")
+        target = (resolved_dest / member).resolve()
+        if resolved_dest not in target.parents and target != resolved_dest:
+            raise InstallError(f"archive member escapes the target dir: {name}")
+        return target
+
+    if zipfile.is_zipfile(archive):
+        with zipfile.ZipFile(archive) as zf:
+            for info in zf.infolist():
+                target = target_for(info.filename)
+                if info.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(info) as src, target.open("wb") as out:
+                    shutil.copyfileobj(src, out)
+    else:
+        with tarfile.open(archive) as tf:
+            for member in tf.getmembers():
+                target = target_for(member.name)
+                if member.isdir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                if not member.isfile():
+                    continue  # skip links/devices — nothing in these archives needs them
+                src = tf.extractfile(member)
+                if src is None:
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("wb") as out:
+                    shutil.copyfileobj(src, out)
+    log(f"Extracted {archive.name} -> {dest}")
+
+
+def find_llama_server(tool_dir: Path) -> Path | None:
+    """Locate the llama-server binary inside a gemma-4 tool dir (or via env)."""
+    import os
+
+    configured = os.environ.get("MEDIACONDUCTOR_LLAMA_SERVER")
+    if configured:
+        path = Path(configured).expanduser()
+        return path if path.is_file() else None
+    exe = "llama-server.exe" if sys.platform == "win32" else "llama-server"
+    runtime_dir = tool_dir / "llama"
+    if not runtime_dir.is_dir():
+        return None
+    for candidate in sorted(runtime_dir.rglob(exe)):
+        return candidate
+    return None
+
+
+def _install_llama_runtime(dest: Path, gpu_mode: str, log: LogFn) -> None:
+    """Download the pinned llama.cpp release binaries into ``<dest>/llama``."""
+    import platform as platform_module
+
+    from mediaconductor.tools.vendored import _download, _make_executable
+
+    system = platform_module.system().lower()
+    machine = platform_module.machine().lower()
+    arch = "arm64" if machine in ("arm64", "aarch64") else "x64"
+    asset = llama_release_asset(system, arch, gpu_mode == "cuda")
+    if asset is None:
+        raise InstallError(
+            f"no pinned llama.cpp build for {system}/{arch}. Install llama.cpp yourself "
+            "and point MEDIACONDUCTOR_LLAMA_SERVER at its llama-server binary."
+        )
+    runtime_dir = dest / "llama"
+    if find_llama_server(dest) is not None:
+        log(f"llama.cpp runtime already present under {runtime_dir}")
+        return
+    url = (
+        "https://github.com/ggml-org/llama.cpp/releases/download/"
+        f"{LLAMA_CPP_RELEASE}/{asset}"
+    )
+    archive = _download(url, dest / "_dl" / asset, log)
+    shutil.rmtree(runtime_dir, ignore_errors=True)
+    _extract_archive_all(archive, runtime_dir, log)
+    shutil.rmtree(dest / "_dl", ignore_errors=True)
+    server = find_llama_server(dest)
+    if server is None:
+        raise InstallError(f"llama-server not found after extracting {asset}")
+    if sys.platform != "win32":
+        for binary in server.parent.iterdir():
+            if binary.is_file():
+                _make_executable(binary)
+    log(f"llama.cpp runtime ready: {server}")
+
+
 def install_tool(
     key: str,
     *,
@@ -871,6 +1024,9 @@ def install_tool(
         _install_uv_project(spec, target, ref or spec.ref, skip_model, log, gpu_mode)
     else:
         _install_managed_env(spec, target, gpu_mode, clone, ref or spec.ref, skip_model, log)
+
+    if spec.key == "gemma-4":
+        _install_llama_runtime(target, gpu_mode, log)
 
     # ``None`` means this integration resolves its model at runtime and the
     # installer cannot truthfully attest to a local snapshot (Kokoro, MAGI,
@@ -979,6 +1135,8 @@ def _tool_health(path: Path | None, spec: ToolSpec) -> tuple[bool, list[str]]:
                     )
         elif not _model_snapshot_present(root, ()):
             reasons.append(f"model snapshot contains no payload files: {model.repo}")
+    if spec.key == "gemma-4" and find_llama_server(path) is None:
+        reasons.append("llama.cpp runtime is missing; re-run install-tool gemma-4")
     return not reasons, reasons
 
 

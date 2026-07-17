@@ -30,6 +30,7 @@ The resolver checks, in order:
    - `MAGI_V3_ROOT` (or legacy `MAGI_V3_DIR`)
    - `DEEPSEEK_OCR2_ROOT` (or `DEEPSEEK_OCR2_DIR`)
    - `Z_IMAGE_TURBO_ROOT` (or `Z_IMAGE_TURBO_DIR`)
+   - `GEMMA_4_ROOT` (or `GEMMA_ROOT`)
 2. The managed tools dir: `<install folder>/.mangaeasy/tools/<name>`
    (override with `MEDIACONDUCTOR_TOOLS_DIR`)
 If a tool has `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix),
@@ -191,3 +192,39 @@ results, and quoted text renders legibly in the image.
 
 On success the command prints `MEDIACONDUCTOR_RESULT {"outputs": [...]}` with
 every generated file.
+
+## Gemma 4 (local LLM, text + vision)
+
+Google's [Gemma 4 E4B instruct](https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF)
+(Apache-2.0) is the local LLM behind the assist commands — the model that lets
+a small or text-only driver agent still get vision-grounded results:
+
+```bash
+mediaconductor install-tool gemma-4
+mediaconductor llm --prompt "Summarize this panel" --image panels/ch01_001.jpg
+mediaconductor crop-qa --project-root library/example --items 01
+mediaconductor characters --project-root library/example --auto-draft
+mediaconductor narrate-auto --project-root library/example --items 01
+```
+
+The install is different from the Torch-based tools: the runtime is a **pinned
+llama.cpp release binary** (`llama-server`, extracted into `gemma-4/llama/`),
+and the weights are a revision-pinned GGUF snapshot in `gemma-4/model/`
+(Q4_0 main model ~5.4 GB + Q8_0 vision projector ~0.6 GB; the BF16/Q8/mtp
+variants in the upstream repo are deliberately not downloaded). The tool env
+itself only carries Pillow (the adapter downscales panel images before
+base64-ing them into vision requests).
+
+Hardware handling: the Windows/Linux GPU builds use **Vulkan** (works on
+NVIDIA without the ~640 MB CUDA runtime download; `-ngl 99` offload is always
+requested and harmlessly ignored by CPU builds), macOS arm64 uses Metal, and
+every platform falls back to a CPU build that runs fine — just slower. A
+custom llama.cpp can be supplied with `MEDIACONDUCTOR_LLAMA_SERVER=<path to
+llama-server>`.
+
+Calling conventions: one `llm`/assist invocation starts one `llama-server`,
+waits for `/health`, sends every request of the batch through
+`/v1/chat/completions` (JSON-schema-constrained when requested), and always
+tears the server down. Model load takes seconds on GPU and up to a minute or
+two on CPU, so batched forms (`--batch-manifest`, the assist commands) are
+strongly preferred over per-request invocations.

@@ -1,5 +1,54 @@
 # Changelog
 
+## 2.2.0 — 2026-07-17
+
+### Added
+
+- **Local LLM: Gemma 4 E4B** (`mediaconductor install-tool gemma-4`,
+  Apache-2.0). A revision-pinned GGUF snapshot (Q4_0 + vision projector,
+  ~6 GB) served by a pinned llama.cpp release binary (Vulkan on GPUs, CPU
+  everywhere else; `MEDIACONDUCTOR_LLAMA_SERVER` overrides). Raw access via
+  `mediaconductor llm` (text + images, JSON-schema-constrained output,
+  batch manifests). Installed by default with `setup --mode manga-video`.
+- **Assist commands** (`mediaconductor/assist/`) so small or text-only driver
+  agents can still produce correct manga videos — see
+  [docs/local-llm.md](docs/local-llm.md):
+  - `crop-qa` — Gemma-vision review of every flagged crop location (webtoon
+    forced cuts/short panels, paged page overlays); prints the exact
+    `webtoon-override` / `--overrides` fix per FIX verdict; exit 3 until clean.
+  - `characters` — per-project `characters.json` cast registry (names,
+    aliases, appearance, role) that grounds narration and speaker
+    attribution; `--auto-draft` proposes it from sampled panels + OCR
+    (always `draft: true` for review).
+  - `narrate-auto` — grounded `narration.json` drafts from panel images +
+    OCR + the registry, with banner skipping and a story-so-far chain; runs
+    `narration-check` + review sheets and always exits 3 (review before TTS).
+  - `manga-auto` — one-command orchestrator: download → style-detect → the
+    correct splitter → crop-qa → panel-transcript → characters +
+    narrate-auto (`--stage prep`, ends at a review checklist), then
+    `--stage build` for TTS/render/join/normalize → validate → work-qa.
+    Never publishes.
+
+### Fixed
+
+- **`style-detect` now recognizes pre-sliced webtoons.** Hosts (MangaDex
+  included) often serve webtoons cut into page-height chunks — page-shaped
+  ratios that the aspect bands alone misread as "paged". A shared modal
+  width with strongly varying heights (`height_cv`) now yields a "webtoon"
+  verdict; genuinely uniform page scans still detect as "paged".
+- **Wrong-splitter runs are now blocked.** `webtoon-split` and `page-split`
+  re-measure each item's pages and refuse a confident opposite verdict
+  (e.g. a webtoon fed to the MAGI paged splitter — a real production
+  incident by a small driver agent), naming the correct command;
+  `--force-style` overrides for deliberate mixed-format items.
+- **Commands run from a wrong cwd no longer scatter `library/` trees.**
+  `setup` registers the workspace (`<data>/workspace.json`); workspace
+  resolution now tries `MEDIACONDUCTOR_PROJECT_ROOT` → a cwd containing
+  `config.json` → the registered workspace → a source checkout's own root →
+  cwd. `where --json` reports `workspace_root`, and `download` prints its
+  resolved destination (with a loud warning outside any workspace) before
+  any network work.
+
 ## 2.1.0 — 2026-07-17
 
 ### Fixed

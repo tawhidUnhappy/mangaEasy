@@ -213,6 +213,33 @@ Language-specific forced aligners are not interchangeable. The current
 production contract rejects non-English manifests until an appropriate pinned
 Wav2Vec2 CTC extension is added.
 
+## gemma-4 (Gemma 4 E4B local LLM, text + vision)
+
+Google's Gemma 4 E4B instruct model (Apache-2.0) powering `llm`, `crop-qa`,
+`characters --auto-draft`, `narrate-auto`, and the review gates of
+`manga-auto`:
+
+```bash
+mediaconductor install-tool gemma-4
+mediaconductor llm --prompt "ping"
+```
+
+The installer:
+
+1. Writes a tiny managed env (Pillow only — no Torch; the heavy lifting is
+   native llama.cpp) and copies in the `run_gemma.py` adapter.
+2. Downloads a revision-pinned GGUF snapshot from
+   `ggml-org/gemma-4-E4B-it-GGUF` into `gemma-4/model/` — only the Q4_0
+   weights (~5.4 GB) and the Q8_0 vision projector (~0.6 GB), never the
+   BF16/Q8/mtp variants.
+3. Downloads the pinned llama.cpp release binaries into `gemma-4/llama/`
+   (Vulkan build with a GPU, CPU build otherwise; macOS uses Metal).
+
+Runs on any machine: ~6 GB RAM at 4-bit on CPU, faster with GPU offload.
+Point `MEDIACONDUCTOR_LLAMA_SERVER` at your own `llama-server` to use a
+custom llama.cpp build. See [docs/local-llm.md](local-llm.md) for what the
+assist commands do with it.
+
 ## Manual installs / custom locations
 
 `install-tool` is a convenience, not a requirement. Any folder that contains a
@@ -220,6 +247,7 @@ Wav2Vec2 CTC extension is added.
 
 - managed: `<install folder>/.mangaeasy/tools/<name>`
 - explicit: `ACESTEP_ROOT`, `DEMUCS_ROOT`, `WHISPERX_ROOT`, `KOKORO_ROOT`,
-  `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT`
+  `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT`,
+  `GEMMA_4_ROOT`
 
 Check resolution any time with `mediaconductor tools` or `mediaconductor doctor`.

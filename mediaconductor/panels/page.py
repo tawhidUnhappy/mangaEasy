@@ -174,6 +174,14 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         print(f"[{item}] SKIP: no images in {source_dir}", flush=True)
         return {"item": item, "status": "skipped"}
 
+    if not args.force_style:
+        from mediaconductor.panels.style_detect import style_guard
+
+        ok, guard_message = style_guard(source_dir, "paged")
+        print(f"[{item}] {guard_message}", flush=True)
+        if not ok:
+            return {"item": item, "status": "error", "reason": "style_mismatch"}
+
     item_verify = verify_dir / item
     item_verify.mkdir(parents=True, exist_ok=True)
     detections = run_batch_detect(
@@ -278,6 +286,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--overrides", type=Path, default=None,
                         help="JSON keyed by item -> {page filename: [[x1,y1,x2,y2], ...]} "
                              "that fully replace MAGI's boxes for that page.")
+    parser.add_argument("--force-style", action="store_true",
+                        help="Skip the webtoon-vs-paged pre-flight guard (only for deliberate "
+                             "mixed-format items; wrong-splitter output is never usable).")
     parser.add_argument("--respect-claims", action="store_true",
                         help="Abort (exit 1) if another live agent's workboard claim covers any "
                              "selected item at this stage (see docs/multi-agent.md).")

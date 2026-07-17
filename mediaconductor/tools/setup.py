@@ -37,10 +37,13 @@ from mediaconductor.utils import emit_result
 # Installed on every machine — the pipeline always has a working TTS engine.
 BASE_TOOLS = ["kokoro-82m"]
 # Installed when an NVIDIA GPU is detected (or forced with --all).
-GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"]
+GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo", "gemma-4"]
 
 MODE_TOOLS = {
-    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"],
+    # gemma-4 (the local LLM behind crop-qa / characters / narrate-auto /
+    # manga-auto) is CPU-capable, so manga setups get it even without a GPU.
+    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo",
+                    "gemma-4"],
     "ai-story": ["kokoro-82m", "index-tts", "z-image-turbo"],
     "song-video": ["ace-step", "demucs", "whisperx", "z-image-turbo"],
 }
@@ -132,7 +135,19 @@ def main() -> int:
             print(f"\n[setup] interrupted — re-run `{CLI_NAME} setup` to resume.", file=sys.stderr)
             return 1
 
-    # 3. Readiness report.
+    # 3. Register the workspace so later commands run from any cwd still
+    #    resolve library/audio/output here instead of the caller's directory.
+    from pathlib import Path
+
+    from mediaconductor.config import PROJECT_ROOT, register_workspace
+
+    for workspace_candidate in (Path.cwd(), PROJECT_ROOT):
+        marker = register_workspace(workspace_candidate)
+        if marker is not None:
+            print(f"\nWorkspace registered: {workspace_candidate.resolve()} ({marker})")
+            break
+
+    # 4. Readiness report.
     report = doctor()
     print("\n=== Setup summary ===")
     print(f"  Tools dir : {report['tools_home']}")

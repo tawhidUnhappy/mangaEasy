@@ -116,7 +116,8 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "youtube-thumbnail":    ("mediaconductor.youtube.thumbnail",                    "main",        "YouTube",          "Set/replace a thumbnail through a selected profile (no re-upload needed)."),
 
     # ── External AI tool environments ─────────────────────────────────────────
-    "tools":                ("mediaconductor.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image) resolve."),
+    "tools":                ("mediaconductor.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image/Gemma) resolve."),
+    "llm":                  ("mediaconductor.tools.gemma",                          "main",        "External tools",   "Run the local Gemma 4 LLM (text + images, JSON-schema output) inside its isolated env."),
     "index-tts":            ("mediaconductor.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
     "deepseek-ocr2":        ("mediaconductor.tools.deepseek_ocr2",                  "main",        "External tools",   "Run DeepSeek-OCR 2 and write `ocr` fields into narration JSON files."),
     "zimage":               ("mediaconductor.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
@@ -144,6 +145,10 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "panels-remap":         ("mediaconductor.panels.remap",                         "main",        "Manga: acquire",   "After a re-crop, carry narration + audio from the archived old panels to the new ones."),
     "page-split":           ("mediaconductor.panels.page",                          "main",        "Manga: acquire",   "Split paged manga into panels with MAGI v3 detection and verify sheets."),
     "panel-transcript":     ("mediaconductor.ocr.panel_transcript",                 "main",        "Manga: acquire",   "OCR every panel into <item>/transcript.json (grounds narration + speaker attribution)."),
+    "crop-qa":              ("mediaconductor.assist.crop_qa",                       "main",        "Manga: acquire",   "Review crop verify artifacts with the local Gemma 4 LLM; flags bad cuts and prints the override fixes."),
+    "characters":           ("mediaconductor.assist.characters",                    "main",        "Manga: acquire",   "Create/validate the per-project character registry (characters.json) that grounds narration; --auto-draft uses Gemma."),
+    "narrate-auto":         ("mediaconductor.assist.narrate",                       "main",        "Video pipeline",   "Draft grounded narration.json with the local Gemma 4 LLM from panels + OCR + characters (review required, exit 3)."),
+    "manga-auto":           ("mediaconductor.assist.auto",                          "main",        "Video pipeline",   "One-command manga pipeline: download → style-detect → correct splitter → crop QA → transcript → narration draft; --stage build renders after review."),
 
     # ── Image export & AI context ─────────────────────────────────────────────
     "to-pdf":               ("mediaconductor.images.pdf",                           "main",        "Manga: export",    "Export chapter images to a PDF."),
@@ -166,7 +171,7 @@ def _group_order() -> list[str]:
 
 PRIMARY_COMMANDS = frozenset({
     "modes", "commands", "where", "doctor", "setup", "mcp",
-    "job-start", "job-status", "jobs", "video", "download",
+    "job-start", "job-status", "jobs", "video", "download", "manga-auto",
     "story-init", "story-check", "story-build",
     "song-init", "song-check", "song-build",
 })

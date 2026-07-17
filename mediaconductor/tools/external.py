@@ -19,6 +19,7 @@ TOOL_ENVS = {
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
     "deepseek-ocr2": ("DEEPSEEK_OCR2_ROOT", "DEEPSEEK_OCR2_DIR"),
     "z-image-turbo": ("Z_IMAGE_TURBO_ROOT", "Z_IMAGE_TURBO_DIR"),
+    "gemma-4": ("GEMMA_4_ROOT", "GEMMA_ROOT"),
 }
 
 TOOL_ENV = {tool_name: env_vars[0] for tool_name, env_vars in TOOL_ENVS.items()}
@@ -296,12 +297,18 @@ def where_main() -> int:
                         help="Emit the report as a single JSON object on stdout.")
     args = parser.parse_args()
 
+    from mediaconductor.config import PROJECT_ROOT
+
     info = {
         "version": __version__,
         "platform": sys.platform,
         "frozen": is_frozen(),
         "executable": sys.executable,
         "app_root": str(app_root()),
+        # The workspace every library/audio/output path resolves against.
+        # If this is not where you expect media to land, cd into the real
+        # workspace, set MEDIACONDUCTOR_PROJECT_ROOT, or re-run `setup` there.
+        "workspace_root": str(PROJECT_ROOT),
         "data_home": str(data_home()),
         # Legacy spelling kept so pre-rename scripts reading `where --json`
         # keep resolving the same location.

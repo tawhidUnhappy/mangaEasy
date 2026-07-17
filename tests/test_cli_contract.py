@@ -58,7 +58,7 @@ def test_tools_json(capsys):
     assert "tools_home" in data
     assert set(data["tools"]) == {
         "ace-step", "demucs", "whisperx", "kokoro-82m", "index-tts",
-        "magi-v3", "deepseek-ocr2", "z-image-turbo",
+        "magi-v3", "deepseek-ocr2", "z-image-turbo", "gemma-4",
     }
 
 

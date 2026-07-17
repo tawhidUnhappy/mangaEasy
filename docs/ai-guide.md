@@ -33,6 +33,21 @@ The detailed manga-only operating manual is
 [`manga-video-guide.md`](manga-video-guide.md). Story and song agents must not
 load it.
 
+## Small or text-only driver agents
+
+If you cannot reliably read panel images, or you are a small model driving the
+CLI, use the assist layer ([`local-llm.md`](local-llm.md)): install the local
+Gemma 4 tool (`mediaconductor install-tool gemma-4`) and prefer
+`mediaconductor manga-auto` — it downloads, picks the correct splitter (the
+splitters also refuse a wrong-format run on their own), reviews crops with
+`crop-qa`, drafts the cast registry and grounded narration, and stops at exit
+3 review gates with an explicit checklist. Exit 3 always means "artifacts are
+ready — review the listed sheets", never "done".
+
+Always run `mediaconductor where --json` first and confirm `workspace_root` is
+the workspace you intend to fill: `library/`, `audio/`, `output/`, and `work/`
+are created under it.
+
 ## MCP contract
 
 Register one scoped server and restart it when switching modes:

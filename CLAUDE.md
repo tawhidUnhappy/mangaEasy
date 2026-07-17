@@ -24,6 +24,7 @@ mode's skill.
 | Crop → verify → narrate loop details | [docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md) |
 | Full production recipe + troubleshooting | [docs/recap-video-playbook.md](docs/recap-video-playbook.md) |
 | Several agents on one project / resuming | [docs/multi-agent.md](docs/multi-agent.md) |
+| Local Gemma 4 LLM + assist commands (`manga-auto`, `crop-qa`, `characters`, `narrate-auto`) | [docs/local-llm.md](docs/local-llm.md) |
 | External AI tool envs, installs, YouTube, releases | [docs/external-tools.md](docs/external-tools.md), [docs/install-tools.md](docs/install-tools.md), [docs/youtube.md](docs/youtube.md), [docs/publishing.md](docs/publishing.md) |
 | Why a guard/invariant exists (incident stories) | [docs/history/incidents.md](docs/history/incidents.md) |
 
@@ -37,6 +38,7 @@ Each package has its own README.md with entry points and gotchas.
 | acquire | `download/` | MangaDex fetch (polite, resumable, writes `manga.json`) |
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
+| assist | `assist/` | local-LLM helpers for small driver agents: `crop-qa`, `characters`, `narrate-auto`, `manga-auto` (Gemma 4 via `tools/gemma.py`) |
 | produce | `video_pipeline/` | audio → faded derivatives → render → join → BGM → final normalize |
 | produce | `story/` | AI Story manifest, continuity prompts, visual QA gates, orchestration |
 | produce | `song/` | Song manifest, canonical lyric alignment, subtitle/render orchestration |

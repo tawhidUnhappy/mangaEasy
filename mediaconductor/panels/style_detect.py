@@ -5,6 +5,9 @@ is this series a vertical-strip webtoon (→ ``webtoon-split``) or a paged
 manga (→ ``page-split``)? It measures the raw downloaded page images —
 tall strips (height ≫ width) mean webtoon, page-shaped images mean paged —
 and reports a verdict plus the evidence, machine-readable with ``--json``.
+Page-shaped images that share one width but vary wildly in height are
+recognized as a webtoon pre-sliced into chunks by the host (see
+``_looks_sliced``) — the case that used to misread as "paged".
 
 The verdict is a *recommendation*: an agent should still open the returned
 ``sample_images`` and visually confirm before cropping (some series mix
@@ -30,11 +33,21 @@ _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 WEBTOON_RATIO = 2.0
 # height/width inside this band = a classic manga page (incl. spreads margin).
 PAGE_RATIO_LO, PAGE_RATIO_HI = 1.15, 1.85
+# Sliced-webtoon detection: hosts (MangaDex included) often serve webtoons
+# pre-cut into page-height chunks — page-shaped ratios, so the ratio bands
+# alone misread them as paged manga (a real production incident: the paged
+# splitter ran MAGI over a webtoon). Real page *scans* have near-identical
+# heights; webtoon slices share one width but vary wildly in height because
+# each cut lands wherever the panel flow allowed.
+SLICE_WIDTH_UNIFORM_MIN = 0.9   # fraction of images at the modal width
+SLICE_HEIGHT_CV_MIN = 0.08      # height stdev/mean among modal-width images
+SLICE_MIN_IMAGES = 8            # too few images -> not enough evidence
+PAGED_HEIGHT_CV_MAX = 0.08      # above this, "paged" confidence drops to uncertain
 
 
 def measure_item(source_dir: Path) -> dict | None:
-    """Aspect-ratio stats for one item's raw pages (header reads only)."""
-    ratios: list[float] = []
+    """Dimension stats for one item's raw pages (header reads only)."""
+    sizes: list[tuple[int, int]] = []
     paths = sorted(p for p in source_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
     for path in paths:
         try:
@@ -42,28 +55,49 @@ def measure_item(source_dir: Path) -> dict | None:
                 w, h = im.size
         except Exception:
             continue
-        if w > 0:
-            ratios.append(h / w)
-    if not ratios:
+        if w > 0 and h > 0:
+            sizes.append((w, h))
+    if not sizes:
         return None
+    ratios = [h / w for w, h in sizes]
     tall = sum(1 for r in ratios if r >= WEBTOON_RATIO)
     paged = sum(1 for r in ratios if PAGE_RATIO_LO <= r <= PAGE_RATIO_HI)
     n = len(ratios)
+    widths = [w for w, _ in sizes]
+    modal_width = statistics.mode(widths)
+    modal_heights = [h for w, h in sizes if w == modal_width]
+    height_cv = (
+        statistics.pstdev(modal_heights) / statistics.mean(modal_heights)
+        if len(modal_heights) >= 2 else 0.0
+    )
     samples = [paths[0], paths[n // 2], paths[-1]] if n >= 3 else paths
     return {
         "images": n,
         "median_ratio": round(statistics.median(ratios), 2),
         "tall_fraction": round(tall / n, 2),
         "paged_fraction": round(paged / n, 2),
+        "width_uniform_fraction": round(widths.count(modal_width) / n, 2),
+        "height_cv": round(height_cv, 3),
         "sample_images": [str(p) for p in dict.fromkeys(samples)],
     }
+
+
+def _looks_sliced(stats: dict) -> bool:
+    """Page-shaped chunks that are really a pre-cut vertical strip."""
+    return (
+        stats["images"] >= SLICE_MIN_IMAGES
+        and stats.get("width_uniform_fraction", 0.0) >= SLICE_WIDTH_UNIFORM_MIN
+        and stats.get("height_cv", 0.0) >= SLICE_HEIGHT_CV_MIN
+    )
 
 
 def verdict_from_stats(stats: dict) -> str:
     if stats["median_ratio"] >= WEBTOON_RATIO or stats["tall_fraction"] >= 0.6:
         return "webtoon"
+    if _looks_sliced(stats):
+        return "webtoon"
     if stats["paged_fraction"] >= 0.6:
-        return "paged"
+        return "paged" if stats.get("height_cv", 0.0) < PAGED_HEIGHT_CV_MAX else "uncertain"
     return "uncertain"
 
 
@@ -72,6 +106,41 @@ RECOMMENDED_COMMAND = {
     "paged": "page-split",
     "uncertain": None,
 }
+
+
+def style_guard(source_dir: Path, expected: str) -> tuple[bool, str]:
+    """Pre-flight check the splitters run before cropping an item.
+
+    ``expected`` is the style the invoking command handles ("webtoon" for
+    ``webtoon-split``, "paged" for ``page-split``). Returns ``(ok, message)``:
+    ``ok`` is False only on a confident opposite verdict — running the paged
+    splitter on a vertical strip (or vice versa) never produces usable panels,
+    and in production a small agent burned a full crop+narration pass on
+    exactly that mistake before a human caught it. "uncertain" and unreadable
+    sources stay allowed (the verify sheets catch those), and ``--force-style``
+    on the splitters bypasses the guard for deliberate mixed-format items.
+    """
+    opposite = {"webtoon": "paged", "paged": "webtoon"}[expected]
+    stats = measure_item(source_dir)
+    if stats is None:
+        return True, "style guard: no readable pages to measure"
+    verdict = verdict_from_stats(stats)
+    detail = (f"median h/w {stats['median_ratio']}, tall {stats['tall_fraction']:.0%}, "
+              f"paged {stats['paged_fraction']:.0%}, height-cv {stats['height_cv']} "
+              f"over {stats['images']} image(s)")
+    if verdict == opposite:
+        return False, (
+            f"style guard: these pages measure as {opposite.upper()} ({detail}). "
+            f"Use `{CLI_NAME} {RECOMMENDED_COMMAND[opposite]}` instead, or pass "
+            f"--force-style if this specific item really is {expected}. "
+            f"Confirm visually: {', '.join(stats['sample_images'])}"
+        )
+    if verdict == "uncertain":
+        return True, (
+            f"style guard: uncertain format ({detail}) — proceeding, but visually "
+            f"confirm the verify sheets extra carefully: {', '.join(stats['sample_images'])}"
+        )
+    return True, f"style guard: confirmed {verdict} ({detail})"
 
 
 def main() -> int:

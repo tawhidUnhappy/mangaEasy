@@ -83,6 +83,10 @@ _PATH_ARGUMENTS: dict[str, frozenset[str]] = {
     "panel_transcript": frozenset({"project_root"}),
     "narration_edit": frozenset({"project_root"}),
     "narration_review_sheets": frozenset({"project_root", "work_dir", "output_root"}),
+    "crop_qa": frozenset({"project_root", "work_dir"}),
+    "characters": frozenset({"project_root", "work_dir"}),
+    "narrate_auto": frozenset({"project_root", "work_dir"}),
+    "manga_auto": frozenset({"project_root", "work_dir", "audio_root", "output_root"}),
     "thumbnail_compose": frozenset({"base", "output", "spec_json"}),
     "series_plan": frozenset({"project_root"}),
     "series_mark_published": frozenset({"project_root"}),
@@ -127,6 +131,7 @@ _RELATIVE_PATH_ARGUMENTS: dict[str, frozenset[str]] = {
 
 _PORTABLE_SEGMENT_ARGUMENTS: dict[str, frozenset[str]] = {
     "download": frozenset({"name"}),
+    "manga_auto": frozenset({"name"}),
     "video_check": frozenset({"project_name"}),
     "video_validate": frozenset({"project_name"}),
     "audio_audit": frozenset({"project_name"}),

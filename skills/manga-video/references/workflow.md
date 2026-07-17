@@ -57,9 +57,19 @@ and `webtoon-cutcheck`. The default is `download`.
    # For paged manga, use page-split with the same roots and --source-subdir.
    ```
 
+   Both splitters re-check the format per item and refuse a confident
+   mismatch (webtoon pages into `page-split` or vice versa), naming the
+   correct command; `--force-style` overrides only for deliberate
+   mixed-format items.
+
 4. Inspect every returned verification sheet at full readable resolution.
    Apply `webtoon-override` fixes and repeat the split until every crop is
    approved. Never infer approval only from a command's exit code.
+
+   With the `gemma-4` tool installed, `crop-qa` performs a first automated
+   pass over every flagged location and prints the exact override command per
+   FIX verdict (exit 3 = fixes proposed; loop split → crop-qa until 0). It
+   supplements — never replaces — reading the sheets yourself.
 
 5. Optionally OCR the panels before writing narration. The narrating agent
    reads bubble text from the panel images themselves; `panel-transcript` adds
@@ -75,7 +85,12 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> job-status <job-id> --json
    ```
 
-6. Read [narration.md](narration.md). Write one grounded
+6. Maintain the cast registry so speaker attribution stays consistent across
+   chapters — `<project-root>/characters.json` via `<mc> characters`
+   (`--auto-draft` drafts it with the local Gemma 4 model; review the names
+   and set `draft: false`). Use exactly these names in narration.
+
+7. Read [narration.md](narration.md). Write one grounded
    `<chapter>/narration.json`, structurally check it, render semantic review
    sheets, and inspect every sheet:
 
@@ -87,7 +102,12 @@ and `webtoon-cutcheck`. The default is `download`.
    Fix incorrect panel descriptions, dialogue, speaker attribution, and spoken
    phrasing; rerun both checks after every edit.
 
-7. Build using explicit roots. This complete foreground form is useful only
+   If you cannot read panel images yourself, `<mc> narrate-auto` drafts the
+   narration with the local Gemma 4 model from panels + OCR + the registry
+   and then runs both checks; its exit 3 still requires this same review of
+   every sheet before TTS.
+
+8. Build using explicit roots. This complete foreground form is useful only
    when the harness can keep a long task alive:
 
    ```bash
@@ -113,7 +133,7 @@ and `webtoon-cutcheck`. The default is `download`.
    → one final two-pass whole-mix normalize to −14 LUFS / −1.5 dBTP. Any music
    change invalidates final normalization.
 
-8. Loop QA until clean, then validate the joined video:
+9. Loop QA until clean, then validate the joined video:
 
    ```bash
    <mc> work-qa --project-root D:/MediaProjects/library/example --audio-root D:/MediaProjects/audio --output-root D:/MediaProjects/output --items 01 --json
@@ -126,7 +146,7 @@ and `webtoon-cutcheck`. The default is `download`.
    and measure the final complete mix at approximately −14 LUFS with true peak
    no higher than −1.5 dBTP.
 
-9. Create and visually inspect a thumbnail. Confirm source, music, voice, and
+10. Create and visually inspect a thumbnail. Confirm source, music, voice, and
    upload rights. Only on an explicit publish request, list profiles, verify
    the intended channel with `youtube-status --profile <name> --verify --json`,
    pass the same `--profile <name>` to the upload, and record the returned

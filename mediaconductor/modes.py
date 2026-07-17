@@ -57,6 +57,7 @@ MANGA_COMMANDS = frozenset({
     "index-tts", "deepseek-ocr2", "zimage", "download", "style-detect",
     "gutter-split", "webtoon-split", "webtoon-cutcheck",
     "webtoon-override", "panels-remap", "page-split", "panel-transcript",
+    "llm", "crop-qa", "characters", "narrate-auto", "manga-auto",
     "to-pdf", "to-pdf-lossless", "convert-images", "thumbnail-compose",
     "watermark", "ai-zip",
 })
@@ -69,6 +70,7 @@ MANGA_TOOLS = frozenset({
     "run_full_pipeline",
     "video_validate", "work_status", "work_claim", "work_note", "work_qa",
     "work_artifacts", "generate_image",
+    "crop_qa", "characters", "narrate_auto", "manga_auto",
 })
 
 STORY_COMMANDS = frozenset({"story-init", "story-check", "story-build"})
@@ -88,7 +90,8 @@ MODES: dict[str, ModeSpec] = {
         commands=COMMON_COMMANDS | PUBLISH_COMMANDS | MANGA_COMMANDS,
         tools=COMMON_TOOLS | PUBLISH_TOOLS | MANGA_TOOLS,
         required_external_tools=("kokoro-82m",),
-        optional_external_tools=("index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"),
+        optional_external_tools=("index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo",
+                                 "gemma-4"),
     ),
     "ai-story": ModeSpec(
         key="ai-story",
