@@ -52,6 +52,12 @@ def _windowless(kwargs: dict) -> dict:
     DETACHED_PROCESS and CREATE_NEW_CONSOLE each dictate their own console
     disposition; Windows ignores (or rejects) CREATE_NO_WINDOW combined with
     them, so an explicit choice by the caller is left untouched.
+
+    Caution for callers choosing DETACHED_PROCESS: never use it to spawn a
+    venv `python.exe` or console-script shim — those launchers respawn the
+    real binary as a child, and that console-less child allocates a brand-new
+    console that Windows 11 shows as a visible blank terminal. Detach with
+    CREATE_NO_WINDOW (own hidden console) instead; see jobs.py.
     """
     if sys.platform != "win32":
         return kwargs

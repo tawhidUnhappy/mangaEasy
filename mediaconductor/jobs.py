@@ -140,9 +140,22 @@ def _pid_alive(pid: int | None) -> bool:
 
 
 def _detached_popen_kwargs() -> dict:
-    """Survive the parent's death: new session (POSIX) / detached process (Windows)."""
+    """Survive the parent's death: new session (POSIX) / own hidden console (Windows).
+
+    Windows deliberately uses CREATE_NO_WINDOW, NOT DETACHED_PROCESS: the
+    supervisor argv is the venv `python.exe`, a launcher shim that respawns
+    the base interpreter as a *child*. Under DETACHED_PROCESS the shim has no
+    console, so that respawned child allocates a fresh one — which Windows 11
+    (default terminal = Windows Terminal) shows as a visible blank terminal
+    for the whole job ("blank terminal keeps popping up", reproduced 2026-07-18).
+    CREATE_NO_WINDOW gives the supervisor its OWN invisible console instead:
+    the venv respawn and every job child inherit it (nothing pops), and
+    because it is not the parent's console, closing the launching terminal
+    still doesn't signal the job — the same detachment DETACHED_PROCESS
+    provided. CREATE_NEW_PROCESS_GROUP keeps Ctrl+C isolation either way.
+    """
     if sys.platform == "win32":
-        return {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP}
+        return {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
     return {"start_new_session": True}
 
 

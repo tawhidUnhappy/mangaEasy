@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.2.1 — 2026-07-18
+
+### Fixed
+
+- **Blank terminal windows stopped popping up — for real this time.** 2.1.0
+  hardened every `subprocess` spawn, but two paths remained and were
+  reproduced with a window-watching probe:
+  - Detached background jobs used `DETACHED_PROCESS`, and the supervisor argv
+    is the venv `python.exe` — a launcher shim that respawns the base
+    interpreter as a child. Console-less shim → the respawn allocates a fresh
+    console → Windows 11 (default terminal = Windows Terminal) shows it as a
+    visible blank terminal for the whole job. Jobs now detach with their own
+    hidden console (`CREATE_NO_WINDOW` + `CREATE_NEW_PROCESS_GROUP`), which
+    the venv respawn and all job children inherit: same parent-death
+    survival, no window. Regression-tested.
+  - `install-tool`'s winpty PTY allocates a console for its agent, which can
+    also surface as a visible terminal. Pipe mode (windowless, same log
+    lines) is now the default; set `MEDIACONDUCTOR_INSTALL_PTY=1` to opt back
+    into PTY progress rendering.
+- `install-tool` skipped the model download entirely for tools that declare
+  their snapshot only via `extra_models` (gemma-4 shipped without weights).
+
 ## 2.2.0 — 2026-07-17
 
 ### Added

@@ -164,3 +164,39 @@ def test_state_save_retries_transient_windows_replace_race(tmp_path, monkeypatch
     assert json.loads(state_file.read_text(encoding="utf-8"))["status"] == "succeeded"
     assert attempts == 3
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_detached_supervisor_never_uses_detached_process_on_windows():
+    """DETACHED_PROCESS + the venv python launcher pops a visible Windows
+    Terminal: the console-less shim respawns the base interpreter, which
+    allocates a brand-new (visible) console. Detachment must come from an own
+    hidden console (CREATE_NO_WINDOW) instead — reproduced 2026-07-18."""
+    from mediaconductor.jobs import _detached_popen_kwargs
+
+    kwargs = _detached_popen_kwargs()
+    if sys.platform == "win32":
+        flags = kwargs["creationflags"]
+        assert flags & subprocess.CREATE_NO_WINDOW
+        assert not flags & subprocess.DETACHED_PROCESS
+        assert flags & subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        assert kwargs == {"start_new_session": True}
+
+
+def test_install_run_defaults_to_pipe_not_pty(monkeypatch):
+    """The winpty install PTY allocates a console that Windows 11 shows as a
+    blank terminal window; it must stay opt-in (MEDIACONDUCTOR_INSTALL_PTY)."""
+    from mediaconductor.tools import install
+
+    monkeypatch.delenv("MEDIACONDUCTOR_INSTALL_PTY", raising=False)
+    calls = []
+    monkeypatch.setattr(install, "_run_pipe", lambda *a, **k: calls.append("pipe"))
+    monkeypatch.setattr(install, "_run_pty_win32",
+                        lambda *a, **k: calls.append("pty"))
+    install._run(["echo", "hi"], lambda *_: None, env={})
+    assert calls == ["pipe"]
+
+    monkeypatch.setenv("MEDIACONDUCTOR_INSTALL_PTY", "1")
+    calls.clear()
+    install._run(["echo", "hi"], lambda *_: None, env={})
+    assert calls == (["pty"] if sys.platform == "win32" else ["pipe"])

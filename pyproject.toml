@@ -1,6 +1,6 @@
 [project]
 name = "media-conductor"
-version = "2.2.0"
+version = "2.2.1"
 description = "Agent-native manga video, AI story, and song video production with isolated AI tools"
 readme = "README.md"
 requires-python = ">=3.10"

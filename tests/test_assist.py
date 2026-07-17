@@ -132,6 +132,23 @@ def test_gemma_toolspec_pins_weights_and_vision_projector():
     assert spec.adapter == "run_gemma.py"
 
 
+def test_managed_env_install_downloads_extra_models_only_specs(tmp_path, monkeypatch):
+    """gemma-4 declares its snapshot via extra_models with model_repo=None; the
+    managed-env installer used to gate the download on model_repo alone and
+    shipped the tool with no weights at all (found on the first real install)."""
+    from mediaconductor.tools import install
+
+    downloaded: list[str] = []
+    monkeypatch.setattr(install, "_require", lambda *args, **kwargs: None)
+    monkeypatch.setattr(install, "_run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(install, "_download_model",
+                        lambda spec, dest, log: downloaded.append(spec.key))
+    install._install_managed_env(install.TOOLS["gemma-4"], tmp_path, "cpu",
+                                 clone=False, ref=None, skip_model=False,
+                                 log=lambda *_: None)
+    assert downloaded == ["gemma-4"]
+
+
 def test_llama_release_asset_covers_supported_platforms():
     assert llama_release_asset("windows", "x64", gpu=True).endswith("win-vulkan-x64.zip")
     assert llama_release_asset("windows", "x64", gpu=False).endswith("win-cpu-x64.zip")

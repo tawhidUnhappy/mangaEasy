@@ -467,6 +467,27 @@ def _run_pipe(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | N
         raise InstallError(f"command failed (exit {code}): {' '.join(cmd)}")
 
 
+def _pty_opt_in() -> bool:
+    """True when the user explicitly asked for the winpty install PTY.
+
+    The PTY used to be the Windows default for nicer line-flushed progress
+    output, but winpty's agent always allocates a brand-new console, and on
+    Windows 11 (default terminal = Windows Terminal) that console ignores the
+    hidden-window request and appears as a visible blank terminal for the
+    whole duration of every install step — the "blank terminal keeps popping
+    up" bug, reproduced even after all subprocess spawns went through
+    runtime.run/popen (winpty spawning is not `subprocess`, so the 2.1.0 fix
+    never covered it). Pipe mode logs the same lines with no window, so it is
+    now the default everywhere; set MEDIACONDUCTOR_INSTALL_PTY=1 to opt back
+    into the PTY in a terminal where the popups don't bother you.
+    """
+    import os
+
+    return os.environ.get("MEDIACONDUCTOR_INSTALL_PTY", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
 def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
     # Every install-tool subprocess (git clone, uv sync, hf download, …) runs
     # under tool_env() by default so its caches (UV_CACHE_DIR, HF_HOME, …)
@@ -476,10 +497,7 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
     if env is None:
         env = tool_env()
     log(f"$ {' '.join(str(c) for c in cmd)}")
-    # On Windows use a ConPTY (pywinpty) so child processes see a real terminal
-    # and flush output line-by-line.  Falls back to a regular pipe if pywinpty
-    # is not installed yet (first run before the dep is available).
-    if sys.platform == "win32":
+    if sys.platform == "win32" and _pty_opt_in():
         try:
             _run_pty_win32(cmd, log, cwd=cwd, env=env)
             return
@@ -844,7 +862,7 @@ def _install_managed_env(
         ], log, cwd=dest, env=env)
     if spec.verify_import:
         _verify_tool_python(dest, spec.verify_import, log)
-    if spec.model_repo:
+    if spec.model_repo or spec.extra_models:
         if skip_model:
             if spec.key == "demucs":
                 if _required_model_files_present(spec, dest):
