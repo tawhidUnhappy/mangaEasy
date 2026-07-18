@@ -13,7 +13,9 @@ cut and short panel recorded in the ranges manifest (same geometry as
 figure or speech bubble / is the short panel a fragment of its neighbour?
 
 Paged items: reviews every page overlay (numbered MAGI boxes) for missed,
-merged, or misordered panels.
+merged, or misordered panels, incomplete crops that cut off panel art, and
+boxes inflated by gutter whitespace that would render as an unreadably
+narrow sliver once fit to the 16:9 video frame.
 
 Verdicts land in ``<work-dir>/crop_qa/<project>/<item>_report.json``. Exit 3
 means fixes are proposed — apply them (``webtoon-override`` + re-split, or a
@@ -65,9 +67,17 @@ _PAGE_SYSTEM = (
     "You are a manga page-segmentation reviewer. The image is a manga page with "
     "numbered red boxes marking detected panels in reading order. Verdict 'fix' "
     "when panels are missing a box, one box merges multiple distinct panels, a "
-    "box cuts through a panel, or the numbering order clearly contradicts the "
-    "reading order. Verdict 'ok' otherwise; a single box covering a full splash "
-    "page, chapter title, or credits page is normal and 'ok'. "
+    "box cuts through a panel (does not fully contain it — a missing edge or "
+    "corner of the art), or the numbering order clearly contradicts the "
+    "reading order. Also verdict 'fix' when a box is far taller than it is "
+    "wide because it swallowed blank gutter above or below the panel instead "
+    "of hugging the art — say so and note it should be tightened to the "
+    "panel's actual content: the rendered video frame is 16:9 landscape, so a "
+    "needlessly tall crop shrinks to an unreadable sliver once fit to it (a "
+    "squarish, 1:1-ish crop is fine; only flag real excess gutter, not a "
+    "panel that is genuinely that tall, like a full-body action shot). "
+    "Verdict 'ok' otherwise; a single box covering a full splash page, "
+    "chapter title, or credits page is normal and 'ok'. "
     "Respond with JSON only."
 )
 

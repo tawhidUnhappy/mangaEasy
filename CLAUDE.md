@@ -129,9 +129,10 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **`amix=…:normalize=0` and `alimiter=level=disabled`** in
   `build_mix_filter()` — each silently undid the −14 LUFS target once;
   test-guarded in `test_music_bed.py`.
-- **dB-native volume flags only** (`--music-volume-db`, default −26 — a true
+- **dB-native volume flags only** (`--music-volume-db`, default −28 — a true
   LU separation now that the bed is loudness-aligned to the measured
-  narration first; keep new defaults within −20…−28). Never a linear
+  narration first; −28 keeps the bed comfortable over a long watch instead of
+  fatiguing the listener, keep new defaults within −20…−32). Never a linear
   multiplier.
 - **`cudnn.benchmark` stays False** in `kokoro_batch_worker.py`;
   `--gpu-workers` is clamped to 4 by `clamp_gpu_workers()`.

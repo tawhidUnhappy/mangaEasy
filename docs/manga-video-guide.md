@@ -158,7 +158,7 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
-  `--music-volume-db -26`. The value is how far the music sits *below the
+  `--music-volume-db -28`. The value is how far the music sits *below the
   measured narration loudness* after the configured narration gain. The music
   stem is aligned to that reference before the offset (disable with
   `--no-music-loudnorm`), so the number is a true LU separation regardless
@@ -167,9 +167,11 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   last gain affects voice and music together and preserves their separation.
   Any BGM change invalidates final normalization. For narration-driven
   recap videos (dense, wall-to-wall narration) the tuned value is
-  **−26 (the default)**; sparser voiceover sits at −20 to −22;
-  below −28 the bed is inaudible on phone speakers, above −15 it masks the
-  voice. `video-add-bgm` also, by default, compresses the bed's own dynamic
+  **−28 (the default)** — chosen so the bed stays comfortable over a full
+  long-form watch instead of fatiguing the listener; a punchier or sparser
+  edit can sit at −26 to −22; below −32 the bed risks becoming inaudible on
+  phone speakers, above −15 it masks the voice. `video-add-bgm` also, by
+  default, compresses the bed's own dynamic
   range so it sits at a consistent level (not swelling on its own), carves
   the 2–5 kHz vocal band, and sidechain-ducks the music under the voice —
   the pro voiceover chain. Opt out per-stage with `--no-condition-bed`,
@@ -344,7 +346,7 @@ uv --project D:/MediaConductor run mediaconductor video-render --project-root "$
 uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" \
     --work-dir "$WORK" --item-range 01-12 --tts indextts \
     --build-long-video --normalize-audio \
-    --background-music /abs/path/music.mp3 --music-volume-db -26
+    --background-music /abs/path/music.mp3 --music-volume-db -28
 ```
 
 ### Re-mix only the background music (cheap — no re-render/re-join)
@@ -352,7 +354,7 @@ uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" -
 ```bash
 uv --project D:/MediaConductor run mediaconductor video-add-bgm --project-root "$PROJ" --output-root "$OUT" \
     --input /abs/path/joined.mp4 --output /abs/path/remixed.mp4 \
-    --background-music /abs/path/other.mp3 --music-volume-db -26
+    --background-music /abs/path/other.mp3 --music-volume-db -28
 uv --project D:/MediaConductor run mediaconductor video-normalize-audio \
     --input /abs/path/remixed.mp4 --replace --target-i -14 --target-tp -1.5
 # Pass both paths explicitly: standalone *_bgm_* outputs are not implicit join

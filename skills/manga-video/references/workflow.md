@@ -66,10 +66,21 @@ and `webtoon-cutcheck`. The default is `download`.
    Apply `webtoon-override` fixes and repeat the split until every crop is
    approved. Never infer approval only from a command's exit code.
 
+   A crop must fully contain its panel — never a partial edge, and never the
+   whole page standing in when the panel has its own border. Frame for the
+   16:9 landscape video frame the crop will be composited into: a squarish
+   (1:1-ish) crop reads fine, but a box far taller than it is wide usually
+   swallowed blank gutter above/below the art rather than hugging it, and
+   shrinks to an unreadable sliver once fit to 16:9. `page-split` reports
+   these as `tall_panel_boxes`; check each against its overlay and, when the
+   excess really is gutter, tighten it with `--overrides` (leave it alone
+   when the panel is genuinely that tall, e.g. a full-body action shot).
+
    With the `gemma-4` tool installed, `crop-qa` performs a first automated
-   pass over every flagged location and prints the exact override command per
-   FIX verdict (exit 3 = fixes proposed; loop split → crop-qa until 0). It
-   supplements — never replaces — reading the sheets yourself.
+   pass over every flagged location — including these framing checks — and
+   prints the exact override command per FIX verdict (exit 3 = fixes
+   proposed; loop split → crop-qa until 0). It supplements — never replaces —
+   reading the sheets yourself.
 
 5. Optionally OCR the panels before writing narration. The narrating agent
    reads bubble text from the panel images themselves; `panel-transcript` adds

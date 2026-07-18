@@ -209,7 +209,8 @@ mediaconductor video --project-root library/<Project> --audio-root audio \
 `--tts auto` uses IndexTTS (voice cloning) when an NVIDIA GPU + model +
 speaker WAV are available, otherwise Kokoro. Music is mixed low under the
 narration by design — conditioned, loudness-aligned, side-chain ducked at
-`--music-volume-db` −26 dB default (keep within −20…−28; narration is
+`--music-volume-db` −28 dB default, tuned to stay comfortable over a long
+watch (keep within −20…−32; narration is
 normalized to −14 LUFS first). **Rebuilding after any panel/narration/audio
 change: pass `--overwrite-video`** (stale item videos are also mtime-detected
 now, but be explicit — a silent skip once shipped six outdated chapters).

@@ -10,7 +10,10 @@ from mediaconductor.config import PROJECT_ROOT, SYSTEM_CONFIG_FILE
 DEFAULT_BACKGROUND_MUSIC = Path("media/background-music.wav")
 DEFAULT_BACKGROUND_MUSIC_DIR = Path("bgm")
 DEFAULT_SPEAKER_WAV = Path("media/speaker-reference.wav")
-DEFAULT_MUSIC_VOLUME_DB = -26.0
+# -28 keeps the bed comfortably in the background for long-form recap
+# watching (previously -26, which read as loud/fatiguing over a full video).
+# -26 to -22 suits punchier or sparser edits that want the bed to read more.
+DEFAULT_MUSIC_VOLUME_DB = -28.0
 DEFAULT_NARRATION_VOLUME = 1.2
 DEFAULT_TTS_ENGINE = "auto"
 DEFAULT_MANGA_VIDEO_AUDIO_SOURCE = "faded"

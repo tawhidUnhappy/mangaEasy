@@ -28,6 +28,16 @@ Suspect pages (always eyeball these against the overlay before narration):
   * a page where MAGI found no panels -> the whole page is used as one crop
   * a page whose single box covers most of the sheet -> likely a missed split
 
+Every crop must fully contain its panel — never a partial edge, never the
+whole page standing in for a panel that has its own border. A box far taller
+than it is wide (>= TALL_PANEL_ASPECT_RATIO, reported as `tall_panel_boxes`)
+usually swallowed gutter whitespace above/below the art instead of hugging
+it; check it against the overlay and, if so, tighten it with --overrides —
+the final video frame is 16:9 landscape, so a needlessly tall crop just
+shrinks to a narrow sliver once fit to it. A squarish (1:1) crop is fine;
+only trim when the excess is gutter, not when the panel is genuinely that
+tall (e.g. a full-body action shot).
+
 Fix a bad page with --overrides: a JSON file keyed by the page's filename whose
 value is a list of [x1, y1, x2, y2] pixel boxes that fully replace MAGI's boxes
 for that page, e.g. {"01_09.jpg": [[0, 0, 900, 700], [0, 700, 900, 1400]]}.
@@ -60,6 +70,16 @@ Box = Dict[str, int]
 # A single detected box covering at least this fraction of the page area is
 # almost always MAGI returning the whole page instead of splitting it.
 FULL_PAGE_AREA_FRAC = 0.85
+
+# height/width past this usually means the box swallowed gutter whitespace
+# above/below the actual panel art rather than hugging it. The final video
+# frame is 16:9 landscape; a needlessly tall crop just shrinks to a narrow
+# sliver in the middle of it once fit to that frame — a square (1:1) crop
+# still reads fine, this only flags crops well past that. Informational, not
+# a suspect: many panels are legitimately tall (a full-body action shot), so
+# this is a hint for the crop reviewer (crop-qa / a human) to check whether
+# the excess is trimmable gutter, not an automatic failure.
+TALL_PANEL_ASPECT_RATIO = 2.2
 
 # Where the shipped batch-detect adapter lives inside the package (fallback if
 # it was not copied into the tool env, e.g. an env installed before it shipped).
@@ -201,6 +221,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     crops: List[Tuple[int, Image.Image]] = []
     suspects: List[str] = []
     full_page_boxes: List[str] = []
+    tall_panel_boxes: List[str] = []
     total_panels = 0
     crop_index = 0
     for page_no, page_path in enumerate(paths, 1):
@@ -230,6 +251,12 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
             crops.append((crop_index, crop))
             total_panels += 1
 
+            if override is None:
+                width, height = b["x2"] - b["x1"], b["y2"] - b["y1"]
+                if width > 0 and height / width >= TALL_PANEL_ASPECT_RATIO:
+                    tall_panel_boxes.append(
+                        f"{page_path.name}#{panel_no} tall-crop ({height / width:.1f}:1)")
+
         write_page_overlay(img, boxes, item_verify / f"{item}_page_{page_no:03d}.png")
 
     write_contact_sheets(item, crops, item_verify)
@@ -238,6 +265,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         f"[{item}] pages={len(paths)} panels={total_panels} "
         f"suspects={suspects if suspects else 'none'}"
         + (f" full_page_boxes={len(full_page_boxes)}" if full_page_boxes else "")
+        + (f" tall_panel_boxes={len(tall_panel_boxes)}" if tall_panel_boxes else "")
         + (f" archived_previous={archived}" if archived else ""),
         flush=True,
     )
@@ -250,6 +278,13 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         # Single-box full pages (splash art / titles / credits) — expected,
         # listed for completeness; the verify sheets confirm at a glance.
         "full_page_boxes": full_page_boxes,
+        # Crops far taller than wide (>= TALL_PANEL_ASPECT_RATIO) — often a
+        # box that swallowed gutter above/below the panel art instead of
+        # hugging it. Check against the page overlay: if it's gutter, trim it
+        # with --overrides so the crop reads well once fit to the 16:9 video
+        # frame; if the panel genuinely is that tall (a full-body action
+        # shot), leave it.
+        "tall_panel_boxes": tall_panel_boxes,
         # The exact images an agent must open to clear the flags above.
         "verify_images": sorted(str(p) for p in item_verify.glob(f"{item}_*.png")),
     }

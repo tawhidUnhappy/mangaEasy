@@ -29,7 +29,7 @@ import json
 import sys
 from pathlib import Path
 
-from mediaconductor.audio.emotion import emotion_lint
+from mediaconductor.audio.emotion import emotion_lint, narration_delivery_lint
 from mediaconductor.brand import CLI_NAME
 from mediaconductor.video_pipeline.check_items import is_speakable
 from mediaconductor.video_pipeline.common import (
@@ -123,6 +123,11 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             add("error", "narration:emotion", f"{image}: {lint}",
                 f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
                 f"--set-json '[{{\"image\": \"{image}\", ...}}]'  (fix or drop the emotion field)")
+        delivery = narration_delivery_lint(text)
+        if delivery:
+            add("info", "narration:delivery", f"{image}: {delivery}",
+                f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
+                f"--set {image} \"<rewritten line>\" --prune-audio")
 
     # 4. Audio coverage + integrity (cheap size gate; deep decode check is
     #    video-audio-audit).

@@ -1,7 +1,7 @@
 """Unit tests for the deterministic parts of `page-split` (no MAGI/GPU needed)."""
 
 from mediaconductor.panels.ai import _manga_reading_order
-from mediaconductor.panels.page import FULL_PAGE_AREA_FRAC, boxes_for_page
+from mediaconductor.panels.page import FULL_PAGE_AREA_FRAC, TALL_PANEL_ASPECT_RATIO, boxes_for_page
 
 
 def test_boxes_for_page_uses_detection_panels():
@@ -34,6 +34,14 @@ def test_override_replaces_detection_and_clamps():
 
 def test_full_page_area_fraction_is_a_sane_threshold():
     assert 0.5 < FULL_PAGE_AREA_FRAC < 1.0
+
+
+def test_tall_panel_aspect_ratio_permits_square_but_flags_far_taller():
+    # A 1:1 crop must not trip the threshold; only meaningfully taller ones should.
+    assert TALL_PANEL_ASPECT_RATIO > 1.0
+    square_ok = 1.0 < TALL_PANEL_ASPECT_RATIO
+    very_tall_flagged = 4.0 >= TALL_PANEL_ASPECT_RATIO
+    assert square_ok and very_tall_flagged
 
 
 def test_reading_order_direction_flips_row_order():

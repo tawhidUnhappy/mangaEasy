@@ -1,5 +1,41 @@
 # Changelog
 
+## 2.2.2 — 2026-07-18
+
+### Changed
+
+- **Background music default lowered −26 → −28 dB.** −26 read as loud and
+  fatiguing over a full long-form recap watch; −28 keeps the bed felt but
+  comfortable in the background (a punchier or sparser edit can move back up
+  to −26…−22). Updated `defaults.py`, both `config.system*.json` templates,
+  every `--music-volume-db` help string, and the stray `-25.0` dataclass
+  fallback in `long_video_builder.py` that had drifted from the real default.
+
+### Added
+
+- **TTS delivery rules, enforced by `work-qa`.** IndexTTS2 renders
+  scream/shout-intensity `emotion` words ("screaming", "shouting", "yelling",
+  "shrieking"...) as actual screaming far more often than not — annoying and
+  usually not even the right read of the panel. `emotion_lint` now rejects
+  those words outright (a calmer synonym like `"tense"`/`"fearful"` still
+  conveys the moment). A new `narration_delivery_lint` flags narration text
+  that spells out a laugh or scream phonetically ("ha ha ha", "gyahahaha",
+  "aaaargh") instead of describing it in prose ("she laughed") — TTS
+  mispronounces or shouts spelled-out SFX since it isn't a real word, but
+  handles real interjections ("hmm", "even though...") fine. Both rules are
+  documented in `narration.md` and baked into `narrate-auto`'s drafting
+  prompt so auto-drafted narration follows them from the start.
+- **Strict panel-crop framing rule for `page-split`/`crop-qa`.** A crop must
+  fully contain its panel — never a partial edge, never the whole page
+  standing in for a panel with its own border. Boxes far taller than wide
+  (`>= TALL_PANEL_ASPECT_RATIO`, reported as `tall_panel_boxes`) usually
+  swallowed gutter whitespace instead of hugging the art; the rendered video
+  frame is 16:9 landscape, so a needlessly tall crop just shrinks to an
+  unreadable sliver once fit to it (1:1-ish crops are fine — this only flags
+  real excess gutter, not a panel that is genuinely that tall). `crop-qa`'s
+  Gemma-vision page reviewer now checks for this and for incomplete crops
+  before proposing an `--overrides` fix.
+
 ## 2.2.1 — 2026-07-18
 
 ### Fixed

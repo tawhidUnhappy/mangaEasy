@@ -70,7 +70,8 @@ near −14 LUFS with true peak no higher than −1.5 dBTP.
   applies it itself. Standalone `video-add-bgm` defaults to unity because its
   joined input already owns the configured gain.
 - Music mix uses `amix=…:normalize=0` and `alimiter=level=disabled`; BGM volume
-  is **dB-native** (`--music-volume-db`, default −26). Mix music before one
+  is **dB-native** (`--music-volume-db`, default −28 — tuned to stay
+  comfortable over a long watch). Mix music before one
   final two-pass whole-mix normalize at −14 LUFS / −1.5 dBTP. The normalizer
   reserves 0.8 dB of pre-codec peak headroom because AAC reconstruction can
   overshoot the filter target. See

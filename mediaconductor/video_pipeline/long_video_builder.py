@@ -42,7 +42,7 @@ class LongVideoConfig:
     audio_root: Path | None = None
     narration_dir: Path | None = None
     background_music: Path | None = None
-    music_volume_db: float = -25.0
+    music_volume_db: float = -28.0
     narration_volume: float = 1.0
     # Off by default: a missing item video is normally a failed render and
     # must stop the build. Turn on only when a chapter genuinely does not

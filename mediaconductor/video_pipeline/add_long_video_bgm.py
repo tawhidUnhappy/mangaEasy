@@ -53,9 +53,10 @@ def parse_args() -> argparse.Namespace:
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-aligned to the joined narration first (see "
                              "--no-music-loudnorm), so this value is a true LU separation regardless of how hot "
-                             "the source track was mastered. Default -26 is the recommendation for dense, "
-                             "wall-to-wall narration (recaps); -20 to -22 suits sparser voiceover, -28 is the "
-                             "'inaudible on phone speakers' floor.")
+                             "the source track was mastered. Default -28 keeps the bed comfortable for long "
+                             "dense, wall-to-wall recap narration without fatiguing the listener; -26 to -22 "
+                             "suits punchier or sparser edits that want the bed to read more; below -32 the "
+                             "music risks becoming inaudible on phone speakers.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Skip measuring both stems and aligning music to narration before applying "
                              "--music-volume-db. With this flag the offset is applied "

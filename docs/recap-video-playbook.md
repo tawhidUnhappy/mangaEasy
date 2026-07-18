@@ -426,13 +426,13 @@ mediaconductor video --project-root library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -26
+  --background-music "<path to music>" --music-volume-db -28
 
 # Kokoro fallback (fast, ~4x parallel on an RTX 3060 — do not exceed 4 gpu-workers):
 mediaconductor video --project-root library/<Project> --items 01 \
   --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -26
+  --background-music "<path to music>" --music-volume-db -28
 ```
 
 - Use the **default audio/output roots** (don't pass `--audio-root
@@ -443,18 +443,21 @@ mediaconductor video --project-root library/<Project> --items 01 \
   and fade-out before rendering. Raw IndexTTS/Kokoro WAVs in `audio/` stay
   untouched. `--audio-source raw` is for an intentional diagnostic comparison,
   not a normal production render.
-- `--music-volume-db -26` (the default) is the tuned recap-channel value
+- `--music-volume-db -28` (the default) is the tuned recap-channel value
   for this mixing chain: with the bed conditioned, EQ-carved, and ducked
-  (all default-on) plus the 1.2 narration lift, −26 keeps the bed felt but
-  never competing (−15 is the masking boundary on phone speakers, −28 the
-  inaudibility boundary under this chain). The music stem is loudness-aligned
+  (all default-on) plus the 1.2 narration lift, −28 keeps the bed felt but
+  never competing, and stays comfortable over a full long-form watch instead
+  of fatiguing the listener (−15 is the masking boundary on phone speakers,
+  −32 the inaudibility boundary under this chain). A punchier or sparser edit
+  can move back up to −26 to −22. The music stem is loudness-aligned
   to the measured narration after its configured gain before the offset
   (`[music-loudnorm]` log line), so the value is a true LU separation whatever
   the track's mastering. The complete voice-plus-music mix is then normalized
   once, in two passes, to −14 LUFS / −1.5 dBTP; `--no-music-loudnorm`
   restores the old raw-offset behavior. An earlier production used −17
   before the loudnorm existed — with a hot-mastered YouTube-rip bed that
-  was effectively ~−16 LU, slightly hot.
+  was effectively ~−16 LU, slightly hot; a later production found even −26
+  fatiguing over a full-length watch and moved the default down to −28.
 - **The bed is conditioned + ducked automatically (all default-on).** Beyond
   the loudness offset, `video-add-bgm` now (a) compresses the music's own
   dynamic range so it sits at a *constant* level instead of swelling and

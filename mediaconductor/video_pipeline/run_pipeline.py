@@ -133,8 +133,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-aligned to the actual joined narration first, so this is "
-                             "a true LU separation; default -26 suits dense recap narration, -20 to -22 sparser "
-                             "voiceover.")
+                             "a true LU separation; default -28 keeps the bed comfortable over a long dense "
+                             "recap, -26 to -22 suits punchier or sparser voiceover.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Apply --music-volume-db without aligning music loudness to the narration first.")
     parser.add_argument("--condition-bed", action=argparse.BooleanOptionalAction, default=True,

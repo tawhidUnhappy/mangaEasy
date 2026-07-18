@@ -61,6 +61,23 @@ events, or visual details. Avoid narrating credits, scanlator notices, and
 purely decorative/SFX panels unless they carry story information. Keep array
 order equal to the intended reading/playback order.
 
+**Voice delivery stays natural — never write toward a scream.** IndexTTS2
+renders scream/shout-intensity `emotion` words ("screaming", "shouting",
+"yelling", "shrieking"...) as actual screaming far more often than not, and
+it reads as broken audio rather than drama, so it is usually wrong for the
+panel anyway. Use a calmer descriptor that still carries the moment —
+`"tense"`, `"urgent"`, `"fearful"`, `"panicked"` — and let the narration
+text, not a shouted delivery, carry the intensity. `work-qa` rejects
+`emotion` fields that use scream/shout words outright.
+
+**Describe sound effects and laughs in prose; never spell them out
+phonetically.** IndexTTS/Kokoro pronounce real words and interjections fine
+("hmm", "huh", ellipses like "even though...") but have no idea how to speak
+"ha ha ha", "gyahahaha", or "aaaargh" — the result is garbled or an
+unintended shout. Write what happened instead: "she laughed", "he let out a
+nervous chuckle", "he screamed in pain". `work-qa` flags narration text that
+still spells out a laugh/scream phonetically, as a reminder to rewrite it.
+
 Run both gates:
 
 ```bash
