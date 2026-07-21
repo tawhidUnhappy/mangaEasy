@@ -55,9 +55,51 @@ Your task is to create narration completely from scratch for the provided manga 
 - Do not summarize entire chapters at once; narrate panel by panel.
 - Never write a punctuation-only line (e.g. `"?!"`) — it produces near-empty,
   unspeakable TTS audio.
-- Avoid ending a line on a bare trailing em dash or hyphen with no closing
-  word (e.g. `"...Ah—"`); use an ellipsis instead for a genuine trail-off,
-  which TTS renders more predictably.
+- Never end a line on a bare trailing em dash or hyphen with no closing word
+  (e.g. `"...Ah—"`). Finish the sentence, or use an ellipsis for a genuine
+  trail-off, which TTS renders more predictably.
+
+### Narrate the emotion, never the stammer
+
+Manga letters a stammer, a cut-off word, or a repeated syllable to *show*
+emotion on the page. Copied into narration this is not emotion, it is a
+defect: TTS re-articulates each fragment as its own word, so the narrator
+sounds broken instead of moved, and the listener hears a glitch. Say what the
+panel means instead.
+
+| Do not write | Write instead |
+| --- | --- |
+| `"Th- This is...?"` | `"He stares, startled by what he is seeing."` |
+| `"I... I guess..."` | `"He agrees, without much confidence."` |
+| `"W... w... well... It is..."` | `"She falters over her own question."` |
+| `"Of... of course."` | `"Of course, he says."` |
+| `"The... the artifact?"` | `"He repeats the word back in surprise."` |
+| `"I... I want... a ribb..."` | `"Hesitantly, she asks for a ribbon."` |
+| `"Huh..."` / `"Um..."` / `"Is that..."` | `"He looks up, confused."` |
+| `"Could she be—"` | `"A suspicion begins to form about who she is."` |
+
+Concretely:
+
+- Never repeat a word for effect (`"I... I"`, `"the... the"`, `"that that"`).
+- Never copy a stammered prefix (`"Th- This"`, `"Cy- Cyril"`). Ordinary
+  hyphenated compounds (`"one-star"`, `"B-rank"`) are fine.
+- Never leave a word cut off mid-spelling (`"a ribb..."`).
+- Never use two ellipses in a row — it renders as a long dead pause.
+- Never leave a bare fragment of three words or fewer trailing on an ellipsis.
+  Every line must carry a beat the listener can follow.
+- One ellipsis inside an otherwise complete sentence is fine for a real pause.
+
+`work-qa` enforces all of this as an error (`narration:fluency`), and the
+TTS/render preflight refuses to build until it is clean.
+
+### Name characters only after the story names them
+
+Do not use a character's name in narration before the moment that name is
+established on the page. If the protagonist gives a dragon its name in panel
+14, every earlier line must call it something neutral — "the dragon", "the
+Child of God", "the immortal being" — even though you already know the name
+from later panels. Naming early quietly spoils the scene and confuses anyone
+watching in order.
 - The narrator is always a calm observer, even when a character screams,
   laughs, cries, fights, or panics. Never imitate the character's volume.
 - Never spell out a laugh, scream, roar, cry, or sound effect (`"ghaha"`,

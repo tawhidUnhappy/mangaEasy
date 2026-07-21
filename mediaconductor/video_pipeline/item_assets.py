@@ -5,7 +5,11 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-from mediaconductor.audio.emotion import emotion_lint, narration_delivery_lint
+from mediaconductor.audio.emotion import (
+    emotion_lint,
+    narration_delivery_lint,
+    narration_fluency_lint,
+)
 from mediaconductor.video_pipeline.common import project_name
 from mediaconductor.video_pipeline.ffmpeg_tools import probe_duration
 
@@ -69,6 +73,9 @@ def validate_calm_narration(entries: list[dict], source: Path) -> None:
         delivery = narration_delivery_lint(text)
         if delivery:
             problems.append(f"{image}: {delivery}")
+        fluency = narration_fluency_lint(text)
+        if fluency:
+            problems.append(f"{image}: {fluency}")
         emotion = emotion_lint(entry)
         if emotion:
             problems.append(f"{image}: {emotion}")

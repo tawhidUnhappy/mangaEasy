@@ -283,6 +283,19 @@ feedback):
 - **Say it aloud.** TTS reads exactly what you write — punctuation-only
   entries like `"?!"` produce a ~0.03 s WAV (`video-check` flags these as
   "unspeakable"); give reaction panels a real line.
+- **Narrate the emotion, never the stammer.** Manga letters a stutter or a
+  cut-off word to show feeling on the page (`"Th- This is...?"`,
+  `"I... I guess..."`, `"W... w... well..."`). Spoken aloud that is not
+  emotion, it is a defect: the voice re-articulates each fragment and the
+  narrator sounds broken. Say what the panel means instead — "he stares,
+  startled", "she answers reluctantly". Same for content-free fragments
+  (`"Huh..."`, `"Um..."`), doubled ellipses, and lines ending on a bare dash.
+  `work-qa` rejects all of these as `narration:fluency`, and the TTS/render
+  preflight refuses to build until they are gone.
+- **Only use a name once the story has given it.** If the protagonist names a
+  dragon on page 14, every earlier line calls it "the dragon" — naming it
+  sooner because you read ahead spoils the scene and confuses viewers watching
+  in order.
 
 Rules that hold across the pipeline:
 

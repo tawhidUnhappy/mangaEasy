@@ -4,6 +4,7 @@ from mediaconductor.audio.emotion import (
     emotion_lint,
     narration_delivery_lint,
     narration_emotion,
+    narration_fluency_lint,
 )
 
 
@@ -96,3 +97,43 @@ def test_narration_delivery_lint_allows_real_words_and_interjections():
     assert narration_delivery_lint("NASA publishes the result in HTML for the MMORPG community.") is None
     assert narration_delivery_lint("US NATO HQ shares a NASA HTML API report.") is None
     assert narration_delivery_lint("") is None
+
+
+def test_narration_fluency_lint_flags_stammered_prefix():
+    assert narration_fluency_lint("Th- This is...?") is not None
+    assert narration_fluency_lint("Cy- Cyril-sama...?") is not None
+
+
+def test_narration_fluency_lint_flags_repeated_word():
+    assert narration_fluency_lint("I... I guess...") is not None
+    assert narration_fluency_lint("The... the artifact?") is not None
+    assert narration_fluency_lint("Of... of course. He agrees.") is not None
+    assert narration_fluency_lint("He said that that was wrong.") is not None
+    assert narration_fluency_lint("W... w... well... It is...") is not None
+
+
+def test_narration_fluency_lint_flags_dead_pauses_and_bare_dashes():
+    assert narration_fluency_lint("I... ...so that was what happened.") is not None
+    assert narration_fluency_lint("Could she be-") is not None
+    assert narration_fluency_lint("The droplet pulses with light—") is not None
+
+
+def test_narration_fluency_lint_flags_contentless_fragments():
+    assert narration_fluency_lint("Huh...") is not None
+    assert narration_fluency_lint("Um...") is not None
+    assert narration_fluency_lint("Is that...") is not None
+    assert narration_fluency_lint("The princess...?") is not None
+
+
+def test_narration_fluency_lint_allows_ordinary_prose():
+    assert narration_fluency_lint("He stares, startled by what he is seeing.") is None
+    assert narration_fluency_lint("She agrees, though without much confidence.") is None
+    # One ellipsis inside a real sentence is a pause, not a stammer.
+    assert narration_fluency_lint("He hesitates... then finally answers her.") is None
+    # Hyphenated compounds are not stammers.
+    assert narration_fluency_lint("He is now a one-star dragon knight.") is None
+    assert narration_fluency_lint("Lindworm keeps several B-rank knights.") is None
+    assert narration_fluency_lint("The dragon stops mid-sentence, clearly shocked.") is None
+    # Legitimate doubled words that are not function-word stammers.
+    assert narration_fluency_lint("She waves and says bye bye now.") is None
+    assert narration_fluency_lint("") is None

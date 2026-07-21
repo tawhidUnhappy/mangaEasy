@@ -178,17 +178,27 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 - **speakers attributed from the panel** (who is on-panel, whose bubble
   tail) — if unsure, narrate without naming;
 - **no punctuation-only lines** (`"?!"` → near-empty TTS audio; video-check
-  flags these as unspeakable); avoid a bare trailing em dash/hyphen with no
-  closing word (`"...Ah—"`) — TTS handles a genuine trail-off more
-  predictably with an ellipsis. Note: an occasional TTS tail-click is a
+  flags these as unspeakable); never end on a bare em dash/hyphen with no
+  closing word (`"...Ah—"`) — finish the sentence, or use an ellipsis for a
+  genuine trail-off. Note: an occasional TTS tail-click is a
   generation-random model artifact seen across ordinary, well-formed lines
   too — `video-fade-audio`'s adaptive declick (see CLAUDE.md) is the actual
   fix, not narration wording;
-- **optional `"emotion"` field** on the few lines that earn it (reveals,
-  battle cries, tearful goodbyes): a 1–3 word phrase like `"tense"` or
-  `"cold, menacing"` that IndexTTS2 blends into the voice — vocabulary and
-  rules in `mediaconductor/assets/prompts/narration.md`; most lines stay neutral
-  (no field).
+- **narrate the emotion, never the stammer** — manga letters a stutter or a
+  cut-off word to show feeling (`"Th- This is...?"`, `"I... I guess..."`,
+  `"W... w... well..."`), but spoken aloud that is a defect, not emotion: the
+  voice re-articulates each fragment and sounds broken. Write what the panel
+  means (`"he stares, startled"`, `"she answers reluctantly"`). Same for
+  content-free fragments (`"Huh..."`, `"Um..."`), two ellipses in a row, and
+  repeated words. `work-qa` rejects these as `narration:fluency` and the
+  TTS/render preflight refuses to build until they are fixed;
+- **no name before the story gives it** — if the hero names a dragon on page
+  14, earlier lines say "the dragon"; naming it sooner spoils the scene;
+- **optional `"emotion"` field** on the few lines that earn it: the value must
+  be **exactly** `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly happy"`
+  — IndexTTS2 renders anything stronger as an actual shouted performance, so
+  high-intensity hints are rejected by QA. Most lines carry no field at all;
+  full rules in `mediaconductor/assets/prompts/narration.md`.
 
 Verify in two passes:
 

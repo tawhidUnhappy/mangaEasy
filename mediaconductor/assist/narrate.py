@@ -30,6 +30,7 @@ from mediaconductor.audio.emotion import (
     SUGGESTED_EMOTIONS,
     emotion_lint,
     narration_delivery_lint,
+    narration_fluency_lint,
     narration_emotion,
 )
 from mediaconductor.brand import CLI_NAME
@@ -153,12 +154,12 @@ def merge_chunk_entries(chunk: list[Path], parsed: dict | None,
             log(f"    [warn] empty narration for {panel.name} — marked for manual narration")
             skipped.append(panel.name)
             continue
-        delivery = narration_delivery_lint(narration)
-        if delivery:
-            # Keep the panel in narration.json so it remains visible on review
-            # sheets. The central TTS/render preflight will refuse to build
-            # until a reviewer rewrites the unsafe draft.
-            log(f"    [warn] {panel.name}: {delivery} - retained for manual rewrite")
+        for problem in (narration_delivery_lint(narration), narration_fluency_lint(narration)):
+            if problem:
+                # Keep the panel in narration.json so it remains visible on
+                # review sheets. The central TTS/render preflight will refuse to
+                # build until a reviewer rewrites the unsafe draft.
+                log(f"    [warn] {panel.name}: {problem} - retained for manual rewrite")
         item: dict = {"image": panel.name, "narration": narration}
         raw_emotion = entry.get("emotion")
         emotion = narration_emotion(entry)
