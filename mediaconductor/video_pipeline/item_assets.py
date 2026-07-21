@@ -5,6 +5,7 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
+from mediaconductor.audio.emotion import emotion_lint, narration_delivery_lint
 from mediaconductor.video_pipeline.common import project_name
 from mediaconductor.video_pipeline.ffmpeg_tools import probe_duration
 
@@ -50,6 +51,35 @@ def load_narration(item_dir: Path) -> list[dict[str, str]]:
             raise ValueError(f"{intro_path} must contain a JSON array.")
         data = intro_data + data
     return data
+
+
+def validate_calm_narration(entries: list[dict], source: Path) -> None:
+    """Reject narration that could produce a loud or exaggerated performance.
+
+    This preflight stays separate from ``load_narration`` so QA can still load
+    unsafe entries and report precise edit commands. Audio and video entry
+    points call it before doing expensive or destructive work.
+    """
+    problems: list[str] = []
+    for index, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        image = entry.get("image") or f"entry {index}"
+        text = str(entry.get("narration") or entry.get("text") or "").strip()
+        delivery = narration_delivery_lint(text)
+        if delivery:
+            problems.append(f"{image}: {delivery}")
+        emotion = emotion_lint(entry)
+        if emotion:
+            problems.append(f"{image}: {emotion}")
+    if problems:
+        details = "\n".join(f"  - {problem}" for problem in problems[:20])
+        more = f"\n  ... and {len(problems) - 20} more" if len(problems) > 20 else ""
+        raise ValueError(
+            f"Narration under {source} violates the calm-narration policy; "
+            "fix narration.json or intro.json before TTS or rendering:\n"
+            f"{details}{more}"
+        )
 
 
 def item_audio_dir(audio_root: Path, project_root: Path, project_name_override: str | None, item_dir: Path) -> Path:

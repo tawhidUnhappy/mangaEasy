@@ -15,6 +15,7 @@ from mediaconductor.video_pipeline.common import (
     item_dirs,
     merge_item_selection,
 )
+from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 
 
 def _default_speaker_wav() -> Path:
@@ -40,7 +41,8 @@ def parse_args() -> argparse.Namespace:
                         help="Strength of per-entry 'emotion' fields in narration.json (IndexTTS2 "
                              "emo_text blending; default 0.6, 0 disables).")
     parser.add_argument("--no-emotion", action="store_true",
-                        help="Ignore narration 'emotion' fields (plain neutral delivery).")
+                        help="Synthesize in a plain neutral delivery. The calm-policy preflight "
+                             "still rejects invalid emotion fields.")
     parser.add_argument("--gpu-workers", type=int, default=1,
                          help="Run this many IndexTTS2 worker processes in parallel, each loading "
                               "its own model copy and handling a separate slice of item folders. "
@@ -61,6 +63,17 @@ def main() -> int:
     args = parse_args()
     args.gpu_workers = clamp_gpu_workers(args.gpu_workers)
     speaker_wav = (args.speaker_wav or _default_speaker_wav()).resolve()
+    project_root = args.project_root.resolve()
+
+    selected = item_dirs(project_root, merge_item_selection(args.items, args.item_range))
+    if not selected:
+        print(f"[FATAL] No item folders found in {project_root}")
+        return 1
+    # Validate the complete selection before any worker can archive audio,
+    # load a model, or generate a shard.
+    for item_dir in selected:
+        narration = load_narration(item_dir)
+        validate_calm_narration(narration, item_dir)
 
     tool_dir = (
         args.index_tts_root.resolve()
@@ -80,7 +93,7 @@ def main() -> int:
         cmd = [
             *python_command(tool_dir),
             str(script),
-            "--project-root", str(args.project_root.resolve()),
+            "--project-root", str(project_root),
             "--audio-root", str(args.audio_root.resolve()),
             "--speaker-wav", str(speaker_wav),
         ]
@@ -107,7 +120,6 @@ def main() -> int:
         result = runtime.run(cmd, cwd=tool_dir, env=env)
         return result.returncode
 
-    selected = item_dirs(args.project_root.resolve(), merge_item_selection(args.items, args.item_range))
     shards = shard_item_names([item.name for item in selected], args.gpu_workers)
     if len(shards) == 1:
         cmd = base_cmd() + ["--items", *shards[0]]

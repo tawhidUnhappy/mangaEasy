@@ -125,7 +125,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
                 f"--set-json '[{{\"image\": \"{image}\", ...}}]'  (fix or drop the emotion field)")
         delivery = narration_delivery_lint(text)
         if delivery:
-            add("info", "narration:delivery", f"{image}: {delivery}",
+            add("error", "narration:delivery", f"{image}: {delivery}",
                 f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
                 f"--set {image} \"<rewritten line>\" --prune-audio")
 

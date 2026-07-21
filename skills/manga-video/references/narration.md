@@ -15,7 +15,7 @@ is optional for IndexTTS; Kokoro ignores it.
   {
     "image": "ch01_001.png",
     "narration": "At the ruined gate, Mina realizes the guards have already fled.",
-    "emotion": "quiet concern"
+    "emotion": "slightly sad"
   },
   {
     "image": "ch01_002.png",
@@ -36,7 +36,10 @@ The effective schema is:
     "properties": {
       "image": {"type": "string", "minLength": 1},
       "narration": {"type": "string", "minLength": 1},
-      "emotion": {"type": "string", "minLength": 1, "maxLength": 60}
+      "emotion": {
+        "type": "string",
+        "enum": ["calm", "neutral", "slightly sad", "slightly happy"]
+      }
     },
     "additionalProperties": true
   }
@@ -61,22 +64,24 @@ events, or visual details. Avoid narrating credits, scanlator notices, and
 purely decorative/SFX panels unless they carry story information. Keep array
 order equal to the intended reading/playback order.
 
-**Voice delivery stays natural — never write toward a scream.** IndexTTS2
-renders scream/shout-intensity `emotion` words ("screaming", "shouting",
-"yelling", "shrieking"...) as actual screaming far more often than not, and
-it reads as broken audio rather than drama, so it is usually wrong for the
-panel anyway. Use a calmer descriptor that still carries the moment —
-`"tense"`, `"urgent"`, `"fearful"`, `"panicked"` — and let the narration
-text, not a shouted delivery, carry the intensity. `work-qa` rejects
-`emotion` fields that use scream/shout words outright.
+**Voice delivery is always restrained.** The narrator remains calm or neutral,
+with only a slight sad or slight happy shift when it materially helps. Omit the
+optional `emotion` field for neutral delivery. If used, its value must be
+exactly `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly happy"`.
+Do not use tense, urgent, fearful, panicked, angry, furious, excited, shocked,
+terrified, scream, shout, or any other high-intensity hint. Describe dramatic
+events accurately while the narrator remains a calm observer. `work-qa`
+rejects every emotion value outside the four-value allowlist, and the TTS
+adapter ignores rejected values even if QA was skipped.
 
-**Describe sound effects and laughs in prose; never spell them out
-phonetically.** IndexTTS/Kokoro pronounce real words and interjections fine
-("hmm", "huh", ellipses like "even though...") but have no idea how to speak
-"ha ha ha", "gyahahaha", or "aaaargh" — the result is garbled or an
-unintended shout. Write what happened instead: "she laughed", "he let out a
-nervous chuckle", "he screamed in pain". `work-qa` flags narration text that
-still spells out a laugh/scream phonetically, as a reminder to rewrite it.
+**Describe sound effects and reactions in prose; never perform them
+phonetically.** IndexTTS/Kokoro pronounce real words and quiet interjections
+fine ("hmm", "huh", ellipses like "even though...") but can garble or shout
+"ghaha", "hahaha", "ha ha ha", "gyahahaha", or "aaaargh". Write what
+happened instead: "he laughed", "she reacted in pain", or "the phoenix let
+out a cry". Do not use exclamation marks, repeated punctuation, or shout-like
+all-caps. `work-qa` treats these delivery violations as blocking errors, and
+the audio/render preflight refuses to proceed if one remains.
 
 Run both gates:
 

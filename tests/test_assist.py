@@ -108,6 +108,32 @@ def test_merge_chunk_entries_survives_unparseable_reply(tmp_path: Path):
     assert entries == [] and skipped == ["a.jpg"] and story == ""
 
 
+def test_merge_chunk_entries_drops_non_calm_model_emotion(tmp_path: Path):
+    panels = _panels(tmp_path, ["a.jpg"])
+    parsed = {
+        "story_so_far": "A phoenix appeared.",
+        "entries": [{"image": "a.jpg", "narration": "The phoenix appears.", "emotion": "excited"}],
+    }
+    warnings: list[str] = []
+    entries, skipped, _ = merge_chunk_entries(panels, parsed, log=warnings.append)
+    assert entries == [{"image": "a.jpg", "narration": "The phoenix appears."}]
+    assert skipped == []
+    assert warnings and "calm-narration policy" in warnings[0]
+
+
+def test_merge_chunk_entries_retains_loud_model_text_for_blocking_review(tmp_path: Path):
+    panels = _panels(tmp_path, ["a.jpg"])
+    parsed = {
+        "story_so_far": "A phoenix appeared.",
+        "entries": [{"image": "a.jpg", "narration": "GHAHA! The phoenix is here."}],
+    }
+    warnings: list[str] = []
+    entries, skipped, _ = merge_chunk_entries(panels, parsed, log=warnings.append)
+    assert entries == [{"image": "a.jpg", "narration": "GHAHA! The phoenix is here."}]
+    assert skipped == []
+    assert warnings and "retained for manual rewrite" in warnings[0]
+
+
 # ── gemma runner helpers ─────────────────────────────────────────────────────
 
 def test_parse_json_reply_handles_fences_and_prose():

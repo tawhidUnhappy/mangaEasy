@@ -10,7 +10,7 @@ from pathlib import Path
 
 from mediaconductor.tools.external import python_command, resolve_tool_dir, tool_env
 from mediaconductor.utils import LazyArchiveRunDir, archive_into_run
-from mediaconductor.video_pipeline.item_assets import load_narration
+from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 from mediaconductor.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_KOKORO_ROOT,
@@ -123,6 +123,7 @@ def build_manifest(
 
     for item_dir in selected_items:
         narration = load_narration(item_dir)
+        validate_calm_narration(narration, item_dir)
         audio_dir = item_audio_dir(args, item_dir)
         audio_dir.mkdir(parents=True, exist_ok=True)
         print(f"\n[{item_dir.name}] {len(narration)} narration item(s)", flush=True)
@@ -247,6 +248,12 @@ def main() -> int:
     selected_items = item_dirs(project_root, merge_item_selection(args.items, args.item_range))
     if not selected_items:
         raise FileNotFoundError(f"No item folders selected under {project_root}")
+
+    # Fail before resume archives or model loading. This protects direct
+    # video-audio calls that did not run work-qa first.
+    for item_dir in selected_items:
+        narration = load_narration(item_dir)
+        validate_calm_narration(narration, item_dir)
 
     if args.device == "cuda":
         print("Audio device: CUDA requested for Kokoro.", flush=True)

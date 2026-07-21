@@ -26,6 +26,12 @@ import json
 from pathlib import Path
 
 from mediaconductor import runtime
+from mediaconductor.audio.emotion import (
+    SUGGESTED_EMOTIONS,
+    emotion_lint,
+    narration_delivery_lint,
+    narration_emotion,
+)
 from mediaconductor.brand import CLI_NAME
 from mediaconductor.runtime import cli_command
 from mediaconductor.utils import emit_result
@@ -42,7 +48,7 @@ _CHUNK_SCHEMA = {
                 "properties": {
                     "image": {"type": "string"},
                     "narration": {"type": "string"},
-                    "emotion": {"type": "string"},
+                    "emotion": {"type": "string", "enum": list(SUGGESTED_EMOTIONS)},
                     "skip": {"type": "boolean"},
                 },
                 "required": ["image"],
@@ -62,17 +68,23 @@ _SYSTEM_TEMPLATE = (
     "- OCR text is evidence for what bubbles say — compare it with the panel "
     "before quoting or paraphrasing; OCR can be wrong.\n"
     "- Keep names, pronouns, relationships, and speaker attribution consistent.\n"
-    "- Write natural spoken prose, 1-2 sentences per panel; vary sentence "
+    "- Write simple, natural spoken prose, 1-2 sentences per panel; vary sentence "
     "openings; no markdown, no quotes around the whole line.\n"
+    "- The narrator is always a calm observer, even during fights, deaths, "
+    "battle cries, shocks, and character outbursts. Convey events through plain "
+    "words, never through a loud performance.\n"
     "- Set \"skip\": true (with empty narration) for scanlator credits, promo "
     "banners, and purely decorative/SFX fragments that carry no story.\n"
-    "- The optional \"emotion\" is a 2-4 word delivery hint (e.g. 'quiet dread'). "
-    "Never use scream/shout words ('screaming', 'shouting', 'yelling', "
-    "'shrieking') — the narrator stays natural; use 'tense', 'urgent', "
-    "'fearful', or 'panicked' instead.\n"
-    "- Never spell out a laugh or scream phonetically ('ha ha ha', 'gyahahaha', "
-    "'aaaargh') — TTS cannot pronounce those. Describe it instead: 'she "
-    "laughed', 'he let out a startled scream'.\n"
+    "- Omit the optional \"emotion\" field for neutral delivery. When a subtle "
+    "tone is genuinely helpful, its value MUST be exactly one of: 'calm', "
+    "'neutral', 'slightly sad', or 'slightly happy'. Never use tense, urgent, "
+    "fearful, panicked, angry, excited, shocked, scream, shout, or any other "
+    "high-intensity delivery hint.\n"
+    "- Never spell out or imitate a laugh, scream, roar, cry, or sound effect "
+    "('ghaha', 'ha ha ha', 'gyahahaha', 'aaaargh'). Describe it calmly in prose: "
+    "'he laughed', 'she reacted in pain', or 'the phoenix let out a cry'.\n"
+    "- Do not use exclamation marks, repeated punctuation, or shout-like ALL "
+    "CAPS. End narration as calm statements.\n"
     "- Return EXACTLY one entry per listed panel, in the given order, with the "
     "exact given image filename.\n\n"
     "{characters}\n"
@@ -141,10 +153,19 @@ def merge_chunk_entries(chunk: list[Path], parsed: dict | None,
             log(f"    [warn] empty narration for {panel.name} — marked for manual narration")
             skipped.append(panel.name)
             continue
+        delivery = narration_delivery_lint(narration)
+        if delivery:
+            # Keep the panel in narration.json so it remains visible on review
+            # sheets. The central TTS/render preflight will refuse to build
+            # until a reviewer rewrites the unsafe draft.
+            log(f"    [warn] {panel.name}: {delivery} - retained for manual rewrite")
         item: dict = {"image": panel.name, "narration": narration}
-        emotion = str(entry.get("emotion") or "").strip()
+        raw_emotion = entry.get("emotion")
+        emotion = narration_emotion(entry)
         if emotion:
-            item["emotion"] = emotion[:60]
+            item["emotion"] = emotion
+        elif raw_emotion:
+            log(f"    [warn] {panel.name}: {emotion_lint(entry)} - emotion omitted")
         entries.append(item)
     return entries, skipped, story
 

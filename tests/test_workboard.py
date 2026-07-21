@@ -177,6 +177,20 @@ def test_qa_reports_problems_with_fix_commands(tmp_path):
     assert all(p["fix"] for p in problems)
 
 
+def test_qa_blocks_loud_narration_delivery(tmp_path):
+    root = tmp_path / "proj"
+    item = make_item(root, panels=1)
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "01_000_01.png", "narration": "GHAHA! The phoenix is here.", "emotion": "excited"},
+    ]), encoding="utf-8")
+    add_audio(tmp_path, "proj", "01", ["01_000_01"])
+
+    problems = qa_item(item, "proj", root, tmp_path / "audio", tmp_path / "out", tmp_path / "work")
+    errors = {(problem["kind"], problem["severity"]) for problem in problems}
+    assert ("narration:emotion", "error") in errors
+    assert ("narration:delivery", "error") in errors
+
+
 def test_qa_clean_item_has_no_errors(tmp_path):
     root = tmp_path / "proj"
     item = make_item(root)
@@ -189,7 +203,7 @@ def test_qa_clean_item_has_no_errors(tmp_path):
 
 
 def test_emotion_field_contract():
-    assert narration_emotion({"emotion": " tense, urgent "}) == "tense, urgent"
+    assert narration_emotion({"emotion": " slightly sad "}) == "slightly sad"
     assert narration_emotion({"narration": "no field"}) is None
     assert narration_emotion({"emotion": 42}) is None
     assert narration_emotion({"emotion": "x" * 61}) is None
@@ -199,8 +213,9 @@ def test_emotion_field_contract():
     assert emotion_lint({"emotion": "x" * 61}) is not None
 
     assert indextts_kwargs(None) == {}
-    kwargs = indextts_kwargs("cold, menacing", 0.5)
-    assert kwargs == {"emo_text": "cold, menacing", "use_emo_text": True, "emo_alpha": 0.5}
+    assert indextts_kwargs("cold, menacing", 0.5) == {}
+    kwargs = indextts_kwargs("slightly happy", 0.5)
+    assert kwargs == {"emo_text": "slightly happy", "use_emo_text": True, "emo_alpha": 0.5}
 
 
 def test_todo_lifecycle_add_start_done_reopen(tmp_path):

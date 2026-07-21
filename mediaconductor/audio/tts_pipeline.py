@@ -32,7 +32,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from mediaconductor.config import HF_CACHE_DIR
 from mediaconductor.utils import LazyArchiveRunDir, archive_into_run
 from mediaconductor.audio.emotion import DEFAULT_EMO_ALPHA, indextts_kwargs, narration_emotion
-from mediaconductor.video_pipeline.item_assets import load_narration
+from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 from mediaconductor.video_pipeline.common import (
     item_dirs,
     merge_item_selection,
@@ -135,7 +135,8 @@ def parse_args() -> argparse.Namespace:
                         help="How strongly a narration entry's optional 'emotion' field colors the "
                              "voice (0 disables, ~0.6 keeps the cloned voice recognizable).")
     parser.add_argument("--no-emotion", action="store_true",
-                        help="Ignore 'emotion' fields entirely (plain neutral delivery).")
+                        help="Synthesize in a plain neutral delivery. The calm-policy preflight "
+                             "still rejects invalid emotion fields.")
     return parser.parse_args()
 
 
@@ -174,6 +175,12 @@ def main() -> int:
     if not selected:
         print(f"[FATAL] No item folders found in {project_root}")
         return 1
+
+    # Fail before resume archives or model loading. This also protects direct
+    # video-audio-indextts calls that did not run work-qa first.
+    for item_dir in selected:
+        narration = load_narration(item_dir)
+        validate_calm_narration(narration, item_dir)
 
     total_chapters = len(selected)
     print(f"MEDIACONDUCTOR_PROGRESS 0/{total_chapters} Generating audio", flush=True)

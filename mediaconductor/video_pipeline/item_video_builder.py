@@ -14,6 +14,7 @@ from mediaconductor.video_pipeline.item_assets import (
     item_narration_path,
     load_narration,
     collect_panel_assets,
+    validate_calm_narration,
 )
 from mediaconductor.video_pipeline.ffmpeg_tools import (
     choose_h264_encoder,
@@ -428,7 +429,9 @@ def _missing_audio(items: list[Path], config: VideoBuildConfig) -> list[str]:
     missing: list[str] = []
     for item_dir in items:
         audio_dir = item_audio_dir(config.audio_root, config.project_root, config.project_name_override, item_dir)
-        for entry in load_narration(item_dir):
+        entries = load_narration(item_dir)
+        validate_calm_narration(entries, item_dir)
+        for entry in entries:
             image_name = entry.get("image") if isinstance(entry, dict) else None
             if not image_name:
                 continue

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -35,6 +36,12 @@ def _invoke(
     audio_root = tmp_path / "audio"
     output_root = tmp_path / "output"
     project_root.mkdir(parents=True)
+    item_dir = project_root / "01"
+    item_dir.mkdir()
+    (item_dir / "narration.json").write_text(
+        json.dumps([{"image": "01_001.png", "narration": "The story begins calmly."}]),
+        encoding="utf-8",
+    )
     long_video = output_root / "Story" / "Story_full.mp4"
     long_video.parent.mkdir(parents=True)
     long_video.write_bytes(b"placeholder")
@@ -187,3 +194,31 @@ def test_item_only_validation_uses_raw_audio_and_render_fps(tmp_path, monkeypatc
         "MEDIACONDUCTOR_PROGRESS 1/2 Starting Validate generated video",
         "MEDIACONDUCTOR_PROGRESS 2/2 Completed Validate generated video",
     ]
+
+
+def test_pipeline_preflight_blocks_before_fade_or_render(tmp_path, monkeypatch):
+    project_root = tmp_path / "library" / "Story"
+    item_dir = project_root / "01"
+    item_dir.mkdir(parents=True)
+    (item_dir / "narration.json").write_text(
+        json.dumps([{"image": "01_001.png", "narration": "GHAHA! The phoenix appears."}]),
+        encoding="utf-8",
+    )
+    commands: list[list[str]] = []
+    monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", tmp_path / "missing.json")
+    monkeypatch.setattr(run_pipeline, "run", lambda command, _cwd: commands.append(list(command)))
+    monkeypatch.setattr(sys, "argv", [
+        "video",
+        "--project-root", str(project_root),
+        "--audio-root", str(tmp_path / "audio"),
+        "--output-root", str(tmp_path / "output"),
+        "--work-dir", str(tmp_path / "work"),
+        "--items", "01",
+        "--skip-audio",
+        "--audio-source", "faded",
+        "--no-background-music",
+        "--no-validate",
+    ])
+    with pytest.raises(ValueError, match="calm-narration policy"):
+        run_pipeline.main()
+    assert commands == []

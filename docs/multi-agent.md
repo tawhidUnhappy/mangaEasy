@@ -187,24 +187,25 @@ Each category comes with its reuse hint — the important ones:
 
 ## Emotion-aware narration (IndexTTS2)
 
-Narration entries may carry an optional `"emotion"` field — a 1–3 word
-natural-language phrase (`"tense"`, `"cold, menacing"`, `"tearful"`) that
-IndexTTS2 blends into the cloned voice for that one line
+Narration entries may carry an optional `"emotion"` field. The calm-narration
+policy accepts only `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly
+happy"`; IndexTTS2 blends that restrained hint into the cloned voice
 (`emo_text`, strength `--emo-alpha`, default 0.6):
 
 ```json
-{"image": "07_013_01.png", "narration": "Time Stop.", "emotion": "cold, menacing"}
+{"image": "07_013_01.png", "narration": "He quietly stops time.", "emotion": "calm"}
 ```
 
 - The vocabulary and usage rules live in
   [../mediaconductor/assets/prompts/narration.md](../mediaconductor/assets/prompts/narration.md):
-  use it sparingly (reveals, battle cries, goodbyes); most lines stay
-  neutral.
+  omit it for normal lines and never use high-intensity delivery hints,
+  phonetic noises, exclamation marks, or shout-like all-caps.
 - Engine-portable: Kokoro simply ignores the field. Older IndexTTS2 builds
   without `emo_text` fall back to neutral delivery with a warning instead of
   failing the run.
 - Tune or disable per run: `mediaconductor video --emo-alpha 0.4` /
-  `--no-emotion`. `work-qa` lints malformed emotion fields.
+  `--no-emotion`. `work-qa` blocks non-calm emotion hints and loud-delivery
+  text before audio generation.
 
 ## MCP
 

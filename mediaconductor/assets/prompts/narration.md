@@ -23,9 +23,9 @@ Your task is to create narration completely from scratch for the provided manga 
 - Panels arrive already cropped and ordered in reading sequence by the toolkit (direction comes from the source language recorded in the project's manga.json). When a single crop contains several bubbles, follow the source's direction (Japanese manga: right-to-left, top-to-bottom; webtoons/manhwa/manhua: left-to-right).
 - Read all speech bubbles, narration boxes, sound effects, expressions, background details, and panel transitions carefully.
 - The narration must be written entirely from scratch, not rewritten from existing text.
-- Write like a professional viral YouTube manga recap narrator.
-- Make the storytelling dramatic, immersive, emotional, and easy to follow.
-- Keep the pacing smooth and dynamic to maximize viewer retention.
+- Write like a clear, professional YouTube manga recap narrator.
+- Keep the storytelling calm, immersive, and easy to follow.
+- Keep the pacing smooth and steady.
 - Add important contextual details, emotions, atmosphere, body language, and action descriptions when relevant.
 - Avoid robotic descriptions and repetitive wording.
 - Avoid excessive use of character names.
@@ -39,7 +39,7 @@ Your task is to create narration completely from scratch for the provided manga 
 1. Accuracy
 2. Clarity
 3. Engagement
-4. Emotional Impact
+4. Calm, consistent delivery
 
 ---
 
@@ -49,7 +49,8 @@ Your task is to create narration completely from scratch for the provided manga 
 - If the speaker is unclear, infer carefully based on context instead of guessing randomly.
 - Keep sentences concise but impactful.
 - Avoid unnecessary filler.
-- Build tension during fights, emotional scenes, reveals, and cliffhangers.
+- Explain tension through the events and wording while keeping the narrator's
+  delivery calm.
 - Do not spoil future events.
 - Do not summarize entire chapters at once; narrate panel by panel.
 - Never write a punctuation-only line (e.g. `"?!"`) — it produces near-empty,
@@ -57,6 +58,13 @@ Your task is to create narration completely from scratch for the provided manga 
 - Avoid ending a line on a bare trailing em dash or hyphen with no closing
   word (e.g. `"...Ah—"`); use an ellipsis instead for a genuine trail-off,
   which TTS renders more predictably.
+- The narrator is always a calm observer, even when a character screams,
+  laughs, cries, fights, or panics. Never imitate the character's volume.
+- Never spell out a laugh, scream, roar, cry, or sound effect (`"ghaha"`,
+  `"hahaha"`, `"ha ha ha"`, `"aaaargh"`). Describe it in calm prose, such as
+  `"he laughed"`, `"she reacted in pain"`, or `"the phoenix let out a cry"`.
+- Do not use exclamation marks, repeated punctuation, or shout-like all-caps
+  phrasing. Write calm statements that normally end with a period.
 
 ---
 
@@ -79,15 +87,12 @@ Each entry may carry an optional `"emotion"` field — a short natural-language
 phrase that colors the voice for that one line (IndexTTS2 blends it into the
 delivery; other engines ignore it):
 
-- Use it **sparingly**, only where the scene clearly calls for it: reveals,
-  deaths, battle cries, tearful goodbyes, menace, whispered plans. Most lines
-  should have **no** emotion field — neutral cinematic narration is the base.
-- Keep it 1–3 words from this tested vocabulary (free text works, this steers
-  best): calm, soft, warm, happy, excited, triumphant, sad, sorrowful,
-  tearful, tense, urgent, fearful, terrified, angry, furious, cold, menacing,
-  surprised, shocked, whispering, solemn.
-- Match the **narrator's** register, not the character's volume: a scream on
-  the page reads as "urgent" or "furious" narration, not literal screaming.
+- Omit it for normal lines; an absent field means neutral delivery.
+- If a subtle shift is genuinely useful, the value must be **exactly one of**:
+  `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly happy"`.
+- Never use tense, urgent, fearful, panicked, angry, furious, excited,
+  triumphant, shocked, terrified, scream, shout, or any other high-intensity
+  delivery hint. Describe the event in the text while the narrator stays calm.
 
 ### Example
 
@@ -95,8 +100,8 @@ delivery; other engines ignore it):
 [
   {
     "image": "1_005_3.png",
-    "narration": "The young warrior freezes in shock as the massive beast suddenly appears behind him, its killing intent filling the entire forest.",
-    "emotion": "tense"
+    "narration": "The young warrior goes still as the massive beast appears behind him.",
+    "emotion": "calm"
   },
   {
     "image": "1_006_1.png",
@@ -109,7 +114,8 @@ delivery; other engines ignore it):
 
 ## Narration Style
 
-- Write in a cinematic manga recap tone.
-- Make scenes feel alive and emotionally engaging.
+- Write in a calm manga recap tone.
+- Make scenes engaging through accurate events and smooth phrasing, not vocal
+  intensity.
 - Use natural narration flow suitable for YouTube voice-over.
 - Keep narration polished, immersive, and binge-watch friendly.

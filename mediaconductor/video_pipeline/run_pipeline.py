@@ -25,9 +25,11 @@ from mediaconductor.video_pipeline.common import (
     DEFAULT_WORK_DIR,
     clamp_gpu_workers,
     find_latest_long_video,
+    item_dirs,
     merge_item_selection,
     project_name,
 )
+from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 
 
 def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
@@ -110,7 +112,8 @@ def parse_args() -> argparse.Namespace:
                         help="IndexTTS only: strength of per-entry narration 'emotion' fields "
                              "(default 0.6; 0 disables). Kokoro ignores emotion fields.")
     parser.add_argument("--no-emotion", action="store_true",
-                        help="IndexTTS only: ignore narration 'emotion' fields.")
+                        help="IndexTTS only: synthesize in a plain neutral delivery. The "
+                             "calm-policy preflight still rejects invalid emotion fields.")
     parser.add_argument("--build-long-video", action="store_true")
     parser.add_argument("--allow-gaps", action="store_true",
                         help="When joining the long video, skip chapters that are genuinely missing "
@@ -231,6 +234,14 @@ def main() -> int:
             return 1
     cwd = Path.cwd()
     selected_items = merge_item_selection(args.items, args.item_range)
+    selected_dirs = item_dirs(args.project_root.resolve(), selected_items)
+    if not selected_dirs:
+        raise FileNotFoundError(f"No item folders selected under {args.project_root.resolve()}")
+    # Run once before audio fades, resume archives, model loads, or rendering.
+    # Individual stages repeat this guard so direct subcommand calls stay safe.
+    for item_dir in selected_dirs:
+        narration = load_narration(item_dir)
+        validate_calm_narration(narration, item_dir)
     background_music = None if args.no_background_music else (args.background_music or default_background_music())
     if args.build_long_video and background_music is None and not args.no_background_music:
         print("[bgm] no configured/default background music found; keeping the long video narration-only.", flush=True)
