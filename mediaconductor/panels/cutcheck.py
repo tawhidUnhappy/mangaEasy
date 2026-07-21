@@ -76,6 +76,27 @@ def parse_forced_cuts(manifest: dict) -> list[int]:
         m = re.match(r"y=(\d+)", str(token))
         if m:
             cuts.append(int(m.group(1)))
+
+    # ``forced_cuts`` records the splitter's original auto-cut candidates so
+    # agents can resolve overrides against stable stitched-strip coordinates.
+    # Once overrides merge one of those boundaries away, however, it is no
+    # longer a cut in the generated panels and must not be presented to crop
+    # QA again.  Otherwise the documented split -> QA -> override loop can
+    # never reach a clean exit: the model keeps reviewing a red line that no
+    # longer exists in ``final``.
+    if manifest.get("overrides_applied") and isinstance(manifest.get("final"), list):
+        final_tops = {
+            int(panel["top"])
+            for panel in manifest["final"]
+            if isinstance(panel, dict) and "top" in panel
+        }
+        final_bottoms = {
+            int(panel["bottom"])
+            for panel in manifest["final"]
+            if isinstance(panel, dict) and "bottom" in panel
+        }
+        live_boundaries = final_tops & final_bottoms
+        cuts = [y for y in cuts if y in live_boundaries]
     return cuts
 
 

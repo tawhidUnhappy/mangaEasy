@@ -66,6 +66,18 @@ def test_is_regular_panel_excludes_hook_and_cta_copies():
 def test_parse_forced_cuts_and_window_bounds():
     assert parse_forced_cuts({"forced_cuts": ["y=123 e=45", "y=9 e=1"]}) == [123, 9]
     assert parse_forced_cuts({}) == []
+
+    overridden = {
+        "overrides_applied": True,
+        "forced_cuts": ["y=100 e=45", "y=250 e=12"],
+        "final": [
+            {"top": 0, "bottom": 200},  # y=100 was merged away
+            {"top": 200, "bottom": 250},
+            {"top": 250, "bottom": 400},  # y=250 is still a real boundary
+        ],
+    }
+    assert parse_forced_cuts(overridden) == [250]
+
     assert window_bounds(100, 200, 5000, 650) == (0, 850)
     assert window_bounds(4900, 4950, 5000, 650) == (4250, 5000)
 
